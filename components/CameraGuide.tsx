@@ -168,7 +168,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       alpha: event.alpha,
       beta: event.beta,
       gamma: event.gamma,
-      absolute: event.absolute === true,
       webkitCompassHeading: event.webkitCompassHeading,
     });
 
@@ -411,7 +410,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             {orientationStatus === "active" ? "Orientation active" : "Activer l'orientation"}
           </button>
           <p className="mt-2 text-xs font-semibold leading-5 text-[#9fa6d9]">
-            Le pointage est recalculé en direct, mais la boussole du téléphone peut rester décalée de quelques degrés.
+            La direction utilise la vraie boussole du navigateur quand elle est disponible. Sinon, suis la direction texte.
           </p>
 
           {orientationStatus === "denied" || orientationStatus === "unsupported" ? (

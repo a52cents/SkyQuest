@@ -20,14 +20,13 @@ export type DeviceOrientationReading = {
   alpha: number | null;
   beta: number | null;
   gamma: number | null;
-  absolute: boolean;
   webkitCompassHeading?: number;
 };
 
 export type CameraPointing = {
   azimuth: number | null;
   altitude: number | null;
-  source: "absolute" | "webkit-compass" | "tilt-only" | "unavailable";
+  source: "webkit-compass" | "tilt-only" | "unavailable";
 };
 
 type Vector3 = [number, number, number];
@@ -125,14 +124,6 @@ export function getCameraPointing(reading: DeviceOrientationReading): CameraPoin
           azimuth: normalizeAngle(horizontal.camera.azimuth + compassOffset),
           altitude: horizontal.camera.altitude,
           source: "webkit-compass",
-        };
-      }
-
-      if (reading.absolute) {
-        return {
-          azimuth: horizontal.camera.azimuth,
-          altitude: horizontal.camera.altitude,
-          source: "absolute",
         };
       }
 
