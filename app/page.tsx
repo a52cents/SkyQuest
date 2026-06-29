@@ -14,6 +14,7 @@ import { QuestCard } from "@/components/QuestCard";
 import { SecureContextNotice } from "@/components/SecureContextNotice";
 import { getInsecureContextMessage, isSecureBrowserContext } from "@/lib/browser-support";
 import { fetchNextIssVisiblePass } from "@/lib/iss";
+import { triggerPopunderAd } from "@/lib/popunder-ad";
 import { generateFutureQuestSuggestions, generateQuests, type FutureQuestSuggestion } from "@/lib/quest-generator";
 import { addObservation, saveActiveQuest, saveLastLocation } from "@/lib/storage";
 import type { SkyQuest } from "@/lib/types";
@@ -75,6 +76,7 @@ export default function HomePage() {
   const [showAllQuests, setShowAllQuests] = useState(false);
 
   async function handleNow() {
+    triggerPopunderAd();
     setState("loading");
     setNotice(null);
     setQuests([]);
@@ -123,6 +125,7 @@ export default function HomePage() {
   }
 
   async function handleFuturePossibilities() {
+    triggerPopunderAd();
     setFutureState("loading");
     setNotice(null);
     setFutureSuggestions([]);

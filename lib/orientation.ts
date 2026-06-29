@@ -79,8 +79,6 @@ function getOrientationRotation(alpha: number, beta: number, gamma: number): num
   const cG = Math.cos(g);
   const sG = Math.sin(g);
   
-  // DeviceOrientation defines intrinsic Z-X'-Y'' rotations. This matrix follows
-  // the W3C algorithm, then we transpose it to map device axes into earth axes.
   return [
     cA * cG - sA * sB * sG,
     -cB * sA,
@@ -117,9 +115,10 @@ export function getCameraPointing(reading: DeviceOrientationReading): CameraPoin
     
     // CORRECTION DU GIMBAL LOCK SUR iOS :
     // webkitCompassHeading suit le bord haut du téléphone.
-    // Quand on lève le téléphone vers le ciel (beta > 90), ce bord bascule vers l'arrière
+    // Quand on lève le téléphone vers le ciel (beta >= 90), ce bord bascule vers l'arrière
     // et sa projection horizontale s'inverse de 180°. On compense en ajoutant 180°.
-    if (typeof reading.beta === "number" && reading.beta > 90) {
+    // On utilise >= 90 pour inclure l'horizon et éviter le saut à 0°.
+    if (typeof reading.beta === "number" && reading.beta >= 90) {
       azimuth = normalizeAngle(compassHeading + 180);
     }
     
