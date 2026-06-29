@@ -27,6 +27,30 @@ type OrientationPermissionEvent = typeof DeviceOrientationEvent & {
   requestPermission?: (absolute?: boolean) => Promise<PermissionState>;
 };
 
+function getDirectionArrow(delta: number | null): string {
+  if (delta === null) {
+    return "—";
+  }
+
+  if (Math.abs(delta) <= 15) {
+    return "◎";
+  }
+
+  return delta > 0 ? "→" : "←";
+}
+
+function getAltitudeArrow(delta: number | null): string {
+  if (delta === null) {
+    return "—";
+  }
+
+  if (Math.abs(delta) <= 10) {
+    return "◎";
+  }
+
+  return delta > 0 ? "↑" : "↓";
+}
+
 export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -172,16 +196,14 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const directionDelta = quest.azimuth !== null && currentAzimuth !== null
     ? angleDifference(currentAzimuth, quest.azimuth)
     : null;
-  const directionDeltaLabel = directionDelta !== null
-    ? `${Math.abs(Math.round(directionDelta))}° ${directionDelta > 0 ? "à droite" : directionDelta < 0 ? "à gauche" : "pile en face"}`
-    : "Active l'orientation";
   const altitudeDelta = quest.altitude !== null && currentAltitude !== null
     ? quest.altitude - currentAltitude
     : null;
   const targetSummary = `${quest.cardinalDirection ?? "zone libre"}${quest.altitude !== null ? ` · ${Math.round(quest.altitude)}°` : ""}`;
-  const cameraSummary = currentAltitude !== null && altitudeDelta !== null
-    ? `Cam. ${Math.round(currentAltitude)}° · ${Math.abs(Math.round(altitudeDelta))}° ${altitudeDelta > 0 ? "plus haut" : altitudeDelta < 0 ? "plus bas" : "pile"}`
-    : "Caméra: inclinaison inactive";
+  const directionArrow = getDirectionArrow(directionDelta);
+  const altitudeArrow = getAltitudeArrow(altitudeDelta);
+  const directionArrowLabel = directionDelta !== null ? `${directionArrow} ${Math.abs(Math.round(directionDelta))}°` : "—";
+  const altitudeArrowLabel = altitudeDelta !== null ? `${altitudeArrow} ${Math.abs(Math.round(altitudeDelta))}°` : "—";
   const currentPhoneDirection = currentAzimuth !== null ? azimuthToCardinal(currentAzimuth) : "Inconnu";
   const isSunTest = quest.target === "SunTest";
   const hasPrecisePoint = quest.azimuth !== null && quest.altitude !== null;
@@ -224,8 +246,11 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
                     </p>
                   </div>
                 </div>
-                <p className="mt-2 text-xs font-bold text-[#d8dcff] sm:hidden">{directionDeltaLabel}</p>
-                <p className="mt-1 text-xs font-semibold text-[#9aeaff] sm:hidden">{cameraSummary}</p>
+                <div className="mt-2 flex flex-wrap gap-2 sm:hidden">
+                  <span className="rounded-full bg-white/[0.08] px-3 py-1 text-sm font-black text-white">{directionArrowLabel}</span>
+                  <span className="rounded-full bg-[#38d5ff]/12 px-3 py-1 text-sm font-black text-[#d7f8ff]">{altitudeArrowLabel}</span>
+                </div>
+                <p className="mt-1 text-xs font-semibold text-[#9aeaff] sm:hidden">{currentAltitude !== null ? `Cam. ${Math.round(currentAltitude)}°` : "Inclinaison inactive"}</p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <button
@@ -254,6 +279,15 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
         {showHud && hasPrecisePoint ? (
           <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
+            <div className="absolute -top-20 rounded-full border border-white/10 bg-[#050610]/55 px-5 py-2 text-5xl font-black text-[#d7f8ff] shadow-[0_0_40px_rgba(56,213,255,0.24)] backdrop-blur-xl">
+              {altitudeArrow}
+            </div>
+            <div className="absolute -left-24 rounded-full border border-white/10 bg-[#050610]/55 px-5 py-2 text-5xl font-black text-white shadow-[0_0_40px_rgba(124,92,255,0.22)] backdrop-blur-xl">
+              {directionArrow === "←" ? "←" : ""}
+            </div>
+            <div className="absolute -right-24 rounded-full border border-white/10 bg-[#050610]/55 px-5 py-2 text-5xl font-black text-white shadow-[0_0_40px_rgba(124,92,255,0.22)] backdrop-blur-xl">
+              {directionArrow === "→" ? "→" : ""}
+            </div>
             <div className="h-28 w-28 rounded-full border border-[#38d5ff]/55 bg-[#38d5ff]/10 shadow-[0_0_60px_rgba(56,213,255,0.22)]" />
             <div className="absolute h-2 w-2 rounded-full bg-[#38d5ff]" />
           </div>
@@ -301,7 +335,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             </div>
             <div className="rounded-[18px] border border-white/10 bg-white/[0.06] p-3">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8ea0ff]">Écart horizontal</p>
-              <p className="mt-1 text-lg font-black">{directionDeltaLabel}</p>
+              <p className="mt-1 text-3xl font-black">{directionArrowLabel}</p>
               <p className="mt-1 text-sm font-semibold text-[#cbd0ff]">Vise jusqu&apos;à 0°</p>
             </div>
             <div className="rounded-[18px] border border-white/10 bg-white/[0.06] p-3">
@@ -310,7 +344,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
                 {currentAltitude !== null ? `${Math.round(currentAltitude)}°` : "Inconnu"}
               </p>
               <p className="mt-1 text-sm font-semibold text-[#cbd0ff]">
-                {altitudeDelta !== null ? `${Math.abs(Math.round(altitudeDelta))}° ${altitudeDelta > 0 ? "plus haut" : altitudeDelta < 0 ? "plus bas" : "pile"}` : "Inclinaison inactive"}
+                {altitudeArrowLabel}
               </p>
             </div>
           </div>
