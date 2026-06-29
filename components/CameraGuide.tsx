@@ -163,18 +163,17 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     return "Caméra indisponible. Tu peux quand même suivre la direction indiquée.";
   }
 
-  function handleOrientation(event: CompassEvent) {
+   function handleOrientation(event: CompassEvent) {
     const pointing = getCameraPointing({
       alpha: event.alpha,
       beta: event.beta,
       gamma: event.gamma,
+      absolute: event.absolute === true, // <-- LIGNE RESTAURÉE ICI
       webkitCompassHeading: event.webkitCompassHeading,
     });
-
     if (pointing.azimuth !== null) {
       setCurrentAzimuth(pointing.azimuth);
     }
-
     if (pointing.altitude !== null) {
       setCurrentAltitude(pointing.altitude);
     }

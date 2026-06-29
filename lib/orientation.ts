@@ -20,16 +20,18 @@ export type DeviceOrientationReading = {
   alpha: number | null;
   beta: number | null;
   gamma: number | null;
+  absolute: boolean; // Restauré pour Android
   webkitCompassHeading?: number;
 };
 
 export type CameraPointing = {
   azimuth: number | null;
   altitude: number | null;
-  source: "webkit-compass" | "tilt-only" | "unavailable";
+  source: "absolute" | "webkit-compass" | "tilt-only" | "unavailable"; // Restauré "absolute"
 };
 
 type Vector3 = [number, number, number];
+
 type FullOrientationReading = {
   alpha: number;
   beta: number;
@@ -37,21 +39,19 @@ type FullOrientationReading = {
 };
 
 function degreesToRadians(degrees: number): number {
-  return degrees * Math.PI / 180;
+  return (degrees * Math.PI) / 180;
 }
 
 function radiansToDegrees(radians: number): number {
-  return radians * 180 / Math.PI;
+  return (radians * 180) / Math.PI;
 }
 
 function vectorToHorizontal(vector: Vector3): { azimuth: number; altitude: number } | null {
   const [east, north, up] = vector;
   const length = Math.hypot(east, north, up);
-
   if (length === 0) {
     return null;
   }
-
   return {
     azimuth: normalizeAngle(radiansToDegrees(Math.atan2(east, north))),
     altitude: Math.max(-90, Math.min(90, radiansToDegrees(Math.asin(up / length)))),
@@ -76,7 +76,7 @@ function getOrientationRotation(alpha: number, beta: number, gamma: number): num
   const sB = Math.sin(b);
   const cG = Math.cos(g);
   const sG = Math.sin(g);
-
+  
   // DeviceOrientation defines intrinsic Z-X'-Y'' rotations. This matrix follows
   // the W3C algorithm, then we transpose it to map device axes into earth axes.
   return [
@@ -97,7 +97,6 @@ function getBackCameraHorizontal(reading: FullOrientationReading): {
   top: { azimuth: number; altitude: number } | null;
 } {
   const rotation = getOrientationRotation(reading.alpha, reading.beta, reading.gamma);
-
   return {
     camera: vectorToHorizontal(deviceToEarthVector(rotation, [0, 0, -1])),
     top: vectorToHorizontal(deviceToEarthVector(rotation, [0, 1, 0])),
@@ -105,75 +104,72 @@ function getBackCameraHorizontal(reading: FullOrientationReading): {
 }
 
 export function getCameraPointing(reading: DeviceOrientationReading): CameraPointing {
-  const compassHeading = typeof reading.webkitCompassHeading === "number"
-    ? normalizeAngle(reading.webkitCompassHeading)
-    : null;
+  const compassHeading =
+    typeof reading.webkitCompassHeading === "number"
+      ? normalizeAngle(reading.webkitCompassHeading)
+      : null;
 
-  if (typeof reading.alpha === "number" && typeof reading.beta === "number" && typeof reading.gamma === "number") {
+  // 1) iOS : webkitCompassHeading est déjà le cap absolu de la caméra arrière.
+  // On l'utilise directement pour l'azimut, et beta pour l'altitude. Fini la fusion bancale.
+  if (compassHeading !== null) {
+    const altitude = typeof reading.beta === "number" ? betaToCameraAltitude(reading.beta) : null;
+    return {
+      azimuth: compassHeading,
+      altitude,
+      source: "webkit-compass",
+    };
+  }
+
+  // 2) Android / Chrome : deviceorientationabsolute fournit un alpha vrai par rapport au Nord.
+  if (reading.absolute && typeof reading.alpha === "number" && typeof reading.beta === "number" && typeof reading.gamma === "number") {
     const horizontal = getBackCameraHorizontal({
       alpha: reading.alpha,
       beta: reading.beta,
       gamma: reading.gamma,
     });
-
     if (horizontal.camera) {
-      if (compassHeading !== null && horizontal.top) {
-        const compassOffset = angleDifference(horizontal.top.azimuth, compassHeading);
-
-        return {
-          azimuth: normalizeAngle(horizontal.camera.azimuth + compassOffset),
-          altitude: horizontal.camera.altitude,
-          source: "webkit-compass",
-        };
-      }
-
       return {
-        azimuth: null,
+        azimuth: horizontal.camera.azimuth,
         altitude: horizontal.camera.altitude,
-        source: "tilt-only",
+        source: "absolute",
       };
     }
   }
 
+  // 3) Fallback : on n'a pas de boussole fiable, juste l'inclinaison (beta)
   if (typeof reading.beta === "number") {
     return {
-      azimuth: compassHeading,
+      azimuth: null,
       altitude: betaToCameraAltitude(reading.beta),
-      source: compassHeading === null ? "tilt-only" : "webkit-compass",
+      source: "tilt-only",
     };
   }
 
   return {
-    azimuth: compassHeading,
+    azimuth: null,
     altitude: null,
-    source: compassHeading === null ? "unavailable" : "webkit-compass",
+    source: "unavailable",
   };
 }
 
 export function getDirectionHint(currentAzimuth: number, targetAzimuth: number): string {
   const diff = angleDifference(currentAzimuth, targetAzimuth);
-
   if (diff > 15) {
     return "Tourne à droite";
   }
-
   if (diff < -15) {
     return "Tourne à gauche";
   }
-
   return "Bonne direction";
 }
 
 export function getAltitudeHint(currentPitch: number, targetAltitude: number): string {
   const diff = targetAltitude - currentPitch;
-
   if (diff > 10) {
     return "Lève un peu le téléphone";
   }
-
   if (diff < -10) {
     return "Baisse un peu le téléphone";
   }
-
   return "Hauteur proche";
 }
