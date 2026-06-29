@@ -77,8 +77,8 @@ function createQuest(object: SkyObject, score: number, now: Date): SkyQuest {
     targetType: object.name === "Moon" ? "moon" : "planet",
     title: object.name === "Moon" ? "Trouve la Lune" : `Repère ${objectLabels[object.name]}`,
     difficulty: getDifficulty(object),
-    azimuth: Math.round(object.azimuth),
-    altitude: Math.round(object.altitude),
+    azimuth: object.azimuth,
+    altitude: object.altitude,
     cardinalDirection: azimuthToCardinal(object.azimuth),
     visibilityScore: score,
     visibilityLabel: getVisibilityLabel(score),
@@ -115,8 +115,8 @@ function createSunTestQuest(latitude: number, longitude: number, now: Date): Sky
     targetType: "star",
     title: "Test guidage : direction du Soleil",
     difficulty: "easy",
-    azimuth: Math.round(sunPosition.azimuth),
-    altitude: Math.round(sunPosition.altitude),
+    azimuth: sunPosition.azimuth,
+    altitude: sunPosition.altitude,
     cardinalDirection: azimuthToCardinal(sunPosition.azimuth),
     visibilityScore: 100,
     visibilityLabel: "Calibration",
@@ -146,8 +146,8 @@ function createCatalogQuest({
     targetType: object.type === "meteor_shower" ? "meteor_shower" : object.type,
     title: object.questTitle,
     difficulty: object.difficulty === "easy" ? "easy" : "medium",
-    azimuth: Math.round(azimuth),
-    altitude: Math.round(altitude),
+    azimuth,
+    altitude,
     cardinalDirection: azimuthToCardinal(azimuth),
     visibilityScore: score,
     visibilityLabel: getVisibilityLabel(score),
@@ -198,8 +198,8 @@ function createIssQuest(pass: IssVisiblePass, score: number, now: Date): SkyQues
     targetType: "satellite",
     title: "Repère l'ISS",
     difficulty: "easy",
-    azimuth: Math.round(pass.maxAzimuth),
-    altitude: Math.round(pass.maxElevation),
+    azimuth: pass.maxAzimuth,
+    altitude: pass.maxElevation,
     cardinalDirection: azimuthToCardinal(pass.maxAzimuth),
     visibilityScore: score,
     visibilityLabel: getVisibilityLabel(score),
@@ -414,4 +414,48 @@ export function generateFutureQuestSuggestions({
   }
 
   return suggestions;
+}
+
+export function recalculateQuestPosition({
+  quest,
+  latitude,
+  longitude,
+  now,
+}: {
+  quest: SkyQuest;
+  latitude: number;
+  longitude: number;
+  now: Date;
+}): SkyQuest {
+  let position: { azimuth: number; altitude: number } | null = null;
+
+  if (quest.target === "SunTest") {
+    position = getSunPosition(latitude, longitude, now);
+  } else if (quest.targetType === "moon" || quest.targetType === "planet") {
+    const object = getSkyObjects(latitude, longitude, now).find((skyObject) => skyObject.name === quest.target);
+    position = object ? { azimuth: object.azimuth, altitude: object.altitude } : null;
+  } else if (quest.targetType !== "satellite" && quest.targetType !== "meteor_shower" && quest.targetType !== "free_observation") {
+    const object = catalogSkyObjects.find((catalogObject) => catalogObject.id === quest.target);
+
+    if (object && typeof object.rightAscensionHours === "number" && typeof object.declinationDegrees === "number") {
+      position = equatorialToHorizontal({
+        rightAscensionHours: object.rightAscensionHours,
+        declinationDegrees: object.declinationDegrees,
+        latitude,
+        longitude,
+        date: now,
+      });
+    }
+  }
+
+  if (!position) {
+    return quest;
+  }
+
+  return {
+    ...quest,
+    azimuth: position.azimuth,
+    altitude: position.altitude,
+    cardinalDirection: azimuthToCardinal(position.azimuth),
+  };
 }

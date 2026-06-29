@@ -269,7 +269,7 @@ export default function HomePage() {
                       <div className="mt-3 flex flex-wrap gap-2 text-sm font-semibold text-[#d8dcff]">
                         <span className="rounded-full bg-white/[0.06] px-3 py-1">{suggestion.quest.cardinalDirection ?? "Zone sombre"}</span>
                         <span className="rounded-full bg-white/[0.06] px-3 py-1">
-                          {suggestion.quest.altitude !== null ? `${suggestion.quest.altitude}°` : "Pas de cible précise"}
+                          {suggestion.quest.altitude !== null ? `${Math.round(suggestion.quest.altitude)}°` : "Pas de cible précise"}
                         </span>
                       </div>
                     </article>
