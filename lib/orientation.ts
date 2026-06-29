@@ -22,14 +22,14 @@ export type DeviceOrientationReading = {
   alpha: number | null;
   beta: number | null;
   gamma: number | null;
-  absolute: boolean; // Restauré pour Android
+  absolute: boolean;
   webkitCompassHeading?: number;
 };
 
 export type CameraPointing = {
   azimuth: number | null;
   altitude: number | null;
-  source: "absolute" | "webkit-compass" | "tilt-only" | "unavailable"; // Restauré "absolute"
+  source: "absolute" | "webkit-compass" | "tilt-only" | "unavailable";
 };
 
 type Vector3 = [number, number, number];
@@ -112,7 +112,6 @@ export function getCameraPointing(reading: DeviceOrientationReading): CameraPoin
       : null;
 
   // 1) iOS : webkitCompassHeading est déjà le cap absolu de la caméra arrière.
-  // On l'utilise directement pour l'azimut, et beta pour l'altitude. Fini la fusion bancale.
   if (compassHeading !== null) {
     const altitude = typeof reading.beta === "number" ? betaToCameraAltitude(reading.beta) : null;
     return {
