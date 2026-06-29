@@ -75,8 +75,11 @@ export function getVisibilityLabel(score: number): VisibilityLabel {
   return "Pas conseillé";
 }
 
-function isNight(weather: WeatherNow, sunAltitude: number): boolean {
-  return !weather.isDay && sunAltitude <= -3;
+function isDarkEnoughForStars(weather: WeatherNow, sunAltitude: number): boolean {
+  // Beginner-friendly star/constellation quests need a genuinely darkening sky.
+  // Civil twilight (-3°) is still too bright for reliable naked-eye guidance,
+  // so catalog objects wait until the Sun is at least 8° below the horizon.
+  return !weather.isDay && sunAltitude <= -8;
 }
 
 function getCloudPenalty(cloudCover: number): number {
@@ -130,7 +133,7 @@ export function calculateCatalogVisibilityScore({
   sunAltitude: number;
   now: Date;
 }): number {
-  if (altitude < 10 || !object.franceFriendly || !isNight(weather, sunAltitude)) {
+  if (altitude < 10 || !object.franceFriendly || !isDarkEnoughForStars(weather, sunAltitude)) {
     return 0;
   }
 
@@ -183,7 +186,7 @@ export function calculateMeteorShowerVisibilityScore({
   sunAltitude: number;
   nearPeak: boolean;
 }): number {
-  if (!isNight(weather, sunAltitude)) {
+  if (!isDarkEnoughForStars(weather, sunAltitude)) {
     return 0;
   }
 
