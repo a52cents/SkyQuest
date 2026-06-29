@@ -59,6 +59,10 @@ export function calculateVisibilityScore({ object, weather, sunAltitude }: Visib
     score += 4;
   }
 
+  if (object.name === "Moon" && object.altitude >= 10 && weather.cloudCover < 50 && !daylight) {
+    score += 8;
+  }
+
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 

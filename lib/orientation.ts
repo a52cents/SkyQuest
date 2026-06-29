@@ -109,24 +109,46 @@ export function getCameraPointing(reading: DeviceOrientationReading): CameraPoin
       ? normalizeAngle(reading.webkitCompassHeading)
       : null;
 
-  // 1) iOS : webkitCompassHeading est la boussole native.
+  // 1) iOS : webkitCompassHeading combiné à la matrice 3D pour la précision maximale
+  if (compassHeading !== null && typeof reading.beta === "number" && typeof reading.gamma === "number") {
+    let c = compassHeading;
+    
+    // CORRECTION DU GIMBAL LOCK iOS :
+    // iOS inverse la boussole de 180° au-delà de 45° d'altitude (beta >= 135).
+    if (reading.beta >= 135) {
+      c = normalizeAngle(c + 180);
+    }
+    
+    // On convertit la boussole en radians
+    const sC = Math.sin(degreesToRadians(c));
+    const cC = Math.cos(degreesToRadians(c));
+    const sB = Math.sin(degreesToRadians(reading.beta));
+    const cB = Math.cos(degreesToRadians(reading.beta));
+    const sG = Math.sin(degreesToRadians(reading.gamma));
+    const cG = Math.cos(degreesToRadians(reading.gamma));
+    
+    // Calcul du vecteur caméra arrière (-Z) dans le repère Terre (Est, Nord, Haut)
+    // en injectant la boussole iOS dans la matrice W3C (alpha = -compassHeading)
+    const east = -(cC * sG - cG * sC * sB);
+    const north = sC * sG + cC * cG * sB;
+    const up = -cB * cG;
+    
+    const length = Math.hypot(east, north, up);
+    if (length > 0) {
+      const azimuth = normalizeAngle(radiansToDegrees(Math.atan2(east, north)));
+      const altitude = Math.max(-90, Math.min(90, radiansToDegrees(Math.asin(up / length))));
+      return { azimuth, altitude, source: "webkit-compass" };
+    }
+  }
+
+  // Fallback iOS simple si gamma manque
   if (compassHeading !== null) {
     let azimuth = compassHeading;
-    
-    // CORRECTION DU GIMBAL LOCK SUR iOS :
-    // Sur iOS, webkitCompassHeading saute de 180° uniquement quand on lève le téléphone 
-    // au-dessus de 45° (ce qui correspond à un angle beta >= 135).
-    // On compense en ajoutant 180° SEULEMENT dans cette zone spécifique.
     if (typeof reading.beta === "number" && reading.beta >= 135) {
       azimuth = normalizeAngle(compassHeading + 180);
     }
-    
     const altitude = typeof reading.beta === "number" ? betaToCameraAltitude(reading.beta) : null;
-    return {
-      azimuth,
-      altitude,
-      source: "webkit-compass",
-    };
+    return { azimuth, altitude, source: "webkit-compass" };
   }
 
   // 2) Android / Chrome : deviceorientationabsolute fournit un alpha vrai par rapport au Nord.

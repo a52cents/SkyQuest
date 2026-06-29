@@ -338,7 +338,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const altitudeTone = altitudeAligned
     ? "border-success/35 bg-success/16 text-success"
     : "border-brand-border bg-white/[0.07] text-white";
-  const isSunTest = liveQuest.target === "SunTest";
   const hasPrecisePoint = liveQuest.azimuth !== null && liveQuest.altitude !== null;
 
   return (
@@ -416,11 +415,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               Orientation approximative : regarde vers {liveQuest.cardinalDirection ?? "le ciel"}
               {liveQuest.altitude !== null ? `, environ ${Math.round(liveQuest.altitude)}° au-dessus de l'horizon.` : "."}
             </p>
-            {isSunTest ? (
-              <p className="mt-3 rounded-[14px] border border-warning/25 bg-warning/10 px-3 py-2 text-xs font-bold leading-5 text-warning sm:text-sm">
-                Test uniquement : ne regarde jamais directement le Soleil. Utilise l&apos;écran comme repère.
-              </p>
-            ) : null}
           </AppCard>
         ) : <div />}
 

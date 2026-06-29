@@ -1,4 +1,4 @@
-import { equatorialToHorizontal, getSkyObjects, getSunAltitude, getSunPosition } from "@/lib/astro";
+import { equatorialToHorizontal, getSkyObjects, getSunAltitude } from "@/lib/astro";
 import type { IssVisiblePass } from "@/lib/iss";
 import { isMeteorShowerActive, isNearMeteorShowerPeak, meteorShowers } from "@/lib/meteor-showers";
 import { azimuthToCardinal } from "@/lib/orientation";
@@ -17,7 +17,6 @@ type GenerateQuestsInput = {
   weather: WeatherNow;
   now: Date;
   issPass?: IssVisiblePass | null;
-  includeSunTest?: boolean;
   limit?: number;
 };
 
@@ -103,27 +102,6 @@ function createFreeObservationQuest(now: Date): SkyQuest {
     description: "Le ciel n'est pas idéal maintenant. Observe la zone la plus dégagée et note ce que tu vois.",
     tip: "Choisis un point sombre, laisse tes yeux s'habituer, puis regarde lentement du Nord au Sud.",
     requiredGear: "naked_eye",
-  };
-}
-
-function createSunTestQuest(latitude: number, longitude: number, now: Date): SkyQuest {
-  const sunPosition = getSunPosition(latitude, longitude, now);
-
-  return {
-    id: `sun-test-${now.getTime()}`,
-    target: "SunTest",
-    targetType: "star",
-    title: "Test guidage : direction du Soleil",
-    difficulty: "easy",
-    azimuth: sunPosition.azimuth,
-    altitude: sunPosition.altitude,
-    cardinalDirection: azimuthToCardinal(sunPosition.azimuth),
-    visibilityScore: 100,
-    visibilityLabel: "Calibration",
-    description: "Mission de test pour vérifier la boussole et l'altitude du téléphone. Ne regarde jamais directement le Soleil.",
-    tip: "Utilise seulement l'écran pour tester le guidage. Ne fixe pas le Soleil à l'oeil nu, même brièvement.",
-    requiredGear: "naked_eye",
-    warning: "Test uniquement : ne regarde jamais directement le Soleil.",
   };
 }
 
@@ -276,7 +254,6 @@ export function generateQuests({
   weather,
   now,
   issPass,
-  includeSunTest = true,
   limit = 8,
 }: GenerateQuestsInput): SkyQuest[] {
   if (latitude === null || longitude === null) {
@@ -364,10 +341,10 @@ export function generateQuests({
     const selected = selectQuestCandidates(candidates, limit);
 
     if (selected.length === 0) {
-      return includeSunTest ? [createSunTestQuest(latitude, longitude, now), createFreeObservationQuest(now)] : [createFreeObservationQuest(now)];
+      return [createFreeObservationQuest(now)];
     }
 
-    return includeSunTest ? [createSunTestQuest(latitude, longitude, now), ...selected] : selected;
+    return selected;
   } catch {
     return [createFreeObservationQuest(now)];
   }
@@ -397,7 +374,6 @@ export function generateFutureQuestSuggestions({
       weather,
       now: date,
       issPass: isIssPassNearTime(issPass, date) ? issPass : null,
-      includeSunTest: false,
       limit: 3,
     }).filter((quest) => quest.targetType !== "free_observation");
 
@@ -429,9 +405,7 @@ export function recalculateQuestPosition({
 }): SkyQuest {
   let position: { azimuth: number; altitude: number } | null = null;
 
-  if (quest.target === "SunTest") {
-    position = getSunPosition(latitude, longitude, now);
-  } else if (quest.targetType === "moon" || quest.targetType === "planet") {
+  if (quest.targetType === "moon" || quest.targetType === "planet") {
     const object = getSkyObjects(latitude, longitude, now).find((skyObject) => skyObject.name === quest.target);
     position = object ? { azimuth: object.azimuth, altitude: object.altitude } : null;
   } else if (quest.targetType !== "satellite" && quest.targetType !== "meteor_shower" && quest.targetType !== "free_observation") {
