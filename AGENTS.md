@@ -85,7 +85,7 @@ Le produit doit rester une experience guidee simple : `Maintenant -> quoi regard
 - Pas de reconnaissance automatique des photos.
 - Pas de carte du ciel complete.
 - Pas de notifications push.
-- Pas de passage ISS en v0.
+
 
 ## Roadmap future
 
@@ -95,4 +95,4 @@ Le produit doit rester une experience guidee simple : `Maintenant -> quoi regard
 - v0.3 : compte utilisateur optionnel.
 - v0.4 : module AR 3D remplacant `CameraGuide`.
 - v0.4 : WebXR ou integration native si PWA insuffisante.
-- v0.5 : objets supplementaires, ISS, constellations guidees, calendrier d'evenements.
+

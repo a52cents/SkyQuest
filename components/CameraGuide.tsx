@@ -184,6 +184,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     : "Caméra: inclinaison inactive";
   const currentPhoneDirection = currentAzimuth !== null ? azimuthToCardinal(currentAzimuth) : "Inconnu";
   const isSunTest = quest.target === "SunTest";
+  const hasPrecisePoint = quest.azimuth !== null && quest.altitude !== null;
 
   return (
     <main className="relative min-h-[100dvh] overflow-hidden bg-[#050610] text-white">
@@ -251,7 +252,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
           </header>
         ) : <div />}
 
-        {showHud ? (
+        {showHud && hasPrecisePoint ? (
           <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
             <div className="h-28 w-28 rounded-full border border-[#38d5ff]/55 bg-[#38d5ff]/10 shadow-[0_0_60px_rgba(56,213,255,0.22)]" />
             <div className="absolute h-2 w-2 rounded-full bg-[#38d5ff]" />

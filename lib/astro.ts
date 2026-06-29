@@ -49,6 +49,28 @@ export function getSkyObjects(latitude: number, longitude: number, date: Date): 
   });
 }
 
+export function equatorialToHorizontal({
+  rightAscensionHours,
+  declinationDegrees,
+  latitude,
+  longitude,
+  date,
+}: {
+  rightAscensionHours: number;
+  declinationDegrees: number;
+  latitude: number;
+  longitude: number;
+  date: Date;
+}): { altitude: number; azimuth: number } {
+  const observer = new Astronomy.Observer(latitude, longitude, 0);
+  const horizon = Astronomy.Horizon(date, observer, rightAscensionHours, declinationDegrees, "normal");
+
+  return {
+    altitude: horizon.altitude,
+    azimuth: horizon.azimuth,
+  };
+}
+
 export function getSunAltitude(latitude: number, longitude: number, date: Date): number {
   return getSunPosition(latitude, longitude, date).altitude;
 }

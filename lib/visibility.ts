@@ -1,4 +1,5 @@
 import type { SkyObject, VisibilityLabel, WeatherNow } from "@/lib/types";
+import type { CatalogSkyObject } from "@/lib/sky-catalog";
 
 type VisibilityInput = {
   object: SkyObject;
@@ -72,4 +73,122 @@ export function getVisibilityLabel(score: number): VisibilityLabel {
     return "Tentable";
   }
   return "Pas conseillé";
+}
+
+function isNight(weather: WeatherNow, sunAltitude: number): boolean {
+  return !weather.isDay && sunAltitude <= -3;
+}
+
+function getCloudPenalty(cloudCover: number): number {
+  if (cloudCover > 80) {
+    return -42;
+  }
+  if (cloudCover >= 50) {
+    return -22;
+  }
+  if (cloudCover < 30) {
+    return 10;
+  }
+  return 0;
+}
+
+function getSeasonBonus(objectId: string, date: Date): number {
+  const month = date.getMonth() + 1;
+  const isSpringSummer = month >= 4 && month <= 8;
+  const isSummerAutumn = month >= 6 && month <= 10;
+  const isAutumnWinter = month >= 10 || month <= 2;
+
+  if (objectId === "summer-triangle" && isSummerAutumn) {
+    return 18;
+  }
+  if (objectId === "vega" && isSummerAutumn) {
+    return 10;
+  }
+  if (objectId === "arcturus" && isSpringSummer) {
+    return 10;
+  }
+  if (objectId === "pleiades" && isAutumnWinter) {
+    return 14;
+  }
+  if (objectId === "andromeda" && month >= 8 && month <= 11) {
+    return 10;
+  }
+
+  return 0;
+}
+
+export function calculateCatalogVisibilityScore({
+  object,
+  altitude,
+  weather,
+  sunAltitude,
+  now,
+}: {
+  object: CatalogSkyObject;
+  altitude: number;
+  weather: WeatherNow;
+  sunAltitude: number;
+  now: Date;
+}): number {
+  if (altitude < 10 || !object.franceFriendly || !isNight(weather, sunAltitude)) {
+    return 0;
+  }
+
+  if (object.id === "antares" && altitude < 15) {
+    return 0;
+  }
+
+  if (object.id === "andromeda" && (altitude < 25 || weather.cloudCover >= 35 || sunAltitude > -8)) {
+    return 0;
+  }
+
+  let score = 36 + Math.round(object.priority * 0.35);
+
+  if (altitude < 15) {
+    score -= 28;
+  } else if (altitude < 25) {
+    score -= 8;
+  } else {
+    score += 14;
+  }
+
+  score += getCloudPenalty(weather.cloudCover);
+  score += getSeasonBonus(object.id, now);
+
+  if (object.requiredGear === "binoculars_recommended") {
+    score -= 14;
+  }
+
+  if (object.difficulty === "medium") {
+    score -= 8;
+  } else if (object.difficulty === "hard") {
+    score -= 26;
+  } else {
+    score += 8;
+  }
+
+  if (object.type === "asterism") {
+    score += 8;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+export function calculateMeteorShowerVisibilityScore({
+  weather,
+  sunAltitude,
+  nearPeak,
+}: {
+  weather: WeatherNow;
+  sunAltitude: number;
+  nearPeak: boolean;
+}): number {
+  if (!isNight(weather, sunAltitude)) {
+    return 0;
+  }
+
+  let score = nearPeak ? 76 : 58;
+  score += getCloudPenalty(weather.cloudCover);
+
+  return Math.max(0, Math.min(100, Math.round(score)));
 }

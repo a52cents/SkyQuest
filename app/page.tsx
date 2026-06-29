@@ -10,6 +10,7 @@ import { PermissionPanel } from "@/components/PermissionPanel";
 import { QuestCard } from "@/components/QuestCard";
 import { SecureContextNotice } from "@/components/SecureContextNotice";
 import { getInsecureContextMessage, isSecureBrowserContext } from "@/lib/browser-support";
+import { fetchNextIssVisiblePass } from "@/lib/iss";
 import { generateQuests } from "@/lib/quest-generator";
 import { addObservation, saveActiveQuest, saveLastLocation } from "@/lib/storage";
 import type { SkyQuest } from "@/lib/types";
@@ -65,11 +66,13 @@ export default function HomePage() {
   const [quests, setQuests] = useState<SkyQuest[]>([]);
   const [position, setPosition] = useState<Position | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [showAllQuests, setShowAllQuests] = useState(false);
 
   async function handleNow() {
     setState("loading");
     setNotice(null);
     setQuests([]);
+    setShowAllQuests(false);
 
     try {
       const coords = await getCurrentPosition();
@@ -81,12 +84,19 @@ export default function HomePage() {
         weatherNotice = "Météo indisponible : estimation prudente utilisée.";
         return getFallbackWeather();
       });
+      const now = new Date();
+      const issPass = await fetchNextIssVisiblePass({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        now,
+      }).catch(() => null);
 
       const nextQuests = generateQuests({
         latitude: coords.latitude,
         longitude: coords.longitude,
         weather,
-        now: new Date(),
+        now,
+        issPass,
       });
 
       setQuests(nextQuests);
@@ -100,6 +110,7 @@ export default function HomePage() {
         now: new Date(),
       });
       setQuests(fallback);
+      setShowAllQuests(false);
       setNotice(error instanceof Error ? error.message : "Position indisponible : observation libre sans localisation précise.");
       setState("ready");
     }
@@ -114,6 +125,9 @@ export default function HomePage() {
     addObservation(quest, status, position ?? undefined);
     setNotice(status === "seen" ? "Observation ajoutée au journal." : "Résultat noté dans le journal.");
   }
+
+  const visibleQuests = showAllQuests ? quests : quests.slice(0, 3);
+  const hiddenQuestCount = Math.max(0, quests.length - visibleQuests.length);
 
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col px-5 pb-8 pt-6 sm:px-8">
@@ -185,7 +199,7 @@ export default function HomePage() {
                 </div>
                 <p className="text-right text-sm text-[#9fa6d9]">Jamais garanti, toujours approximatif.</p>
               </div>
-              {quests.map((quest) => (
+              {visibleQuests.map((quest) => (
                 <QuestCard
                   key={quest.id}
                   quest={quest}
@@ -194,6 +208,15 @@ export default function HomePage() {
                   onMissed={(nextQuest) => handleLog(nextQuest, "missed")}
                 />
               ))}
+              {quests.length > 3 ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAllQuests((current) => !current)}
+                  className="min-h-14 rounded-full border border-[#38d5ff]/25 bg-[#38d5ff]/12 px-5 text-base font-extrabold text-[#d7f8ff] transition active:scale-[0.98]"
+                >
+                  {showAllQuests ? "Masquer les autres" : `Afficher ${hiddenQuestCount} autre${hiddenQuestCount > 1 ? "s" : ""}`}
+                </button>
+              ) : null}
             </div>
           ) : null}
         </section>

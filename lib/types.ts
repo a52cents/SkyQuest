@@ -1,5 +1,19 @@
 export type SkyObjectName = "Moon" | "Venus" | "Jupiter" | "Saturn" | "Mars";
 
+export type QuestTargetType =
+  | "moon"
+  | "planet"
+  | "star"
+  | "asterism"
+  | "constellation"
+  | "star_cluster"
+  | "galaxy"
+  | "meteor_shower"
+  | "satellite"
+  | "free_observation";
+
+export type RequiredGear = "naked_eye" | "binoculars_recommended";
+
 export type SkyObject = {
   name: SkyObjectName;
   azimuth: number;
@@ -17,7 +31,8 @@ export type VisibilityLabel = "Excellente chance" | "Bonne chance" | "Tentable" 
 
 export type SkyQuest = {
   id: string;
-  target: SkyObjectName | "FreeObservation" | "SunTest";
+  target: string;
+  targetType: QuestTargetType;
   title: string;
   difficulty: "easy" | "medium";
   azimuth: number | null;
@@ -27,6 +42,8 @@ export type SkyQuest = {
   visibilityLabel: string;
   description: string;
   tip: string;
+  requiredGear: RequiredGear;
+  warning?: string;
 };
 
 export type Observation = {

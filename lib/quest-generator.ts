@@ -1,6 +1,14 @@
-import { getSkyObjects, getSunAltitude, getSunPosition } from "@/lib/astro";
+import { equatorialToHorizontal, getSkyObjects, getSunAltitude, getSunPosition } from "@/lib/astro";
+import type { IssVisiblePass } from "@/lib/iss";
+import { isMeteorShowerActive, isNearMeteorShowerPeak, meteorShowers } from "@/lib/meteor-showers";
 import { azimuthToCardinal } from "@/lib/orientation";
-import { calculateVisibilityScore, getVisibilityLabel } from "@/lib/visibility";
+import { catalogSkyObjects } from "@/lib/sky-catalog";
+import {
+  calculateCatalogVisibilityScore,
+  calculateMeteorShowerVisibilityScore,
+  calculateVisibilityScore,
+  getVisibilityLabel,
+} from "@/lib/visibility";
 import type { SkyObject, SkyObjectName, SkyQuest, WeatherNow } from "@/lib/types";
 
 type GenerateQuestsInput = {
@@ -8,6 +16,7 @@ type GenerateQuestsInput = {
   longitude: number | null;
   weather: WeatherNow;
   now: Date;
+  issPass?: IssVisiblePass | null;
 };
 
 const objectLabels: Record<SkyObjectName, string> = {
@@ -18,11 +27,20 @@ const objectLabels: Record<SkyObjectName, string> = {
   Mars: "Mars",
 };
 
+type QuestCandidate = {
+  quest: SkyQuest;
+  score: number;
+};
+
 function getDifficulty(object: SkyObject): SkyQuest["difficulty"] {
   return object.name === "Saturn" || object.name === "Mars" ? "medium" : "easy";
 }
 
 function getDescription(object: SkyObject, score: number): string {
+  if (object.name === "Moon") {
+    return "C'est l'objet le plus facile à repérer quand elle est au-dessus de l'horizon.";
+  }
+
   const label = objectLabels[object.name];
 
   if (score >= 80) {
@@ -37,6 +55,10 @@ function getDescription(object: SkyObject, score: number): string {
 }
 
 function getTip(object: SkyObject): string {
+  if (object.name === "Moon") {
+    return "C'est l'objet le plus facile à repérer. Regarde dans la direction indiquée et cherche le disque lumineux.";
+  }
+
   const fists = Math.max(1, Math.round(object.altitude / 10));
   return `Tends le bras : un poing fermé représente environ 10°. Cherche environ ${fists} poing${fists > 1 ? "s" : ""} au-dessus de l'horizon.`;
 }
@@ -45,6 +67,7 @@ function createQuest(object: SkyObject, score: number, now: Date): SkyQuest {
   return {
     id: `${object.name.toLowerCase()}-${now.getTime()}`,
     target: object.name,
+    targetType: object.name === "Moon" ? "moon" : "planet",
     title: object.name === "Moon" ? "Trouve la Lune" : `Repère ${objectLabels[object.name]}`,
     difficulty: getDifficulty(object),
     azimuth: Math.round(object.azimuth),
@@ -54,6 +77,7 @@ function createQuest(object: SkyObject, score: number, now: Date): SkyQuest {
     visibilityLabel: getVisibilityLabel(score),
     description: getDescription(object, score),
     tip: getTip(object),
+    requiredGear: "naked_eye",
   };
 }
 
@@ -61,6 +85,7 @@ function createFreeObservationQuest(now: Date): SkyQuest {
   return {
     id: `free-observation-${now.getTime()}`,
     target: "FreeObservation",
+    targetType: "free_observation",
     title: "Observe le ciel pendant 2 minutes",
     difficulty: "easy",
     azimuth: null,
@@ -70,6 +95,7 @@ function createFreeObservationQuest(now: Date): SkyQuest {
     visibilityLabel: "Tentable",
     description: "Le ciel n'est pas idéal maintenant. Observe la zone la plus dégagée et note ce que tu vois.",
     tip: "Choisis un point sombre, laisse tes yeux s'habituer, puis regarde lentement du Nord au Sud.",
+    requiredGear: "naked_eye",
   };
 }
 
@@ -79,6 +105,7 @@ function createSunTestQuest(latitude: number, longitude: number, now: Date): Sky
   return {
     id: `sun-test-${now.getTime()}`,
     target: "SunTest",
+    targetType: "star",
     title: "Test guidage : direction du Soleil",
     difficulty: "easy",
     azimuth: Math.round(sunPosition.azimuth),
@@ -88,33 +115,235 @@ function createSunTestQuest(latitude: number, longitude: number, now: Date): Sky
     visibilityLabel: "Calibration",
     description: "Mission de test pour vérifier la boussole et l'altitude du téléphone. Ne regarde jamais directement le Soleil.",
     tip: "Utilise seulement l'écran pour tester le guidage. Ne fixe pas le Soleil à l'oeil nu, même brièvement.",
+    requiredGear: "naked_eye",
+    warning: "Test uniquement : ne regarde jamais directement le Soleil.",
   };
 }
 
-export function generateQuests({ latitude, longitude, weather, now }: GenerateQuestsInput): SkyQuest[] {
+function createCatalogQuest({
+  object,
+  score,
+  altitude,
+  azimuth,
+  now,
+}: {
+  object: (typeof catalogSkyObjects)[number];
+  score: number;
+  altitude: number;
+  azimuth: number;
+  now: Date;
+}): SkyQuest {
+  return {
+    id: `${object.id}-${now.getTime()}`,
+    target: object.id,
+    targetType: object.type === "meteor_shower" ? "meteor_shower" : object.type,
+    title: object.questTitle,
+    difficulty: object.difficulty === "easy" ? "easy" : "medium",
+    azimuth: Math.round(azimuth),
+    altitude: Math.round(altitude),
+    cardinalDirection: azimuthToCardinal(azimuth),
+    visibilityScore: score,
+    visibilityLabel: getVisibilityLabel(score),
+    description: object.description,
+    tip: object.observationTip,
+    requiredGear: object.requiredGear,
+    warning: object.warning,
+  };
+}
+
+function createMeteorShowerQuest({
+  showerName,
+  radiantName,
+  tip,
+  score,
+  now,
+}: {
+  showerName: string;
+  radiantName: string;
+  tip: string;
+  score: number;
+  now: Date;
+}): SkyQuest {
+  return {
+    id: `meteor-shower-${showerName.toLowerCase()}-${now.getTime()}`,
+    target: `meteor-${showerName.toLowerCase()}`,
+    targetType: "meteor_shower",
+    title: "Observe une pluie d'étoiles filantes",
+    difficulty: "easy",
+    azimuth: null,
+    altitude: null,
+    cardinalDirection: null,
+    visibilityScore: score,
+    visibilityLabel: getVisibilityLabel(score),
+    description: `${showerName} active maintenant. Le radiant est vers ${radiantName}, mais regarde surtout une zone sombre du ciel.`,
+    tip: `${tip} Pas besoin de regarder exactement le radiant.`,
+    requiredGear: "naked_eye",
+  };
+}
+
+function createIssQuest(pass: IssVisiblePass, score: number, now: Date): SkyQuest {
+  const startTime = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(pass.startTime);
+  const durationMinutes = Math.max(1, Math.round(pass.durationSeconds / 60));
+
+  return {
+    id: `iss-${now.getTime()}`,
+    target: "iss",
+    targetType: "satellite",
+    title: "Repère l'ISS",
+    difficulty: "easy",
+    azimuth: Math.round(pass.maxAzimuth),
+    altitude: Math.round(pass.maxElevation),
+    cardinalDirection: azimuthToCardinal(pass.maxAzimuth),
+    visibilityScore: score,
+    visibilityLabel: getVisibilityLabel(score),
+    description: `Passage visible prévu vers ${startTime}, pendant environ ${durationMinutes} min si le ciel est dégagé.`,
+    tip: "Elle ressemble à une étoile très brillante qui traverse lentement le ciel sans clignoter.",
+    requiredGear: "naked_eye",
+  };
+}
+
+function scoreIssPass(pass: IssVisiblePass, weather: WeatherNow): number {
+  if (weather.cloudCover > 80 || pass.maxElevation < 15) {
+    return 0;
+  }
+
+  let score = 74;
+
+  if (pass.maxElevation >= 35) {
+    score += 14;
+  } else if (pass.maxElevation < 25) {
+    score -= 8;
+  }
+
+  if (weather.cloudCover >= 50) {
+    score -= 20;
+  } else if (weather.cloudCover < 30) {
+    score += 8;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function shouldSkipDuplicate(candidate: SkyQuest, selected: SkyQuest[]): boolean {
+  if (candidate.target === "vega" && selected.some((quest) => quest.target === "summer-triangle")) {
+    return true;
+  }
+
+  if (candidate.target === "summer-triangle" && selected.some((quest) => quest.target === "vega")) {
+    return true;
+  }
+
+  return selected.some(
+    (quest) => quest.target === candidate.target || (quest.targetType === "meteor_shower" && candidate.targetType === "meteor_shower"),
+  );
+}
+
+function selectQuestCandidates(candidates: QuestCandidate[], limit: number): SkyQuest[] {
+  const selected: SkyQuest[] = [];
+
+  for (const candidate of candidates.sort((a, b) => b.score - a.score)) {
+    if (selected.length >= limit) {
+      break;
+    }
+
+    if (!shouldSkipDuplicate(candidate.quest, selected)) {
+      selected.push(candidate.quest);
+    }
+  }
+
+  return selected;
+}
+
+export function generateQuests({ latitude, longitude, weather, now, issPass }: GenerateQuestsInput): SkyQuest[] {
   if (latitude === null || longitude === null) {
     return [createFreeObservationQuest(now)];
   }
 
   try {
     const sunAltitude = getSunAltitude(latitude, longitude, now);
-    const scored = getSkyObjects(latitude, longitude, now)
-      .map((object) => ({
-        object,
-        score: calculateVisibilityScore({ object, weather, sunAltitude }),
-      }))
-      .sort((a, b) => b.score - a.score);
+    const planetCandidates = getSkyObjects(latitude, longitude, now)
+      .map((object) => {
+        const score = calculateVisibilityScore({ object, weather, sunAltitude });
 
-    const reliable = scored.filter((item) => item.score >= 50);
-    const selected = reliable.slice(0, 3);
+        return {
+          quest: createQuest(object, score, now),
+          score,
+        };
+      })
+      .filter((item) => item.score >= 50);
 
+    const catalogCandidates = catalogSkyObjects
+      .filter((object) => object.type !== "satellite")
+      .flatMap<QuestCandidate>((object) => {
+        if (typeof object.rightAscensionHours !== "number" || typeof object.declinationDegrees !== "number") {
+          return [];
+        }
+
+        const position = equatorialToHorizontal({
+          rightAscensionHours: object.rightAscensionHours,
+          declinationDegrees: object.declinationDegrees,
+          latitude,
+          longitude,
+          date: now,
+        });
+
+        const score = calculateCatalogVisibilityScore({
+          object,
+          altitude: position.altitude,
+          weather,
+          sunAltitude,
+          now,
+        });
+
+        if (score < 50) {
+          return [];
+        }
+
+        return [{
+          quest: createCatalogQuest({ object, score, altitude: position.altitude, azimuth: position.azimuth, now }),
+          score,
+        }];
+      });
+
+    const meteorCandidates = meteorShowers
+      .filter((shower) => isMeteorShowerActive(shower, now))
+      .flatMap<QuestCandidate>((shower) => {
+        const score = calculateMeteorShowerVisibilityScore({
+          weather,
+          sunAltitude,
+          nearPeak: isNearMeteorShowerPeak(shower, now),
+        });
+
+        if (score < 50) {
+          return [];
+        }
+
+        return [{
+          quest: createMeteorShowerQuest({
+            showerName: shower.name,
+            radiantName: shower.radiantName,
+            tip: shower.recommendedViewingTip,
+            score,
+            now,
+          }),
+          score,
+        }];
+      });
+
+    const issCandidates: QuestCandidate[] = issPass
+      ? [{ quest: createIssQuest(issPass, scoreIssPass(issPass, weather), now), score: scoreIssPass(issPass, weather) }]
+        .filter((candidate) => candidate.score >= 50)
+      : [];
+
+    const candidates = [...issCandidates, ...planetCandidates, ...catalogCandidates, ...meteorCandidates];
     const sunTestQuest = createSunTestQuest(latitude, longitude, now);
+    const selected = selectQuestCandidates(candidates, 8);
 
     if (selected.length === 0) {
       return [sunTestQuest, createFreeObservationQuest(now)];
     }
 
-    return [sunTestQuest, ...selected.slice(0, 2).map((item) => createQuest(item.object, item.score, now))];
+    return [sunTestQuest, ...selected];
   } catch {
     return [createFreeObservationQuest(now)];
   }
