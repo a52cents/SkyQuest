@@ -1,22 +1,63 @@
 @import "tailwindcss";
+@import "../system/variables.dark.css";
 
 :root {
   color-scheme: dark;
-  --background: #070816;
-  --surface: #0e1026;
-  --surface-strong: #161a35;
-  --text: #f7f7ff;
-  --muted: #b8bde6;
-  --faint: #7d84b8;
-  --accent: #7c5cff;
-  --accent-cyan: #38d5ff;
-  --success: #63e6a4;
-  --warning: #ffd166;
-  --danger: #ff6b8a;
+  --background: var(--brand-color-bg-layout);
+  --surface: var(--brand-color-bg-container);
+  --surface-strong: var(--brand-color-bg-elevated);
+  --text: var(--brand-color-text);
+  --muted: var(--brand-color-text-secondary);
+  --faint: var(--brand-color-text-tertiary);
+  --accent: var(--brand-color-primary);
+  --accent-cyan: var(--brand-color-link);
+  --success: var(--brand-color-success);
+  --warning: var(--brand-color-warning);
+  --danger: var(--brand-color-error);
 }
 
 @theme inline {
-  --font-sans: var(--font-outfit);
+  --font-sans: var(--brand-font-family);
+  --font-mono: var(--brand-font-family-code);
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-cyan: var(--accent-cyan);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-brand-primary: var(--brand-color-primary);
+  --color-brand-primary-hover: var(--brand-color-primary-hover);
+  --color-brand-link: var(--brand-color-link);
+  --color-brand-border: var(--brand-color-border);
+  --color-brand-border-secondary: var(--brand-color-border-secondary);
+  --radius-brand-xs: var(--brand-border-radius-xs);
+  --radius-brand-sm: var(--brand-border-radius-sm);
+  --radius-brand: var(--brand-border-radius);
+  --radius-brand-lg: var(--brand-border-radius-lg);
+  --spacing-brand-xxs: var(--brand-size-xxs);
+  --spacing-brand-xs: var(--brand-size-xs);
+  --spacing-brand-sm: var(--brand-size-sm);
+  --spacing-brand: var(--brand-size);
+  --spacing-brand-md: var(--brand-size-md);
+  --spacing-brand-lg: var(--brand-size-lg);
+  --spacing-brand-xl: var(--brand-size-xl);
+  --spacing-brand-xxl: var(--brand-size-xxl);
+  --text-brand-sm: var(--brand-font-size-sm);
+  --text-brand-base: var(--brand-font-size);
+  --text-brand-lg: var(--brand-font-size-lg);
+  --text-brand-xl: var(--brand-font-size-xl);
+  --text-brand-heading-1: var(--brand-font-size-heading-1);
+  --text-brand-heading-2: var(--brand-font-size-heading-2);
+  --text-brand-heading-3: var(--brand-font-size-heading-3);
+  --text-brand-heading-4: var(--brand-font-size-heading-4);
+  --text-brand-heading-5: var(--brand-font-size-heading-5);
+  --ease-brand-in-out: var(--brand-motion-ease-in-out);
+  --ease-brand-out: var(--brand-motion-ease-out);
 }
 
 * {
@@ -32,11 +73,11 @@ body {
   min-height: 100dvh;
   margin: 0;
   background:
-    radial-gradient(circle at 18% 12%, rgba(124, 92, 255, 0.24), transparent 28rem),
-    radial-gradient(circle at 82% 18%, rgba(56, 213, 255, 0.13), transparent 24rem),
-    linear-gradient(180deg, #070816 0%, #0b0d20 48%, #050610 100%);
+    radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--brand-color-primary-hover) 42%, transparent), transparent 28rem),
+    radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--brand-color-link) 18%, transparent), transparent 24rem),
+    linear-gradient(180deg, var(--background) 0%, var(--brand-color-fill-quaternary) 48%, var(--brand-color-bg-container) 100%);
   color: var(--text);
-  font-family: var(--font-outfit), system-ui, sans-serif;
+  font-family: var(--brand-font-family);
 }
 
 button,
@@ -51,11 +92,11 @@ a:focus-visible {
 }
 
 .glass-card {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(20, 24, 54, 0.68);
+  border: var(--brand-line-width) solid color-mix(in srgb, var(--brand-color-border) 68%, transparent);
+  background: color-mix(in srgb, var(--surface-strong) 72%, transparent);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 22px 70px rgba(40, 33, 98, 0.3);
+    inset 0 1px 0 color-mix(in srgb, var(--brand-color-text) 8%, transparent),
+    0 22px 70px color-mix(in srgb, var(--brand-color-primary) 32%, transparent);
   backdrop-filter: blur(18px);
 }
 
@@ -65,8 +106,8 @@ a:focus-visible {
   z-index: -1;
   pointer-events: none;
   background-image:
-    radial-gradient(circle, rgba(255, 255, 255, 0.55) 1px, transparent 1px),
-    radial-gradient(circle, rgba(124, 92, 255, 0.28) 1px, transparent 1px);
+    radial-gradient(circle, color-mix(in srgb, var(--brand-color-text) 55%, transparent) 1px, transparent 1px),
+    radial-gradient(circle, color-mix(in srgb, var(--brand-color-link) 28%, transparent) 1px, transparent 1px);
   background-position: 0 0, 22px 34px;
   background-size: 86px 86px, 132px 132px;
   mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent 82%);
@@ -74,7 +115,7 @@ a:focus-visible {
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass-card {
-    background: #161a35;
+    background: var(--surface-strong);
   }
 }
 

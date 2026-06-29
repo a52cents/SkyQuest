@@ -1,110 +1,98 @@
-# SkyQuest Design Contract
+---
+name: "SkyQuest Design System"
+category: Brands
+surface: web
+colors:
+  primary: "#f8fafc"
+  primary-2: "#7c5cff"
+  surface: "#11172a"
+  surface-2: "#f3f4fc"
+  secondary: "#b8c3d9"
+  border: "#e7e4fc"
+  secondary-2: "#38bdf8"
+---
 
-## Direction artistique
+# SkyQuest Design System
 
-SkyQuest est une PWA mobile-first pour observer le ciel sans surcharge scientifique. La direction visuelle v0 est `spatial colore`, sombre, lisible dehors la nuit, avec une sensation d'exploration accessible. L'interface doit guider l'utilisateur rapidement vers une action : appuyer sur `Maintenant`, choisir une quete, ouvrir le guidage camera, noter le resultat.
+> Category: Brands
 
-Le design ne doit pas ressembler a Stellarium, a une carte du ciel complete, ni a un tableau scientifique. Il doit ressembler a un compagnon mobile simple, calme et lumineux.
+> Surface: web
 
-## Palette
+*SkyQuest is a mobile-first astronomy app for beginners and casual sky lovers.*
 
-- Fond principal : `#070816`, bleu nuit presque noir.
-- Fond secondaire : `#0E1026`, surface nocturne profonde.
-- Surface glass : `rgba(20, 24, 54, 0.68)` avec `backdrop-filter: blur(18px)` si disponible.
-- Surface glass solide fallback : `#161A35`.
-- Texte principal : `#F7F7FF`.
-- Texte secondaire : `#B8BDE6`.
-- Texte muted : `#7D84B8`.
-- Accent principal : `#7C5CFF`, bleu-violet.
-- Accent secondaire : `#38D5FF`, cyan stellaire pour les signaux de guidage.
-- Succes : `#63E6A4`.
-- Warning : `#FFD166`.
-- Erreur : `#FF6B8A`.
+SkyQuest is a mobile-first astronomy app for beginners and casual sky lovers.
 
-Regle : utiliser le bleu-violet comme accent dominant. Le cyan sert uniquement aux details d'orientation, focus rings, petits halos et valeurs actives. Eviter les gradients generiques trop satures.
+The app gives users 1 to 3 real-time “sky quests” based on their GPS position, current time, weather, and visible sky objects. Instead of showing a complex star map, SkyQuest tells users what they can observe right now and guides them with a simple camera overlay.
 
-## Typographie
+The brand should feel calm, magical, premium, immersive, and beginner-friendly. It should make astronomy feel accessible and emotional, not technical or overwhelming.
 
-- Police principale : `Outfit` via `next/font/google`, sans-serif arrondie et lisible.
-- Police mono optionnelle : `Geist Mono` ou stack monospace pour valeurs techniques courtes.
-- Titres mobiles : 32-44px, line-height serre mais non coupe.
-- Corps : 16-18px minimum pour lisibilite nocturne.
-- Labels et meta : 12-14px, uppercase seulement avec parcimonie.
+Core feeling:
+“Look up. The sky has a quest for you.”
 
-## Radius
+Visual direction:
+Dark premium night-sky aesthetic, deep navy/black backgrounds, subtle violet-blue/cyan glow, soft glassmorphism cards, rounded corners, large readable text, simple celestial icons, and a mobile-first interface readable outdoors at night.
 
-- Cards principales : `28px`.
-- Cards compactes et badges : `18px`.
-- Boutons : `999px` pour une affordance tactile claire.
-- Overlay camera : `22px`.
+Avoid:
+Technical astronomy dashboards, cluttered star maps, childish cartoon space visuals, aggressive neon sci-fi UI, tiny labels, and low-contrast text.
 
-## Spacing
+The design should feel like a calm magical night companion, not a professional science tool.
 
-- Grille mobile : padding horizontal 20px.
-- Espacement sections : 28-40px.
-- Gap entre cards : 14-18px.
-- Boutons tactiles : hauteur minimum 52px.
-- Zones critiques camera : garder les actions principales dans les zones atteignables au pouce.
+## Color Palette
 
-## Style des cards
+| Role | Name | Hex | Usage |
+| --- | --- | --- | --- |
+| background | Primary: " | `#f8fafc` | page canvas |
+| foreground | Primary: " | `#7c5cff` | body text and headings |
+| accent | Surface: " | `#11172a` | primary actions and emphasis |
+| surface | Surface | `#f3f4fc` | cards and panels |
+| muted | Secondary: " | `#b8c3d9` | secondary text and metadata |
+| border | Border | `#e7e4fc` | rules and dividers |
+| accent-secondary | Secondary: " | `#38bdf8` | secondary actions and links |
 
-- Glassmorphism leger, pas de verre trop flou ou illisible.
-- Bordure : `1px solid rgba(255,255,255,0.10)`.
-- Highlight interne discret : `inset 0 1px 0 rgba(255,255,255,0.08)`.
-- Ombre : halo bleu-violet tres subtil, jamais noir dur.
-- Les cards doivent rester lisibles avec `prefers-reduced-transparency` ou si `backdrop-filter` n'est pas supporte.
+## Typography
+- **Display:** Inter — weights 400, 700 — fallbacks: system-ui, -apple-system, Segoe UI, Helvetica Neue, Arial, sans-serif
+- **Body:** Inter — weights 400, 700 — fallbacks: system-ui, -apple-system, Segoe UI, Helvetica Neue, Arial, sans-serif
 
-## Style des boutons
+## Voice & Tone
 
-- Bouton primaire `Maintenant` : grand, pill, fond bleu-violet, contraste fort, feedback tactile `scale(0.98)`.
-- Bouton secondaire : glass sombre, bordure fine, texte clair.
-- Actions `Je l'ai vu` et `Pas trouve` : boutons distincts, respectivement succes discret et surface sombre.
-- Focus visible : outline cyan ou bleu-violet, 3px, offset 3px.
+- **Adjectives:** (none yet)
+- **Tone:** SkyQuest is a mobile-first astronomy app for beginners and casual sky lovers.
 
-## Etats loading, empty, error
+### Messaging pillars
+- SkyQuest is a mobile-first astronomy app for beginners and casual sky lovers.
 
-- Loading : skeletons glass proches de la forme finale, texte court `On lit le ciel actuel...`.
-- Empty : message utile et non culpabilisant, avec action de retour.
-- Error : formulation claire, permission ou reseau expliquee simplement, toujours proposer une alternative.
-- Ne jamais bloquer l'utilisateur sur un spinner indefini.
+The app gives users 1 to 3 real-time “sky quests” based on their GPS position, current time, weather, and visible sky objects. Instead of showing a complex star map, SkyQuest tells users what they can observe right now and guides them with a simple camera overlay.
 
-## Mode camera
+The brand should feel calm, magical, premium, immersive, and beginner-friendly. It should make astronomy feel accessible and emotional, not technical or overwhelming.
 
-- Plein ecran mobile, video en `object-fit: cover`.
-- Overlay 2D uniquement : titre, direction, altitude, hint textuel, repere central simple.
-- Ne jamais promettre une precision parfaite. Utiliser des formulations comme `orientation approximative`, `tu es proche`, `regarde bien le ciel`.
-- Bouton explicite `Activer l'orientation` pour iOS/Safari.
-- Fallback lisible si camera ou boussole indisponible : direction cardinale et hauteur en degres.
+Core feeling:
+“Look up. The sky has a quest for you.”
 
-## Mobile-first
+Visual direction:
+Dark premium night-sky aesthetic, deep navy/black backgrounds, subtle violet-blue/cyan glow, soft glassmorphism cards, rounded corners, large readable text, simple celestial icons, and a mobile-first interface readable outdoors at night.
 
-- L'app doit etre confortable dehors la nuit, a une main, avec gros boutons.
-- Eviter les longs paragraphes. Le texte doit etre actionnable.
-- Utiliser `min-height: 100dvh`, jamais `100vh` seul.
-- Layout principal optimise 360-430px de large, puis s'etend proprement sur desktop.
-- Les controles importants doivent rester visibles sans scroll excessif.
+Avoid:
+Technical astronomy dashboards, cluttered star maps, childish cartoon space visuals, aggressive neon sci-fi UI, tiny labels, and low-contrast text.
 
-## Accessibilite
+The design should feel like a calm magical night companion, not a professional science tool.
+- SkyQuest is a mobile-first astronomy app for beginners and casual sky lovers.
 
-- Contraste WCAG AA minimum, viser AAA pour texte principal.
-- Boutons en vrais `button` ou liens semantiques.
-- Labels visibles, focus states visibles, aria-live pour resultats dynamiques.
-- Respecter `prefers-reduced-motion`.
-- Ne pas utiliser uniquement la couleur pour communiquer un etat.
-- Les permissions navigateur doivent etre expliquees avant ou pendant la demande.
+### Vocabulary
+- **Use:** (none yet)
+- **Avoid:** (none yet)
 
-## Ton general
+## Imagery
 
-- Clair, encourageant, prudent.
-- Pas trop scientifique, pas infantilisant.
-- Ne jamais dire `tu verras X a coup sur`.
-- Favoriser : `bonne chance`, `a tenter`, `conditions favorables`, `pas ideal maintenant`.
+- **Style:** (none yet)
+- **Subjects:** (none yet)
+- **Treatment:** (none yet)
+- **Avoid:** (none yet)
 
-## Exemples de microcopy
+## Layout
 
-- `Decouvre quoi observer dans le ciel maintenant.`
-- `On utilise ta position, la meteo et le ciel actuel pour proposer 1 a 3 mini-quetes.`
-- `Bonne chance de visibilite.`
-- `Tends le bras : un poing ferme represente environ 10 degres.`
-- `La boussole peut etre imprecise. Utilise cette indication comme un guide, pas comme une cible parfaite.`
-- `Le ciel n'est pas ideal maintenant. Tu peux quand meme observer deux minutes et noter ce que tu vois.`
+- **Radius:** 8px
+- **Border weight:** 1px
+- **Spacing:** 8px baseline grid
+
+### Posture rules
+- Component kit should cover: large, rounded, gradient, subtle, high, minimum, dark, off-white, object, quest, visibility, difficulty.

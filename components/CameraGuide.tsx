@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { AppButton, getAppButtonClassName } from "@/components/AppButton";
+import { AppCard } from "@/components/AppCard";
 import {
   ALIGNMENT_TOLERANCE_DEGREES,
   angleDifference,
@@ -331,36 +333,38 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const directionAligned = directionDelta !== null && Math.abs(directionDelta) <= ALIGNMENT_TOLERANCE_DEGREES;
   const altitudeAligned = altitudeDelta !== null && Math.abs(altitudeDelta) <= ALIGNMENT_TOLERANCE_DEGREES;
   const directionTone = directionAligned
-    ? "border-[#63e6a4]/35 bg-[#63e6a4]/16 text-[#b8ffd7]"
-    : "border-[#38d5ff]/20 bg-[#38d5ff]/12 text-white";
+    ? "border-success/35 bg-success/16 text-success"
+    : "border-accent-cyan/20 bg-accent-cyan/12 text-white";
   const altitudeTone = altitudeAligned
-    ? "border-[#63e6a4]/35 bg-[#63e6a4]/16 text-[#b8ffd7]"
-    : "border-white/10 bg-white/[0.07] text-white";
+    ? "border-success/35 bg-success/16 text-success"
+    : "border-brand-border bg-white/[0.07] text-white";
   const isSunTest = liveQuest.target === "SunTest";
   const hasPrecisePoint = liveQuest.azimuth !== null && liveQuest.altitude !== null;
 
   return (
-    <main className="relative min-h-[100dvh] overflow-hidden bg-[#050610] text-white">
+    <main className="relative min-h-[100dvh] overflow-hidden bg-background text-white">
       <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover opacity-90" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,16,0.28),rgba(5,6,16,0.72))]" aria-hidden="true" />
 
       {cameraStatus !== "active" ? (
-        <div className="absolute inset-0 bg-[#070816]" aria-hidden="true" />
+        <div className="absolute inset-0 bg-background" aria-hidden="true" />
       ) : null}
 
       {!showHud ? (
-        <button
+        <AppButton
+          variant="ghost"
+          size="sm"
           type="button"
           onClick={() => setShowHud(true)}
-          className="absolute right-4 top-4 z-20 rounded-full border border-white/10 bg-[#050610]/72 px-4 py-2 text-sm font-extrabold text-white backdrop-blur-xl transition active:scale-[0.98]"
+          className="absolute right-4 top-4 z-20 min-h-0 bg-background/72 py-2 backdrop-blur-xl"
         >
           Afficher
-        </button>
+        </AppButton>
       ) : null}
 
       <section className="relative z-10 flex min-h-[100dvh] flex-col justify-between px-5 pb-6 pt-5">
         {showHud ? (
-          <header className="glass-card rounded-[20px] p-3 sm:rounded-[24px] sm:p-4">
+          <AppCard as="section" className="rounded-[20px] p-3 sm:rounded-[24px] sm:p-4" padding="sm">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="hidden text-sm font-semibold uppercase tracking-[0.18em] text-[#8ea0ff] sm:block">Guidage 2D</p>
@@ -394,14 +398,16 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
                 <p className="mt-1 text-xs font-semibold text-[#9aeaff] sm:hidden">Le but : rapprocher les deux valeurs de la cible.</p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <button
+                <AppButton
+                  variant="ghost"
+                  size="sm"
                   type="button"
                   onClick={() => setShowHud(false)}
-                  className="rounded-full border border-white/10 bg-white/[0.08] px-3 py-2 text-xs font-bold sm:px-4 sm:text-sm"
+                  className="min-h-0 px-3 py-2 text-xs sm:px-4 sm:text-sm"
                 >
                   Masquer
-                </button>
-                <Link href="/" className="rounded-full border border-white/10 bg-white/[0.08] px-3 py-2 text-xs font-bold sm:px-4 sm:text-sm">
+                </AppButton>
+                <Link href="/" className={getAppButtonClassName({ variant: "ghost", size: "sm", className: "min-h-0 px-3 py-2 text-xs sm:px-4 sm:text-sm" })}>
                   Quitter
                 </Link>
               </div>
@@ -415,7 +421,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
                 Test uniquement : ne regarde jamais directement le Soleil. Utilise l&apos;écran comme repère.
               </p>
             ) : null}
-          </header>
+          </AppCard>
         ) : <div />}
 
         {showHud && hasPrecisePoint ? (
@@ -435,28 +441,24 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         ) : null}
 
         {showHud ? (
-        <div className="glass-card rounded-[24px] p-3 sm:rounded-[28px] sm:p-5">
+        <AppCard className="rounded-[24px] p-3 sm:rounded-[28px] sm:p-5" padding="sm">
           {cameraError ? <p className="mb-4 rounded-[18px] border border-[#ffd166]/25 bg-[#ffd166]/10 p-3 text-sm text-[#ffe3a3]">{cameraError}</p> : null}
           {zoomError ? <p className="mb-4 rounded-[18px] border border-[#ffd166]/25 bg-[#ffd166]/10 p-3 text-sm text-[#ffe3a3]">{zoomError}</p> : null}
 
           {cameraStatus !== "active" ? (
-            <button
-              type="button"
+            <AppButton
               onClick={startCamera}
               disabled={cameraStatus === "starting"}
-              className="mb-4 min-h-14 w-full rounded-full bg-[#7c5cff] px-5 text-base font-extrabold text-white shadow-[0_16px_40px_rgba(124,92,255,0.35)] transition active:scale-[0.98] disabled:opacity-70"
+              fullWidth
+              className="mb-4"
             >
               {cameraStatus === "starting" ? "Ouverture caméra..." : "Démarrer la caméra"}
-            </button>
+            </AppButton>
           ) : null}
           {cameraStatus === "active" && zoomRange ? (
-            <button
-              type="button"
-              onClick={toggleCameraZoom}
-              className="mb-4 min-h-12 w-full rounded-full border border-white/10 bg-white/[0.08] px-5 text-sm font-extrabold text-white transition active:scale-[0.98]"
-            >
+            <AppButton variant="ghost" size="sm" onClick={toggleCameraZoom} fullWidth className="mb-4">
               Zoom réel {formatZoom(currentZoom ?? zoomRange.min)}x
-            </button>
+            </AppButton>
           ) : null}
 
           <div className="hidden gap-3 sm:grid sm:grid-cols-2">
@@ -505,13 +507,9 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             <p className="mt-2 text-base font-semibold text-[#d8dcff]">{altitudeHint ?? "La boussole mobile peut être imprécise."}</p>
           </div>
 
-          <button
-            type="button"
-            onClick={requestOrientation}
-            className="mt-4 min-h-14 w-full rounded-full border border-[#38d5ff]/25 bg-[#38d5ff]/12 px-5 text-base font-extrabold text-[#d7f8ff] transition active:scale-[0.98]"
-          >
+          <AppButton variant="secondary" onClick={requestOrientation} fullWidth className="mt-4">
             {orientationStatus === "active" ? "Orientation active" : "Activer l'orientation"}
-          </button>
+          </AppButton>
           <p className="mt-2 text-xs font-semibold leading-5 text-[#9fa6d9]">
             La direction utilise la vraie boussole du navigateur quand elle est disponible. Sinon, suis la direction texte.
           </p>
@@ -524,22 +522,14 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
           ) : null}
 
           <div className="mt-5 grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={onSeen}
-              className="min-h-13 rounded-full bg-[#63e6a4] px-4 text-sm font-extrabold text-[#04140c] transition active:scale-[0.98]"
-            >
+            <AppButton variant="success" size="sm" onClick={onSeen}>
               Je l&apos;ai vu
-            </button>
-            <button
-              type="button"
-              onClick={onMissed}
-              className="min-h-13 rounded-full border border-white/10 bg-white/[0.08] px-4 text-sm font-extrabold text-white transition active:scale-[0.98]"
-            >
+            </AppButton>
+            <AppButton variant="ghost" size="sm" onClick={onMissed}>
               Pas trouvé
-            </button>
+            </AppButton>
           </div>
-        </div>
+        </AppCard>
         ) : <div />}
       </section>
     </main>

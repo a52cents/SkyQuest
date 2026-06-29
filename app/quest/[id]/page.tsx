@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { getAppButtonClassName } from "@/components/AppButton";
 import { CameraGuide } from "@/components/CameraGuide";
 import { ErrorState } from "@/components/ErrorState";
+import { PageShell } from "@/components/PageShell";
 import { addObservation, getActiveQuest, getLastLocation } from "@/lib/storage";
 import type { SkyQuest } from "@/lib/types";
 
@@ -29,18 +31,18 @@ export default function QuestGuidePage() {
 
   if (!quest) {
     return (
-      <main className="mx-auto flex min-h-[100dvh] w-full max-w-2xl flex-col justify-center px-5">
+      <PageShell className="max-w-2xl justify-center" contentClassName="flex flex-col justify-center">
         <ErrorState
           tone="warning"
           message="Quête introuvable. Relance Maintenant pour générer une nouvelle observation."
         />
         <Link
           href="/"
-          className="mt-4 flex min-h-14 items-center justify-center rounded-full bg-[#7c5cff] px-6 text-base font-bold text-white"
+          className={getAppButtonClassName({ className: "mt-4" })}
         >
           Retour à l&apos;accueil
         </Link>
-      </main>
+      </PageShell>
     );
   }
 

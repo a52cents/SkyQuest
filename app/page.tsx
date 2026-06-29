@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AppButton, getAppButtonClassName } from "@/components/AppButton";
+import { AppCard } from "@/components/AppCard";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
+import { PageShell } from "@/components/PageShell";
 import { PermissionPanel } from "@/components/PermissionPanel";
 import { QuestCard } from "@/components/QuestCard";
 import { SecureContextNotice } from "@/components/SecureContextNotice";
@@ -172,22 +175,17 @@ export default function HomePage() {
   const isBusy = state === "loading" || futureState === "loading";
 
   return (
-    <main className="mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col px-5 pb-8 pt-6 sm:px-8">
-      <header className="flex items-center justify-between gap-4 py-2">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8ea0ff]">PWA mobile</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-[-0.04em] text-white">SkyQuest</h1>
-        </div>
-        <Link
-          href="/journal"
-          className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98]"
-        >
+    <PageShell
+      eyebrow="PWA mobile"
+      title="SkyQuest"
+      action={(
+        <Link href="/journal" className={getAppButtonClassName({ variant: "ghost", size: "sm" })}>
           Journal
         </Link>
-      </header>
-
-      <section className="flex flex-1 flex-col justify-center py-8">
-        <div className="relative overflow-hidden rounded-[34px] border border-white/10 bg-[#101331]/70 p-6 shadow-[0_24px_90px_rgba(22,18,72,0.45)] sm:p-8">
+      )}
+      contentClassName="flex flex-col justify-center py-8"
+    >
+        <AppCard className="relative overflow-hidden rounded-[34px] bg-surface-strong/70" padding="lg">
           <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#7c5cff]/30 blur-3xl" aria-hidden="true" />
           <div className="absolute -bottom-20 left-10 h-48 w-48 rounded-full bg-[#38d5ff]/15 blur-3xl" aria-hidden="true" />
 
@@ -205,31 +203,21 @@ export default function HomePage() {
             </p>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-[1fr_auto]">
-              <button
-                type="button"
-                onClick={handleNow}
-                disabled={isBusy}
-                className="min-h-16 rounded-full bg-[#7c5cff] px-7 text-lg font-extrabold text-white shadow-[0_18px_50px_rgba(124,92,255,0.45)] transition hover:bg-[#8a70ff] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
-              >
+              <AppButton size="lg" onClick={handleNow} disabled={isBusy}>
                 {state === "loading" ? "Lecture du ciel..." : "Maintenant"}
-              </button>
-              <button
-                type="button"
-                onClick={handleFuturePossibilities}
-                disabled={isBusy}
-                className="flex min-h-16 items-center justify-center rounded-full border border-[#38d5ff]/25 bg-[#38d5ff]/12 px-7 text-lg font-bold text-[#d7f8ff] transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
-              >
+              </AppButton>
+              <AppButton variant="secondary" size="lg" onClick={handleFuturePossibilities} disabled={isBusy}>
                 {futureState === "loading" ? "Calcul..." : "Possibilités futures"}
-              </button>
+              </AppButton>
               <Link
                 href="/journal"
-                className="flex min-h-16 items-center justify-center rounded-full border border-white/10 bg-white/[0.07] px-7 text-lg font-bold text-white transition active:scale-[0.98]"
+                className={getAppButtonClassName({ variant: "ghost", size: "lg" })}
               >
                 Journal
               </Link>
             </div>
           </div>
-        </div>
+        </AppCard>
 
         <PermissionPanel />
 
@@ -253,7 +241,7 @@ export default function HomePage() {
               ) : (
                 <div className="grid gap-3">
                   {futureSuggestions.map((suggestion) => (
-                    <article key={`${suggestion.quest.id}-${suggestion.availableAt}`} className="glass-card rounded-[24px] p-4">
+                    <AppCard as="article" key={`${suggestion.quest.id}-${suggestion.availableAt}`} className="rounded-[24px]" padding="sm">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#38d5ff]">
@@ -272,7 +260,7 @@ export default function HomePage() {
                           {suggestion.quest.altitude !== null ? `${Math.round(suggestion.quest.altitude)}°` : "Pas de cible précise"}
                         </span>
                       </div>
-                    </article>
+                    </AppCard>
                   ))}
                 </div>
               )}
@@ -300,18 +288,13 @@ export default function HomePage() {
                 />
               ))}
               {quests.length > 3 ? (
-                <button
-                  type="button"
-                  onClick={() => setShowAllQuests((current) => !current)}
-                  className="min-h-14 rounded-full border border-[#38d5ff]/25 bg-[#38d5ff]/12 px-5 text-base font-extrabold text-[#d7f8ff] transition active:scale-[0.98]"
-                >
+                <AppButton variant="secondary" onClick={() => setShowAllQuests((current) => !current)}>
                   {showAllQuests ? "Masquer les autres" : `Afficher ${hiddenQuestCount} autre${hiddenQuestCount > 1 ? "s" : ""}`}
-                </button>
+                </AppButton>
               ) : null}
             </div>
           ) : null}
         </section>
-      </section>
-    </main>
+    </PageShell>
   );
 }
