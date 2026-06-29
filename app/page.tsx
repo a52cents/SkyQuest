@@ -186,19 +186,19 @@ export default function HomePage() {
       contentClassName="flex flex-col justify-center py-8"
     >
         <AppCard className="relative overflow-hidden rounded-[34px] bg-surface-strong/70" padding="lg">
-          <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#7c5cff]/30 blur-3xl" aria-hidden="true" />
-          <div className="absolute -bottom-20 left-10 h-48 w-48 rounded-full bg-[#38d5ff]/15 blur-3xl" aria-hidden="true" />
+          <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-accent/30 blur-3xl" aria-hidden="true" />
+          <div className="absolute -bottom-20 left-10 h-48 w-48 rounded-full bg-accent-cyan/15 blur-3xl" aria-hidden="true" />
 
           <div className="relative">
-            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-[#cbd0ff]">
-              <span className="h-2 w-2 rounded-full bg-[#63e6a4] soft-pulse" aria-hidden="true" />
+            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-brand-border bg-white/[0.06] px-3 py-2 text-sm text-muted">
+              <span className="h-2 w-2 rounded-full bg-success soft-pulse" aria-hidden="true" />
               Ciel actuel, sans carte compliquée
             </div>
 
             <h2 className="max-w-xl text-5xl font-black leading-[0.95] tracking-[-0.06em] text-white sm:text-6xl">
               Découvre quoi observer maintenant.
             </h2>
-            <p className="mt-5 max-w-md text-lg leading-7 text-[#c6caff]">
+            <p className="mt-5 max-w-md text-lg leading-7 text-muted">
               Position, météo et ciel actuel pour proposer 1 à 3 mini-quêtes simples.
             </p>
 
@@ -230,10 +230,10 @@ export default function HomePage() {
             <section className="mb-6 grid gap-4">
               <div className="flex items-end justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8ea0ff]">Possibilités futures</p>
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-accent-cyan">Possibilités futures</p>
                   <h3 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-white">Quand revenir</h3>
                 </div>
-                <p className="text-right text-sm text-[#9fa6d9]">Estimation, à revérifier sur place.</p>
+                <p className="text-right text-sm text-faint">Estimation, à revérifier sur place.</p>
               </div>
 
               {futureSuggestions.length === 0 ? (
@@ -244,17 +244,17 @@ export default function HomePage() {
                     <AppCard as="article" key={`${suggestion.quest.id}-${suggestion.availableAt}`} className="rounded-[24px]" padding="sm">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#38d5ff]">
+                          <p className="text-sm font-bold uppercase tracking-[0.16em] text-accent-cyan">
                             Vers {new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(new Date(suggestion.availableAt))}
                           </p>
                           <h4 className="mt-1 text-xl font-extrabold tracking-[-0.03em] text-white">{suggestion.quest.title}</h4>
-                          <p className="mt-2 text-sm leading-6 text-[#c5caf5]">{suggestion.quest.description}</p>
+                          <p className="mt-2 text-sm leading-6 text-muted">{suggestion.quest.description}</p>
                         </div>
-                        <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-sm font-bold text-[#d8dcff]">
+                        <span className="rounded-full border border-brand-border bg-white/[0.06] px-3 py-1 text-sm font-bold text-muted">
                           {suggestion.quest.visibilityScore}
                         </span>
                       </div>
-                      <div className="mt-3 flex flex-wrap gap-2 text-sm font-semibold text-[#d8dcff]">
+                      <div className="mt-3 flex flex-wrap gap-2 text-sm font-semibold text-muted">
                         <span className="rounded-full bg-white/[0.06] px-3 py-1">{suggestion.quest.cardinalDirection ?? "Zone sombre"}</span>
                         <span className="rounded-full bg-white/[0.06] px-3 py-1">
                           {suggestion.quest.altitude !== null ? `${Math.round(suggestion.quest.altitude)}°` : "Pas de cible précise"}
@@ -273,10 +273,10 @@ export default function HomePage() {
             <div className="grid gap-4">
               <div className="flex items-end justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8ea0ff]">Quêtes proposées</p>
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-accent-cyan">Quêtes proposées</p>
                   <h3 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-white">À tenter maintenant</h3>
                 </div>
-                <p className="text-right text-sm text-[#9fa6d9]">Jamais garanti, toujours approximatif.</p>
+                <p className="text-right text-sm text-faint">Jamais garanti, toujours approximatif.</p>
               </div>
               {visibleQuests.map((quest) => (
                 <QuestCard

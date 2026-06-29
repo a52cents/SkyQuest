@@ -344,7 +344,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   return (
     <main className="relative min-h-[100dvh] overflow-hidden bg-background text-white">
       <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover opacity-90" />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,16,0.28),rgba(5,6,16,0.72))]" aria-hidden="true" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_28%,transparent),color-mix(in_srgb,var(--background)_72%,transparent))]" aria-hidden="true" />
 
       {cameraStatus !== "active" ? (
         <div className="absolute inset-0 bg-background" aria-hidden="true" />
@@ -367,35 +367,35 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
           <AppCard as="section" className="rounded-[20px] p-3 sm:rounded-[24px] sm:p-4" padding="sm">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <p className="hidden text-sm font-semibold uppercase tracking-[0.18em] text-[#8ea0ff] sm:block">Guidage 2D</p>
+                <p className="hidden text-sm font-semibold uppercase tracking-[0.18em] text-accent-cyan sm:block">Guidage 2D</p>
                 <h1 className="truncate text-base font-extrabold tracking-[-0.03em] sm:mt-1 sm:text-2xl">{liveQuest.title}</h1>
                 <div className="mt-2 grid grid-cols-2 gap-2 sm:hidden">
-                  <div className="rounded-[14px] border border-white/10 bg-white/[0.07] px-3 py-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#8ea0ff]">Cible</p>
+                  <div className="rounded-[14px] border border-brand-border bg-white/[0.07] px-3 py-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-accent-cyan">Cible</p>
                     <p className="mt-0.5 text-sm font-black text-white">
                       {liveQuest.cardinalDirection ?? "Zone libre"} {liveQuest.azimuth !== null ? `${Math.round(liveQuest.azimuth)}°` : ""}
                     </p>
                   </div>
                   <div className={`rounded-[14px] border px-3 py-2 ${directionTone}`}>
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9aeaff]">Direction tél.</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-accent-cyan">Direction tél.</p>
                     <p className="mt-0.5 text-sm font-black">
                       {currentAzimuth !== null ? `${currentPhoneDirection} ${Math.round(currentAzimuth)}°` : "Inconnu"}
                     </p>
                   </div>
-                  <div className="rounded-[14px] border border-white/10 bg-white/[0.07] px-3 py-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#8ea0ff]">Hauteur cible</p>
+                  <div className="rounded-[14px] border border-brand-border bg-white/[0.07] px-3 py-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-accent-cyan">Hauteur cible</p>
                     <p className="mt-0.5 text-sm font-black text-white">{liveQuest.altitude !== null ? `${Math.round(liveQuest.altitude)}°` : "Libre"}</p>
                   </div>
                   <div className={`rounded-[14px] border px-3 py-2 ${altitudeTone}`}>
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9aeaff]">Hauteur tél.</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-accent-cyan">Hauteur tél.</p>
                     <p className="mt-0.5 text-sm font-black">{currentAltitude !== null ? `${Math.round(currentAltitude)}°` : "Inconnu"}</p>
                   </div>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2 sm:hidden">
-                  <span className={`rounded-full px-3 py-1 text-sm font-black ${directionAligned ? "bg-[#63e6a4]/18 text-[#b8ffd7]" : "bg-white/[0.08] text-white"}`}>{directionArrowLabel}</span>
-                  <span className={`rounded-full px-3 py-1 text-sm font-black ${altitudeAligned ? "bg-[#63e6a4]/18 text-[#b8ffd7]" : "bg-[#38d5ff]/12 text-[#d7f8ff]"}`}>{altitudeArrowLabel}</span>
+                  <span className={`rounded-full px-3 py-1 text-sm font-black ${directionAligned ? "bg-success/18 text-success" : "bg-white/[0.08] text-white"}`}>{directionArrowLabel}</span>
+                  <span className={`rounded-full px-3 py-1 text-sm font-black ${altitudeAligned ? "bg-success/18 text-success" : "bg-accent-cyan/12 text-accent-cyan"}`}>{altitudeArrowLabel}</span>
                 </div>
-                <p className="mt-1 text-xs font-semibold text-[#9aeaff] sm:hidden">Le but : rapprocher les deux valeurs de la cible.</p>
+                <p className="mt-1 text-xs font-semibold text-accent-cyan sm:hidden">Le but : rapprocher les deux valeurs de la cible.</p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <AppButton
@@ -412,12 +412,12 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
                 </Link>
               </div>
             </div>
-            <p className="mt-3 hidden text-sm leading-6 text-[#d8dcff] sm:block">
+            <p className="mt-3 hidden text-sm leading-6 text-muted sm:block">
               Orientation approximative : regarde vers {liveQuest.cardinalDirection ?? "le ciel"}
               {liveQuest.altitude !== null ? `, environ ${Math.round(liveQuest.altitude)}° au-dessus de l'horizon.` : "."}
             </p>
             {isSunTest ? (
-              <p className="mt-3 rounded-[14px] border border-[#ffd166]/25 bg-[#ffd166]/10 px-3 py-2 text-xs font-bold leading-5 text-[#ffe3a3] sm:text-sm">
+              <p className="mt-3 rounded-[14px] border border-warning/25 bg-warning/10 px-3 py-2 text-xs font-bold leading-5 text-warning sm:text-sm">
                 Test uniquement : ne regarde jamais directement le Soleil. Utilise l&apos;écran comme repère.
               </p>
             ) : null}
@@ -426,24 +426,24 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
         {showHud && hasPrecisePoint ? (
           <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
-            <div className={`absolute -top-20 rounded-full border px-5 py-2 text-5xl font-black shadow-[0_0_40px_rgba(56,213,255,0.24)] backdrop-blur-xl ${altitudeAligned ? "border-[#63e6a4]/40 bg-[#63e6a4]/18 text-[#b8ffd7]" : "border-white/10 bg-[#050610]/55 text-[#d7f8ff]"}`}>
+            <div className={`absolute -top-20 rounded-full border px-5 py-2 text-5xl font-black shadow-[0_0_40px_color-mix(in_srgb,var(--accent-cyan)_24%,transparent)] backdrop-blur-xl ${altitudeAligned ? "border-success/40 bg-success/18 text-success" : "border-brand-border bg-background/55 text-accent-cyan"}`}>
               {altitudeArrow}
             </div>
-            <div className={`absolute -left-24 rounded-full border px-5 py-2 text-5xl font-black shadow-[0_0_40px_rgba(124,92,255,0.22)] backdrop-blur-xl ${directionAligned ? "border-[#63e6a4]/40 bg-[#63e6a4]/18 text-[#b8ffd7]" : "border-white/10 bg-[#050610]/55 text-white"}`}>
+            <div className={`absolute -left-24 rounded-full border px-5 py-2 text-5xl font-black shadow-[0_0_40px_color-mix(in_srgb,var(--accent)_22%,transparent)] backdrop-blur-xl ${directionAligned ? "border-success/40 bg-success/18 text-success" : "border-brand-border bg-background/55 text-white"}`}>
               {directionArrow === "←" ? "←" : ""}
             </div>
-            <div className={`absolute -right-24 rounded-full border px-5 py-2 text-5xl font-black shadow-[0_0_40px_rgba(124,92,255,0.22)] backdrop-blur-xl ${directionAligned ? "border-[#63e6a4]/40 bg-[#63e6a4]/18 text-[#b8ffd7]" : "border-white/10 bg-[#050610]/55 text-white"}`}>
+            <div className={`absolute -right-24 rounded-full border px-5 py-2 text-5xl font-black shadow-[0_0_40px_color-mix(in_srgb,var(--accent)_22%,transparent)] backdrop-blur-xl ${directionAligned ? "border-success/40 bg-success/18 text-success" : "border-brand-border bg-background/55 text-white"}`}>
               {directionArrow === "→" ? "→" : ""}
             </div>
-            <div className={`h-28 w-28 rounded-full border shadow-[0_0_60px_rgba(56,213,255,0.22)] ${directionAligned && altitudeAligned ? "border-[#63e6a4]/70 bg-[#63e6a4]/12" : "border-[#38d5ff]/55 bg-[#38d5ff]/10"}`} />
-            <div className={`absolute h-2 w-2 rounded-full ${directionAligned && altitudeAligned ? "bg-[#63e6a4]" : "bg-[#38d5ff]"}`} />
+            <div className={`h-28 w-28 rounded-full border shadow-[0_0_60px_color-mix(in_srgb,var(--accent-cyan)_22%,transparent)] ${directionAligned && altitudeAligned ? "border-success/70 bg-success/12" : "border-accent-cyan/55 bg-accent-cyan/10"}`} />
+            <div className={`absolute h-2 w-2 rounded-full ${directionAligned && altitudeAligned ? "bg-success" : "bg-accent-cyan"}`} />
           </div>
         ) : null}
 
         {showHud ? (
         <AppCard className="rounded-[24px] p-3 sm:rounded-[28px] sm:p-5" padding="sm">
-          {cameraError ? <p className="mb-4 rounded-[18px] border border-[#ffd166]/25 bg-[#ffd166]/10 p-3 text-sm text-[#ffe3a3]">{cameraError}</p> : null}
-          {zoomError ? <p className="mb-4 rounded-[18px] border border-[#ffd166]/25 bg-[#ffd166]/10 p-3 text-sm text-[#ffe3a3]">{zoomError}</p> : null}
+          {cameraError ? <p className="mb-4 rounded-[18px] border border-warning/25 bg-warning/10 p-3 text-sm text-warning">{cameraError}</p> : null}
+          {zoomError ? <p className="mb-4 rounded-[18px] border border-warning/25 bg-warning/10 p-3 text-sm text-warning">{zoomError}</p> : null}
 
           {cameraStatus !== "active" ? (
             <AppButton
@@ -462,60 +462,60 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
           ) : null}
 
           <div className="hidden gap-3 sm:grid sm:grid-cols-2">
-            <div className="rounded-[20px] border border-white/10 bg-white/[0.06] p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8ea0ff]">Direction cible</p>
+            <div className="rounded-[20px] border border-brand-border bg-white/[0.06] p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent-cyan">Direction cible</p>
               <p className="mt-1 text-2xl font-black">{liveQuest.cardinalDirection ?? "Libre"}</p>
-              <p className="mt-1 text-sm font-semibold text-[#cbd0ff]">
+              <p className="mt-1 text-sm font-semibold text-muted">
                 {liveQuest.azimuth !== null ? `${Math.round(liveQuest.azimuth)}°` : "Zone dégagée"}
               </p>
             </div>
-            <div className="rounded-[20px] border border-white/10 bg-white/[0.06] p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8ea0ff]">Altitude cible</p>
+            <div className="rounded-[20px] border border-brand-border bg-white/[0.06] p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent-cyan">Altitude cible</p>
               <p className="mt-1 text-2xl font-black">{liveQuest.altitude !== null ? `${Math.round(liveQuest.altitude)}°` : "Libre"}</p>
-              <p className="mt-1 text-sm font-semibold text-[#cbd0ff]">0° = horizon, 90° = zénith</p>
+              <p className="mt-1 text-sm font-semibold text-muted">0° = horizon, 90° = zénith</p>
             </div>
           </div>
 
           <div className="mt-3 hidden gap-3 sm:grid sm:grid-cols-3">
             <div className={`rounded-[18px] border p-3 ${directionTone}`}>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9aeaff]">Téléphone</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent-cyan">Téléphone</p>
               <p className="mt-1 text-lg font-black">
                 {currentAzimuth !== null ? azimuthToCardinal(currentAzimuth) : "Inconnu"}
               </p>
-              <p className="mt-1 text-sm font-semibold text-[#d7f8ff]">
+              <p className="mt-1 text-sm font-semibold text-accent-cyan">
                 {currentAzimuth !== null ? `${Math.round(currentAzimuth)}°` : "Boussole inactive"}
               </p>
             </div>
             <div className={`rounded-[18px] border p-3 ${directionTone}`}>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8ea0ff]">Écart horizontal</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent-cyan">Écart horizontal</p>
               <p className="mt-1 text-3xl font-black">{directionArrowLabel}</p>
-              <p className="mt-1 text-sm font-semibold text-[#cbd0ff]">Vise jusqu&apos;à 0°</p>
+              <p className="mt-1 text-sm font-semibold text-muted">Vise jusqu&apos;à 0°</p>
             </div>
             <div className={`rounded-[18px] border p-3 ${altitudeTone}`}>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8ea0ff]">Caméra</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent-cyan">Caméra</p>
               <p className="mt-1 text-lg font-black">
                 {currentAltitude !== null ? `${Math.round(currentAltitude)}°` : "Inconnu"}
               </p>
-              <p className="mt-1 text-sm font-semibold text-[#cbd0ff]">
+              <p className="mt-1 text-sm font-semibold text-muted">
                 {altitudeArrowLabel}
               </p>
             </div>
           </div>
 
-          <div className="mt-4 hidden rounded-[22px] bg-[#7c5cff]/16 p-4 sm:block">
+          <div className="mt-4 hidden rounded-[22px] bg-accent/16 p-4 sm:block">
             <p className="text-2xl font-black tracking-[-0.03em]">{mainHint}</p>
-            <p className="mt-2 text-base font-semibold text-[#d8dcff]">{altitudeHint ?? "La boussole mobile peut être imprécise."}</p>
+            <p className="mt-2 text-base font-semibold text-muted">{altitudeHint ?? "La boussole mobile peut être imprécise."}</p>
           </div>
 
           <AppButton variant="secondary" onClick={requestOrientation} fullWidth className="mt-4">
             {orientationStatus === "active" ? "Orientation active" : "Activer l'orientation"}
           </AppButton>
-          <p className="mt-2 text-xs font-semibold leading-5 text-[#9fa6d9]">
+          <p className="mt-2 text-xs font-semibold leading-5 text-faint">
             La direction utilise la vraie boussole du navigateur quand elle est disponible. Sinon, suis la direction texte.
           </p>
 
           {orientationStatus === "denied" || orientationStatus === "unsupported" ? (
-            <p className="mt-3 text-sm leading-6 text-[#ffdca0]">
+            <p className="mt-3 text-sm leading-6 text-warning">
               {orientationError ?? "La boussole n'est pas disponible."} Regarde vers {liveQuest.cardinalDirection ?? "la zone la plus dégagée"}
               {liveQuest.altitude !== null ? `, environ ${Math.round(liveQuest.altitude)}° au-dessus de l'horizon.` : "."}
             </p>

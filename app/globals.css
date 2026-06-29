@@ -3,6 +3,7 @@
 
 :root {
   color-scheme: dark;
+  --brand-font-family: var(--font-inter), system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --background: var(--brand-color-bg-layout);
   --surface: var(--brand-color-bg-container);
   --surface-strong: var(--brand-color-bg-elevated);

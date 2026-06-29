@@ -18,10 +18,10 @@ const baseClasses = [
 
 const variantClasses: Record<AppButtonVariant, string> = {
   primary: "bg-accent px-5 text-white shadow-[0_16px_40px_color-mix(in_srgb,var(--accent)_35%,transparent)] hover:bg-brand-primary-hover",
-  secondary: "border border-accent-cyan/25 bg-accent-cyan/12 text-[#d7f8ff]",
+  secondary: "border border-accent-cyan/25 bg-accent-cyan/12 text-accent-cyan",
   ghost: "border border-brand-border bg-white/[0.06] text-white",
-  success: "border border-success/25 bg-success/12 text-[#9df0c4]",
-  danger: "border border-danger/25 bg-danger/10 text-[#ffd2dc]",
+  success: "border border-success/25 bg-success/12 text-success",
+  danger: "border border-danger/25 bg-danger/10 text-danger",
 };
 
 const sizeClasses: Record<AppButtonSize, string> = {
