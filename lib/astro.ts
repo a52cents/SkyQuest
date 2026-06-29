@@ -50,6 +50,10 @@ export function getSkyObjects(latitude: number, longitude: number, date: Date): 
 }
 
 export function getSunAltitude(latitude: number, longitude: number, date: Date): number {
+  return getSunPosition(latitude, longitude, date).altitude;
+}
+
+export function getSunPosition(latitude: number, longitude: number, date: Date): { azimuth: number; altitude: number } {
   const observer = new Astronomy.Observer(latitude, longitude, 0);
-  return calculateHorizontalPosition(bodyByName.Sun, observer, date).altitude;
+  return calculateHorizontalPosition(bodyByName.Sun, observer, date);
 }

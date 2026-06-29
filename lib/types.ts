@@ -17,7 +17,7 @@ export type VisibilityLabel = "Excellente chance" | "Bonne chance" | "Tentable" 
 
 export type SkyQuest = {
   id: string;
-  target: SkyObjectName | "FreeObservation";
+  target: SkyObjectName | "FreeObservation" | "SunTest";
   title: string;
   difficulty: "easy" | "medium";
   azimuth: number | null;

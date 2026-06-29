@@ -1,4 +1,4 @@
-import { getSkyObjects, getSunAltitude } from "@/lib/astro";
+import { getSkyObjects, getSunAltitude, getSunPosition } from "@/lib/astro";
 import { azimuthToCardinal } from "@/lib/orientation";
 import { calculateVisibilityScore, getVisibilityLabel } from "@/lib/visibility";
 import type { SkyObject, SkyObjectName, SkyQuest, WeatherNow } from "@/lib/types";
@@ -73,6 +73,24 @@ function createFreeObservationQuest(now: Date): SkyQuest {
   };
 }
 
+function createSunTestQuest(latitude: number, longitude: number, now: Date): SkyQuest {
+  const sunPosition = getSunPosition(latitude, longitude, now);
+
+  return {
+    id: `sun-test-${now.getTime()}`,
+    target: "SunTest",
+    title: "Test guidage : direction du Soleil",
+    difficulty: "easy",
+    azimuth: Math.round(sunPosition.azimuth),
+    altitude: Math.round(sunPosition.altitude),
+    cardinalDirection: azimuthToCardinal(sunPosition.azimuth),
+    visibilityScore: 100,
+    visibilityLabel: "Calibration",
+    description: "Mission de test pour vérifier la boussole et l'altitude du téléphone. Ne regarde jamais directement le Soleil.",
+    tip: "Utilise seulement l'écran pour tester le guidage. Ne fixe pas le Soleil à l'oeil nu, même brièvement.",
+  };
+}
+
 export function generateQuests({ latitude, longitude, weather, now }: GenerateQuestsInput): SkyQuest[] {
   if (latitude === null || longitude === null) {
     return [createFreeObservationQuest(now)];
@@ -90,11 +108,13 @@ export function generateQuests({ latitude, longitude, weather, now }: GenerateQu
     const reliable = scored.filter((item) => item.score >= 50);
     const selected = reliable.slice(0, 3);
 
+    const sunTestQuest = createSunTestQuest(latitude, longitude, now);
+
     if (selected.length === 0) {
-      return [createFreeObservationQuest(now)];
+      return [sunTestQuest, createFreeObservationQuest(now)];
     }
 
-    return selected.map((item) => createQuest(item.object, item.score, now));
+    return [sunTestQuest, ...selected.slice(0, 2).map((item) => createQuest(item.object, item.score, now))];
   } catch {
     return [createFreeObservationQuest(now)];
   }

@@ -8,13 +8,14 @@ type QuestCardProps = {
   onMissed: (quest: SkyQuest) => void;
 };
 
-const icons: Record<SkyObjectName | "FreeObservation", string> = {
+const icons: Record<SkyObjectName | "FreeObservation" | "SunTest", string> = {
   Moon: "🌙",
   Venus: "✦",
   Jupiter: "◉",
   Saturn: "◎",
   Mars: "•",
   FreeObservation: "✧",
+  SunTest: "☼",
 };
 
 export function QuestCard({ quest, onStart, onSeen, onMissed }: QuestCardProps) {

@@ -179,12 +179,11 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     ? quest.altitude - currentAltitude
     : null;
   const targetSummary = `${quest.cardinalDirection ?? "zone libre"}${quest.altitude !== null ? ` · ${Math.round(quest.altitude)}°` : ""}`;
-  const phoneSummary = currentAzimuth !== null
-    ? `Tél. ${azimuthToCardinal(currentAzimuth)} ${Math.round(currentAzimuth)}° · ${directionDeltaLabel}`
-    : "Active l'orientation pour voir ta direction";
   const cameraSummary = currentAltitude !== null && altitudeDelta !== null
     ? `Cam. ${Math.round(currentAltitude)}° · ${Math.abs(Math.round(altitudeDelta))}° ${altitudeDelta > 0 ? "plus haut" : altitudeDelta < 0 ? "plus bas" : "pile"}`
     : "Caméra: inclinaison inactive";
+  const currentPhoneDirection = currentAzimuth !== null ? azimuthToCardinal(currentAzimuth) : "Inconnu";
+  const isSunTest = quest.target === "SunTest";
 
   return (
     <main className="relative min-h-[100dvh] overflow-hidden bg-[#050610] text-white">
@@ -211,9 +210,21 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="hidden text-sm font-semibold uppercase tracking-[0.18em] text-[#8ea0ff] sm:block">Guidage 2D</p>
-                <h1 className="truncate text-base font-extrabold tracking-[-0.03em] sm:mt-1 sm:text-2xl">{quest.title} · {targetSummary}</h1>
-                <p className="mt-1 truncate text-xs font-bold text-[#d8dcff] sm:hidden">{phoneSummary}</p>
-                <p className="mt-1 truncate text-xs font-semibold text-[#9aeaff] sm:hidden">{cameraSummary}</p>
+                <h1 className="truncate text-base font-extrabold tracking-[-0.03em] sm:mt-1 sm:text-2xl">{quest.title}</h1>
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:hidden">
+                  <div className="rounded-[14px] border border-white/10 bg-white/[0.07] px-3 py-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#8ea0ff]">Cible</p>
+                    <p className="mt-0.5 text-sm font-black text-white">{targetSummary}</p>
+                  </div>
+                  <div className="rounded-[14px] border border-[#38d5ff]/20 bg-[#38d5ff]/12 px-3 py-2">
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#9aeaff]">Téléphone</p>
+                    <p className="mt-0.5 text-sm font-black text-white">
+                      {currentAzimuth !== null ? `${currentPhoneDirection} ${Math.round(currentAzimuth)}°` : "Inconnu"}
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs font-bold text-[#d8dcff] sm:hidden">{directionDeltaLabel}</p>
+                <p className="mt-1 text-xs font-semibold text-[#9aeaff] sm:hidden">{cameraSummary}</p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <button
@@ -232,6 +243,11 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               Orientation approximative : regarde vers {quest.cardinalDirection ?? "le ciel"}
               {quest.altitude !== null ? `, environ ${Math.round(quest.altitude)}° au-dessus de l'horizon.` : "."}
             </p>
+            {isSunTest ? (
+              <p className="mt-3 rounded-[14px] border border-[#ffd166]/25 bg-[#ffd166]/10 px-3 py-2 text-xs font-bold leading-5 text-[#ffe3a3] sm:text-sm">
+                Test uniquement : ne regarde jamais directement le Soleil. Utilise l&apos;écran comme repère.
+              </p>
+            ) : null}
           </header>
         ) : <div />}
 
