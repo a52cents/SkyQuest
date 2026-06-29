@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
+  angleDifference,
+  azimuthToCardinal,
+  betaToCameraAltitude,
   getAltitudeHint,
   getDirectionHint,
   normalizeAngle,
@@ -32,7 +35,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [orientationStatus, setOrientationStatus] = useState<"idle" | "active" | "denied" | "unsupported">("idle");
   const [orientationError, setOrientationError] = useState<string | null>(null);
   const [currentAzimuth, setCurrentAzimuth] = useState<number | null>(null);
-  const [currentPitch, setCurrentPitch] = useState<number | null>(null);
+  const [currentAltitude, setCurrentAltitude] = useState<number | null>(null);
 
   useEffect(() => {
     return () => {
@@ -117,7 +120,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     }
 
     if (typeof event.beta === "number") {
-      setCurrentPitch(Math.max(-90, Math.min(90, event.beta)));
+      setCurrentAltitude(betaToCameraAltitude(event.beta));
     }
   }
 
@@ -160,11 +163,20 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const directionHint = quest.azimuth !== null && currentAzimuth !== null
     ? getDirectionHint(currentAzimuth, quest.azimuth)
     : null;
-  const altitudeHint = quest.altitude !== null && currentPitch !== null
-    ? getAltitudeHint(currentPitch, quest.altitude)
+  const altitudeHint = quest.altitude !== null && currentAltitude !== null
+    ? getAltitudeHint(currentAltitude, quest.altitude)
     : null;
   const close = directionHint === "Bonne direction" && altitudeHint === "Hauteur proche";
   const mainHint = close ? "Tu es proche, regarde bien le ciel" : directionHint ?? "Active l'orientation ou suis la direction texte";
+  const directionDelta = quest.azimuth !== null && currentAzimuth !== null
+    ? angleDifference(currentAzimuth, quest.azimuth)
+    : null;
+  const directionDeltaLabel = directionDelta !== null
+    ? `${Math.abs(Math.round(directionDelta))}° ${directionDelta > 0 ? "à droite" : directionDelta < 0 ? "à gauche" : "pile en face"}`
+    : "Active l'orientation";
+  const altitudeDelta = quest.altitude !== null && currentAltitude !== null
+    ? quest.altitude - currentAltitude
+    : null;
 
   return (
     <main className="relative min-h-[100dvh] overflow-hidden bg-[#050610] text-white">
@@ -215,10 +227,40 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             <div className="rounded-[20px] border border-white/10 bg-white/[0.06] p-4">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8ea0ff]">Direction cible</p>
               <p className="mt-1 text-2xl font-black">{quest.cardinalDirection ?? "Libre"}</p>
+              <p className="mt-1 text-sm font-semibold text-[#cbd0ff]">
+                {quest.azimuth !== null ? `${Math.round(quest.azimuth)}°` : "Zone dégagée"}
+              </p>
             </div>
             <div className="rounded-[20px] border border-white/10 bg-white/[0.06] p-4">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8ea0ff]">Altitude cible</p>
               <p className="mt-1 text-2xl font-black">{quest.altitude !== null ? `${Math.round(quest.altitude)}°` : "Libre"}</p>
+              <p className="mt-1 text-sm font-semibold text-[#cbd0ff]">0° = horizon, 90° = zénith</p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[18px] border border-[#38d5ff]/15 bg-[#38d5ff]/10 p-3">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9aeaff]">Téléphone</p>
+              <p className="mt-1 text-lg font-black">
+                {currentAzimuth !== null ? azimuthToCardinal(currentAzimuth) : "Inconnu"}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-[#d7f8ff]">
+                {currentAzimuth !== null ? `${Math.round(currentAzimuth)}°` : "Boussole inactive"}
+              </p>
+            </div>
+            <div className="rounded-[18px] border border-white/10 bg-white/[0.06] p-3">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8ea0ff]">Écart horizontal</p>
+              <p className="mt-1 text-lg font-black">{directionDeltaLabel}</p>
+              <p className="mt-1 text-sm font-semibold text-[#cbd0ff]">Vise jusqu&apos;à 0°</p>
+            </div>
+            <div className="rounded-[18px] border border-white/10 bg-white/[0.06] p-3">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8ea0ff]">Caméra</p>
+              <p className="mt-1 text-lg font-black">
+                {currentAltitude !== null ? `${Math.round(currentAltitude)}°` : "Inconnu"}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-[#cbd0ff]">
+                {altitudeDelta !== null ? `${Math.abs(Math.round(altitudeDelta))}° ${altitudeDelta > 0 ? "plus haut" : altitudeDelta < 0 ? "plus bas" : "pile"}` : "Inclinaison inactive"}
+              </p>
             </div>
           </div>
 

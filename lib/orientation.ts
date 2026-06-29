@@ -12,6 +12,10 @@ export function azimuthToCardinal(azimuth: number): string {
   return directions[index];
 }
 
+export function betaToCameraAltitude(beta: number): number {
+  return Math.max(-90, Math.min(90, 90 - beta));
+}
+
 export function getDirectionHint(currentAzimuth: number, targetAzimuth: number): string {
   const diff = angleDifference(currentAzimuth, targetAzimuth);
 

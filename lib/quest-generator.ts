@@ -88,7 +88,7 @@ export function generateQuests({ latitude, longitude, weather, now }: GenerateQu
       .sort((a, b) => b.score - a.score);
 
     const reliable = scored.filter((item) => item.score >= 50);
-    const selected = reliable.length > 0 ? reliable.slice(0, 3) : scored.filter((item) => item.score >= 40).slice(0, 1);
+    const selected = reliable.slice(0, 3);
 
     if (selected.length === 0) {
       return [createFreeObservationQuest(now)];

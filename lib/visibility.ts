@@ -29,14 +29,24 @@ export function calculateVisibilityScore({ object, weather, sunAltitude }: Visib
     score += 10;
   }
 
-  const daylight = weather.isDay || sunAltitude > -3;
+  const daylight = weather.isDay || sunAltitude > 0;
+  const brightTwilight = sunAltitude > -3;
+
   if (daylight) {
     if (object.name === "Moon") {
       score -= 8;
     } else if (object.name === "Venus") {
-      score -= 24;
+      score -= 52;
     } else {
-      score -= 45;
+      score -= 60;
+    }
+  } else if (brightTwilight) {
+    if (object.name === "Moon") {
+      score -= 4;
+    } else if (object.name === "Venus") {
+      score -= 18;
+    } else {
+      score -= 36;
     }
   }
 
