@@ -20,6 +20,7 @@ export type DeviceOrientationReading = {
   alpha: number | null;
   beta: number | null;
   gamma: number | null;
+  absolute: boolean;
   webkitCompassHeading?: number;
 };
 
@@ -127,10 +128,18 @@ export function getCameraPointing(reading: DeviceOrientationReading): CameraPoin
         };
       }
 
+      if (reading.absolute) {
+        return {
+          azimuth: horizontal.camera.azimuth,
+          altitude: horizontal.camera.altitude,
+          source: "absolute",
+        };
+      }
+
       return {
-        azimuth: horizontal.camera.azimuth,
+        azimuth: null,
         altitude: horizontal.camera.altitude,
-        source: "absolute",
+        source: "tilt-only",
       };
     }
   }

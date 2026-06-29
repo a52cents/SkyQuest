@@ -168,6 +168,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       alpha: event.alpha,
       beta: event.beta,
       gamma: event.gamma,
+      absolute: event.absolute === true,
       webkitCompassHeading: event.webkitCompassHeading,
     });
 
