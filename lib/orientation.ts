@@ -1,3 +1,5 @@
+export const ALIGNMENT_TOLERANCE_DEGREES = 4;
+
 export function normalizeAngle(angle: number): number {
   return ((angle % 360) + 360) % 360;
 }
@@ -154,10 +156,10 @@ export function getCameraPointing(reading: DeviceOrientationReading): CameraPoin
 
 export function getDirectionHint(currentAzimuth: number, targetAzimuth: number): string {
   const diff = angleDifference(currentAzimuth, targetAzimuth);
-  if (diff > 15) {
+  if (diff > ALIGNMENT_TOLERANCE_DEGREES) {
     return "Tourne à droite";
   }
-  if (diff < -15) {
+  if (diff < -ALIGNMENT_TOLERANCE_DEGREES) {
     return "Tourne à gauche";
   }
   return "Bonne direction";
@@ -165,10 +167,10 @@ export function getDirectionHint(currentAzimuth: number, targetAzimuth: number):
 
 export function getAltitudeHint(currentPitch: number, targetAltitude: number): string {
   const diff = targetAltitude - currentPitch;
-  if (diff > 10) {
+  if (diff > ALIGNMENT_TOLERANCE_DEGREES) {
     return "Lève un peu le téléphone";
   }
-  if (diff < -10) {
+  if (diff < -ALIGNMENT_TOLERANCE_DEGREES) {
     return "Baisse un peu le téléphone";
   }
   return "Hauteur proche";

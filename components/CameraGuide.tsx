@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
+  ALIGNMENT_TOLERANCE_DEGREES,
   angleDifference,
   azimuthToCardinal,
   getCameraPointing,
@@ -28,12 +29,34 @@ type OrientationPermissionEvent = typeof DeviceOrientationEvent & {
   requestPermission?: (absolute?: boolean) => Promise<PermissionState>;
 };
 
+type CameraZoomRange = {
+  min: number;
+  max: number;
+  step: number;
+};
+
+type CameraZoomCapabilities = MediaTrackCapabilities & {
+  zoom?: {
+    min?: number;
+    max?: number;
+    step?: number;
+  };
+};
+
+type CameraZoomSettings = MediaTrackSettings & {
+  zoom?: number;
+};
+
+type CameraZoomConstraintSet = MediaTrackConstraintSet & {
+  zoom?: number;
+};
+
 function getDirectionArrow(delta: number | null): string {
   if (delta === null) {
     return "—";
   }
 
-  if (Math.abs(delta) <= 15) {
+  if (Math.abs(delta) <= ALIGNMENT_TOLERANCE_DEGREES) {
     return "◎";
   }
 
@@ -45,7 +68,7 @@ function getAltitudeArrow(delta: number | null): string {
     return "—";
   }
 
-  if (Math.abs(delta) <= 10) {
+  if (Math.abs(delta) <= ALIGNMENT_TOLERANCE_DEGREES) {
     return "◎";
   }
 
@@ -62,6 +85,9 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [currentAzimuth, setCurrentAzimuth] = useState<number | null>(null);
   const [currentAltitude, setCurrentAltitude] = useState<number | null>(null);
   const [liveQuest, setLiveQuest] = useState<SkyQuest>(quest);
+  const [zoomRange, setZoomRange] = useState<CameraZoomRange | null>(null);
+  const [currentZoom, setCurrentZoom] = useState<number | null>(null);
+  const [zoomError, setZoomError] = useState<string | null>(null);
   const [showHud, setShowHud] = useState(true);
 
   useEffect(() => {
@@ -107,6 +133,9 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
   async function startCamera() {
     setCameraError(null);
+    setZoomError(null);
+    setZoomRange(null);
+    setCurrentZoom(null);
 
     if (!isSecureBrowserContext()) {
       setCameraStatus("error");
@@ -133,6 +162,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       });
 
       streamRef.current = stream;
+      configureCameraZoom(stream);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => undefined);
@@ -142,6 +172,70 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       const fallbackMessage = getCameraErrorMessage(error);
       setCameraStatus("error");
       setCameraError(fallbackMessage);
+    }
+  }
+
+  function readCameraZoomRange(track: MediaStreamTrack): CameraZoomRange | null {
+    if (typeof track.getCapabilities !== "function") {
+      return null;
+    }
+
+    const zoom = (track.getCapabilities() as CameraZoomCapabilities).zoom;
+
+    if (!zoom || typeof zoom.min !== "number" || typeof zoom.max !== "number" || zoom.max <= zoom.min) {
+      return null;
+    }
+
+    return {
+      min: zoom.min,
+      max: zoom.max,
+      step: typeof zoom.step === "number" && zoom.step > 0 ? zoom.step : 0.5,
+    };
+  }
+
+  function configureCameraZoom(stream: MediaStream) {
+    const track = stream.getVideoTracks()[0];
+    const range = track ? readCameraZoomRange(track) : null;
+    const settings = track ? (track.getSettings() as CameraZoomSettings) : null;
+
+    setZoomRange(range);
+    setCurrentZoom(range ? settings?.zoom ?? range.min : null);
+    setZoomError(null);
+  }
+
+  function formatZoom(value: number): string {
+    return Number.isInteger(value) ? value.toString() : value.toFixed(1);
+  }
+
+  function getNextZoom(range: CameraZoomRange, current: number | null): number {
+    const stops = [range.min, Math.min(2, range.max), Math.min(4, range.max), range.max]
+      .filter((value, index, values) => values.findIndex((candidate) => Math.abs(candidate - value) < 0.05) === index)
+      .sort((a, b) => a - b);
+    const activeZoom = current ?? range.min;
+    const nextStop = stops.find((stop) => stop > activeZoom + range.step / 2);
+
+    return nextStop ?? range.min;
+  }
+
+  async function toggleCameraZoom() {
+    const track = streamRef.current?.getVideoTracks()[0];
+
+    if (!track || !zoomRange) {
+      return;
+    }
+
+    const nextZoom = getNextZoom(zoomRange, currentZoom);
+
+    try {
+      // This is optical/sensor zoom exposed by the camera track, not CSS scaling.
+      await track.applyConstraints({
+        advanced: [{ zoom: nextZoom } as CameraZoomConstraintSet],
+      });
+      const settings = track.getSettings() as CameraZoomSettings;
+      setCurrentZoom(settings.zoom ?? nextZoom);
+      setZoomError(null);
+    } catch {
+      setZoomError("Zoom indisponible sur cette caméra.");
     }
   }
 
@@ -163,12 +257,12 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     return "Caméra indisponible. Tu peux quand même suivre la direction indiquée.";
   }
 
-   function handleOrientation(event: CompassEvent) {
+  function handleOrientation(event: CompassEvent) {
     const pointing = getCameraPointing({
       alpha: event.alpha,
       beta: event.beta,
       gamma: event.gamma,
-      absolute: event.absolute === true, // <-- LIGNE RESTAURÉE ICI
+      absolute: event.absolute === true,
       webkitCompassHeading: event.webkitCompassHeading,
     });
     if (pointing.azimuth !== null) {
@@ -234,8 +328,8 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const directionArrowLabel = directionDelta !== null ? `${directionArrow} ${Math.abs(Math.round(directionDelta))}°` : "—";
   const altitudeArrowLabel = altitudeDelta !== null ? `${altitudeArrow} ${Math.abs(Math.round(altitudeDelta))}°` : "—";
   const currentPhoneDirection = currentAzimuth !== null ? azimuthToCardinal(currentAzimuth) : "Inconnu";
-  const directionAligned = directionDelta !== null && Math.abs(directionDelta) <= 15;
-  const altitudeAligned = altitudeDelta !== null && Math.abs(altitudeDelta) <= 10;
+  const directionAligned = directionDelta !== null && Math.abs(directionDelta) <= ALIGNMENT_TOLERANCE_DEGREES;
+  const altitudeAligned = altitudeDelta !== null && Math.abs(altitudeDelta) <= ALIGNMENT_TOLERANCE_DEGREES;
   const directionTone = directionAligned
     ? "border-[#63e6a4]/35 bg-[#63e6a4]/16 text-[#b8ffd7]"
     : "border-[#38d5ff]/20 bg-[#38d5ff]/12 text-white";
@@ -343,6 +437,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         {showHud ? (
         <div className="glass-card rounded-[24px] p-3 sm:rounded-[28px] sm:p-5">
           {cameraError ? <p className="mb-4 rounded-[18px] border border-[#ffd166]/25 bg-[#ffd166]/10 p-3 text-sm text-[#ffe3a3]">{cameraError}</p> : null}
+          {zoomError ? <p className="mb-4 rounded-[18px] border border-[#ffd166]/25 bg-[#ffd166]/10 p-3 text-sm text-[#ffe3a3]">{zoomError}</p> : null}
 
           {cameraStatus !== "active" ? (
             <button
@@ -352,6 +447,15 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               className="mb-4 min-h-14 w-full rounded-full bg-[#7c5cff] px-5 text-base font-extrabold text-white shadow-[0_16px_40px_rgba(124,92,255,0.35)] transition active:scale-[0.98] disabled:opacity-70"
             >
               {cameraStatus === "starting" ? "Ouverture caméra..." : "Démarrer la caméra"}
+            </button>
+          ) : null}
+          {cameraStatus === "active" && zoomRange ? (
+            <button
+              type="button"
+              onClick={toggleCameraZoom}
+              className="mb-4 min-h-12 w-full rounded-full border border-white/10 bg-white/[0.08] px-5 text-sm font-extrabold text-white transition active:scale-[0.98]"
+            >
+              Zoom réel {formatZoom(currentZoom ?? zoomRange.min)}x
             </button>
           ) : null}
 
