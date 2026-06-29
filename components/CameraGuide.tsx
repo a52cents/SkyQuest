@@ -36,6 +36,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [orientationError, setOrientationError] = useState<string | null>(null);
   const [currentAzimuth, setCurrentAzimuth] = useState<number | null>(null);
   const [currentAltitude, setCurrentAltitude] = useState<number | null>(null);
+  const [showHud, setShowHud] = useState(true);
 
   useEffect(() => {
     return () => {
@@ -177,6 +178,13 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const altitudeDelta = quest.altitude !== null && currentAltitude !== null
     ? quest.altitude - currentAltitude
     : null;
+  const targetSummary = `${quest.cardinalDirection ?? "zone libre"}${quest.altitude !== null ? ` · ${Math.round(quest.altitude)}°` : ""}`;
+  const phoneSummary = currentAzimuth !== null
+    ? `Tél. ${azimuthToCardinal(currentAzimuth)} ${Math.round(currentAzimuth)}° · ${directionDeltaLabel}`
+    : "Active l'orientation pour voir ta direction";
+  const cameraSummary = currentAltitude !== null && altitudeDelta !== null
+    ? `Cam. ${Math.round(currentAltitude)}° · ${Math.abs(Math.round(altitudeDelta))}° ${altitudeDelta > 0 ? "plus haut" : altitudeDelta < 0 ? "plus bas" : "pile"}`
+    : "Caméra: inclinaison inactive";
 
   return (
     <main className="relative min-h-[100dvh] overflow-hidden bg-[#050610] text-white">
@@ -187,29 +195,55 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         <div className="absolute inset-0 bg-[#070816]" aria-hidden="true" />
       ) : null}
 
+      {!showHud ? (
+        <button
+          type="button"
+          onClick={() => setShowHud(true)}
+          className="absolute right-4 top-4 z-20 rounded-full border border-white/10 bg-[#050610]/72 px-4 py-2 text-sm font-extrabold text-white backdrop-blur-xl transition active:scale-[0.98]"
+        >
+          Afficher
+        </button>
+      ) : null}
+
       <section className="relative z-10 flex min-h-[100dvh] flex-col justify-between px-5 pb-6 pt-5">
-        <header className="glass-card rounded-[24px] p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8ea0ff]">Guidage 2D</p>
-              <h1 className="mt-1 text-2xl font-extrabold tracking-[-0.03em]">{quest.title}</h1>
+        {showHud ? (
+          <header className="glass-card rounded-[20px] p-3 sm:rounded-[24px] sm:p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="hidden text-sm font-semibold uppercase tracking-[0.18em] text-[#8ea0ff] sm:block">Guidage 2D</p>
+                <h1 className="truncate text-base font-extrabold tracking-[-0.03em] sm:mt-1 sm:text-2xl">{quest.title} · {targetSummary}</h1>
+                <p className="mt-1 truncate text-xs font-bold text-[#d8dcff] sm:hidden">{phoneSummary}</p>
+                <p className="mt-1 truncate text-xs font-semibold text-[#9aeaff] sm:hidden">{cameraSummary}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowHud(false)}
+                  className="rounded-full border border-white/10 bg-white/[0.08] px-3 py-2 text-xs font-bold sm:px-4 sm:text-sm"
+                >
+                  Masquer
+                </button>
+                <Link href="/" className="rounded-full border border-white/10 bg-white/[0.08] px-3 py-2 text-xs font-bold sm:px-4 sm:text-sm">
+                  Quitter
+                </Link>
+              </div>
             </div>
-            <Link href="/" className="rounded-full border border-white/10 bg-white/[0.08] px-4 py-2 text-sm font-bold">
-              Quitter
-            </Link>
+            <p className="mt-3 hidden text-sm leading-6 text-[#d8dcff] sm:block">
+              Orientation approximative : regarde vers {quest.cardinalDirection ?? "le ciel"}
+              {quest.altitude !== null ? `, environ ${Math.round(quest.altitude)}° au-dessus de l'horizon.` : "."}
+            </p>
+          </header>
+        ) : <div />}
+
+        {showHud ? (
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
+            <div className="h-28 w-28 rounded-full border border-[#38d5ff]/55 bg-[#38d5ff]/10 shadow-[0_0_60px_rgba(56,213,255,0.22)]" />
+            <div className="absolute h-2 w-2 rounded-full bg-[#38d5ff]" />
           </div>
-          <p className="mt-3 text-sm leading-6 text-[#d8dcff]">
-            Orientation approximative : regarde vers {quest.cardinalDirection ?? "le ciel"}
-            {quest.altitude !== null ? `, environ ${Math.round(quest.altitude)}° au-dessus de l'horizon.` : "."}
-          </p>
-        </header>
+        ) : null}
 
-        <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
-          <div className="h-28 w-28 rounded-full border border-[#38d5ff]/55 bg-[#38d5ff]/10 shadow-[0_0_60px_rgba(56,213,255,0.22)]" />
-          <div className="absolute h-2 w-2 rounded-full bg-[#38d5ff]" />
-        </div>
-
-        <div className="glass-card rounded-[28px] p-5">
+        {showHud ? (
+        <div className="glass-card rounded-[24px] p-3 sm:rounded-[28px] sm:p-5">
           {cameraError ? <p className="mb-4 rounded-[18px] border border-[#ffd166]/25 bg-[#ffd166]/10 p-3 text-sm text-[#ffe3a3]">{cameraError}</p> : null}
 
           {cameraStatus !== "active" ? (
@@ -223,7 +257,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             </button>
           ) : null}
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="hidden gap-3 sm:grid sm:grid-cols-2">
             <div className="rounded-[20px] border border-white/10 bg-white/[0.06] p-4">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8ea0ff]">Direction cible</p>
               <p className="mt-1 text-2xl font-black">{quest.cardinalDirection ?? "Libre"}</p>
@@ -238,7 +272,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             </div>
           </div>
 
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <div className="mt-3 hidden gap-3 sm:grid sm:grid-cols-3">
             <div className="rounded-[18px] border border-[#38d5ff]/15 bg-[#38d5ff]/10 p-3">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9aeaff]">Téléphone</p>
               <p className="mt-1 text-lg font-black">
@@ -264,7 +298,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             </div>
           </div>
 
-          <div className="mt-4 rounded-[22px] bg-[#7c5cff]/16 p-4">
+          <div className="mt-4 hidden rounded-[22px] bg-[#7c5cff]/16 p-4 sm:block">
             <p className="text-2xl font-black tracking-[-0.03em]">{mainHint}</p>
             <p className="mt-2 text-base font-semibold text-[#d8dcff]">{altitudeHint ?? "La boussole mobile peut être imprécise."}</p>
           </div>
@@ -301,6 +335,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             </button>
           </div>
         </div>
+        ) : <div />}
       </section>
     </main>
   );

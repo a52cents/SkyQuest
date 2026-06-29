@@ -13,7 +13,7 @@ export function azimuthToCardinal(azimuth: number): string {
 }
 
 export function betaToCameraAltitude(beta: number): number {
-  return Math.max(-90, Math.min(90, 90 - beta));
+  return Math.max(-90, Math.min(90, beta - 90));
 }
 
 export function getDirectionHint(currentAzimuth: number, targetAzimuth: number): string {
