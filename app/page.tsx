@@ -11,12 +11,13 @@ import { QuestCard } from "@/components/QuestCard";
 import { SecureContextNotice } from "@/components/SecureContextNotice";
 import { getInsecureContextMessage, isSecureBrowserContext } from "@/lib/browser-support";
 import { fetchNextIssVisiblePass } from "@/lib/iss";
-import { generateQuests } from "@/lib/quest-generator";
+import { generateFutureQuestSuggestions, generateQuests, type FutureQuestSuggestion } from "@/lib/quest-generator";
 import { addObservation, saveActiveQuest, saveLastLocation } from "@/lib/storage";
 import type { SkyQuest } from "@/lib/types";
 import { getFallbackWeather, fetchWeatherNow } from "@/lib/weather";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
+type FutureState = "idle" | "loading" | "ready";
 
 type Position = {
   latitude: number;
@@ -63,7 +64,9 @@ function getCurrentPosition(): Promise<Position> {
 export default function HomePage() {
   const router = useRouter();
   const [state, setState] = useState<LoadState>("idle");
+  const [futureState, setFutureState] = useState<FutureState>("idle");
   const [quests, setQuests] = useState<SkyQuest[]>([]);
+  const [futureSuggestions, setFutureSuggestions] = useState<FutureQuestSuggestion[]>([]);
   const [position, setPosition] = useState<Position | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showAllQuests, setShowAllQuests] = useState(false);
@@ -116,6 +119,44 @@ export default function HomePage() {
     }
   }
 
+  async function handleFuturePossibilities() {
+    setFutureState("loading");
+    setNotice(null);
+    setFutureSuggestions([]);
+
+    try {
+      const coords = await getCurrentPosition();
+      setPosition(coords);
+      saveLastLocation(coords);
+
+      let weatherNotice: string | null = null;
+      const weather = await fetchWeatherNow(coords.latitude, coords.longitude).catch(() => {
+        weatherNotice = "Météo future indisponible : estimation prudente avec la météo actuelle.";
+        return getFallbackWeather();
+      });
+      const now = new Date();
+      const issPass = await fetchNextIssVisiblePass({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        now,
+        horizonMinutes: 24 * 60,
+      }).catch(() => null);
+
+      setFutureSuggestions(generateFutureQuestSuggestions({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        weather,
+        now,
+        issPass,
+      }));
+      setNotice(weatherNotice);
+      setFutureState("ready");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Position indisponible : impossible d'estimer les possibilités futures.");
+      setFutureState("ready");
+    }
+  }
+
   function handleStart(quest: SkyQuest) {
     saveActiveQuest(quest);
     router.push(`/quest/${quest.id}`);
@@ -128,6 +169,7 @@ export default function HomePage() {
 
   const visibleQuests = showAllQuests ? quests : quests.slice(0, 3);
   const hiddenQuestCount = Math.max(0, quests.length - visibleQuests.length);
+  const isBusy = state === "loading" || futureState === "loading";
 
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col px-5 pb-8 pt-6 sm:px-8">
@@ -166,10 +208,18 @@ export default function HomePage() {
               <button
                 type="button"
                 onClick={handleNow}
-                disabled={state === "loading"}
+                disabled={isBusy}
                 className="min-h-16 rounded-full bg-[#7c5cff] px-7 text-lg font-extrabold text-white shadow-[0_18px_50px_rgba(124,92,255,0.45)] transition hover:bg-[#8a70ff] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {state === "loading" ? "Lecture du ciel..." : "Maintenant"}
+              </button>
+              <button
+                type="button"
+                onClick={handleFuturePossibilities}
+                disabled={isBusy}
+                className="flex min-h-16 items-center justify-center rounded-full border border-[#38d5ff]/25 bg-[#38d5ff]/12 px-7 text-lg font-bold text-[#d7f8ff] transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {futureState === "loading" ? "Calcul..." : "Possibilités futures"}
               </button>
               <Link
                 href="/journal"
@@ -187,6 +237,47 @@ export default function HomePage() {
           <SecureContextNotice />
           {notice ? <ErrorState tone="info" message={notice} /> : null}
           {state === "loading" ? <LoadingState /> : null}
+          {futureState === "loading" ? <LoadingState /> : null}
+          {futureState === "ready" ? (
+            <section className="mb-6 grid gap-4">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8ea0ff]">Possibilités futures</p>
+                  <h3 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-white">Quand revenir</h3>
+                </div>
+                <p className="text-right text-sm text-[#9fa6d9]">Estimation, à revérifier sur place.</p>
+              </div>
+
+              {futureSuggestions.length === 0 ? (
+                <EmptyState title="Rien de fiable trouvé" message="Relance plus tard : nuages, lumière du jour ou horizon peuvent bloquer les meilleures cibles." />
+              ) : (
+                <div className="grid gap-3">
+                  {futureSuggestions.map((suggestion) => (
+                    <article key={`${suggestion.quest.id}-${suggestion.availableAt}`} className="glass-card rounded-[24px] p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#38d5ff]">
+                            Vers {new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(new Date(suggestion.availableAt))}
+                          </p>
+                          <h4 className="mt-1 text-xl font-extrabold tracking-[-0.03em] text-white">{suggestion.quest.title}</h4>
+                          <p className="mt-2 text-sm leading-6 text-[#c5caf5]">{suggestion.quest.description}</p>
+                        </div>
+                        <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-sm font-bold text-[#d8dcff]">
+                          {suggestion.quest.visibilityScore}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2 text-sm font-semibold text-[#d8dcff]">
+                        <span className="rounded-full bg-white/[0.06] px-3 py-1">{suggestion.quest.cardinalDirection ?? "Zone sombre"}</span>
+                        <span className="rounded-full bg-white/[0.06] px-3 py-1">
+                          {suggestion.quest.altitude !== null ? `${suggestion.quest.altitude}°` : "Pas de cible précise"}
+                        </span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          ) : null}
           {state === "ready" && quests.length === 0 ? (
             <EmptyState title="Aucune quête prête" message="Tu peux relancer maintenant ou tenter une observation libre du ciel." />
           ) : null}

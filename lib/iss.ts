@@ -28,15 +28,18 @@ export async function fetchNextIssVisiblePass({
   latitude,
   longitude,
   now,
+  horizonMinutes = 90,
 }: {
   latitude: number;
   longitude: number;
   now: Date;
+  horizonMinutes?: number;
 }): Promise<IssVisiblePass | null> {
   const url = new URL("/api/iss-pass", window.location.origin);
   url.searchParams.set("latitude", latitude.toString());
   url.searchParams.set("longitude", longitude.toString());
   url.searchParams.set("now", now.toISOString());
+  url.searchParams.set("horizonMinutes", horizonMinutes.toString());
 
   const response = await fetch(url.toString(), { cache: "no-store" });
 
@@ -67,9 +70,9 @@ export function parseIssVisiblePass(payload: IssVisiblePassPayload): IssVisibleP
   };
 }
 
-export function findNextIssVisiblePass(data: N2yoVisualPassResponse, now: Date): IssVisiblePassPayload | null {
+export function findNextIssVisiblePass(data: N2yoVisualPassResponse, now: Date, horizonMinutes = MAX_MINUTES_UNTIL_PASS): IssVisiblePassPayload | null {
   const nowSeconds = Math.floor(now.getTime() / 1000);
-  const maxStartSeconds = nowSeconds + MAX_MINUTES_UNTIL_PASS * 60;
+  const maxStartSeconds = nowSeconds + horizonMinutes * 60;
   const pass = data.passes
     ?.filter((candidate) => typeof candidate.startUTC === "number" && candidate.startUTC <= maxStartSeconds)
     .find((candidate) => typeof candidate.maxEl === "number" && candidate.maxEl >= 15);

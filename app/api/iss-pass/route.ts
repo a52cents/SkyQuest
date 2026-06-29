@@ -16,6 +16,19 @@ function readCoordinate(value: string | null, min: number, max: number): number 
   return parsed;
 }
 
+function readInteger(value: string | null, fallback: number, min: number, max: number): number {
+  if (value === null) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
 export async function GET(request: Request) {
   const apiKey = process.env.N2YO_API_KEY;
 
@@ -27,6 +40,7 @@ export async function GET(request: Request) {
   const latitude = readCoordinate(searchParams.get("latitude"), -90, 90);
   const longitude = readCoordinate(searchParams.get("longitude"), -180, 180);
   const now = new Date(searchParams.get("now") ?? Date.now());
+  const horizonMinutes = readInteger(searchParams.get("horizonMinutes"), 90, 30, 24 * 60);
 
   if (latitude === null || longitude === null || Number.isNaN(now.getTime())) {
     return NextResponse.json({ pass: null }, { status: 400 });
@@ -43,7 +57,7 @@ export async function GET(request: Request) {
     }
 
     const data = (await response.json()) as N2yoVisualPassResponse;
-    return NextResponse.json({ pass: findNextIssVisiblePass(data, now) });
+    return NextResponse.json({ pass: findNextIssVisiblePass(data, now, horizonMinutes) });
   } catch {
     return NextResponse.json({ pass: null });
   }

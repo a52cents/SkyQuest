@@ -17,6 +17,13 @@ type GenerateQuestsInput = {
   weather: WeatherNow;
   now: Date;
   issPass?: IssVisiblePass | null;
+  includeSunTest?: boolean;
+  limit?: number;
+};
+
+export type FutureQuestSuggestion = {
+  availableAt: string;
+  quest: SkyQuest;
 };
 
 const objectLabels: Record<SkyObjectName, string> = {
@@ -254,16 +261,34 @@ function selectQuestCandidates(candidates: QuestCandidate[], limit: number): Sky
   return selected;
 }
 
-export function generateQuests({ latitude, longitude, weather, now, issPass }: GenerateQuestsInput): SkyQuest[] {
+function isIssPassNearTime(pass: IssVisiblePass | null | undefined, date: Date): boolean {
+  if (!pass) {
+    return false;
+  }
+
+  const minutesUntilPass = (pass.startTime.getTime() - date.getTime()) / 60000;
+  return minutesUntilPass >= 0 && minutesUntilPass <= 45;
+}
+
+export function generateQuests({
+  latitude,
+  longitude,
+  weather,
+  now,
+  issPass,
+  includeSunTest = true,
+  limit = 8,
+}: GenerateQuestsInput): SkyQuest[] {
   if (latitude === null || longitude === null) {
     return [createFreeObservationQuest(now)];
   }
 
   try {
     const sunAltitude = getSunAltitude(latitude, longitude, now);
+    const effectiveWeather: WeatherNow = { ...weather, isDay: sunAltitude > 0 };
     const planetCandidates = getSkyObjects(latitude, longitude, now)
       .map((object) => {
-        const score = calculateVisibilityScore({ object, weather, sunAltitude });
+        const score = calculateVisibilityScore({ object, weather: effectiveWeather, sunAltitude });
 
         return {
           quest: createQuest(object, score, now),
@@ -290,7 +315,7 @@ export function generateQuests({ latitude, longitude, weather, now, issPass }: G
         const score = calculateCatalogVisibilityScore({
           object,
           altitude: position.altitude,
-          weather,
+          weather: effectiveWeather,
           sunAltitude,
           now,
         });
@@ -309,7 +334,7 @@ export function generateQuests({ latitude, longitude, weather, now, issPass }: G
       .filter((shower) => isMeteorShowerActive(shower, now))
       .flatMap<QuestCandidate>((shower) => {
         const score = calculateMeteorShowerVisibilityScore({
-          weather,
+          weather: effectiveWeather,
           sunAltitude,
           nearPeak: isNearMeteorShowerPeak(shower, now),
         });
@@ -331,20 +356,62 @@ export function generateQuests({ latitude, longitude, weather, now, issPass }: G
       });
 
     const issCandidates: QuestCandidate[] = issPass
-      ? [{ quest: createIssQuest(issPass, scoreIssPass(issPass, weather), now), score: scoreIssPass(issPass, weather) }]
+      ? [{ quest: createIssQuest(issPass, scoreIssPass(issPass, effectiveWeather), now), score: scoreIssPass(issPass, effectiveWeather) }]
         .filter((candidate) => candidate.score >= 50)
       : [];
 
     const candidates = [...issCandidates, ...planetCandidates, ...catalogCandidates, ...meteorCandidates];
-    const sunTestQuest = createSunTestQuest(latitude, longitude, now);
-    const selected = selectQuestCandidates(candidates, 8);
+    const selected = selectQuestCandidates(candidates, limit);
 
     if (selected.length === 0) {
-      return [sunTestQuest, createFreeObservationQuest(now)];
+      return includeSunTest ? [createSunTestQuest(latitude, longitude, now), createFreeObservationQuest(now)] : [createFreeObservationQuest(now)];
     }
 
-    return [sunTestQuest, ...selected];
+    return includeSunTest ? [createSunTestQuest(latitude, longitude, now), ...selected] : selected;
   } catch {
     return [createFreeObservationQuest(now)];
   }
+}
+
+export function generateFutureQuestSuggestions({
+  latitude,
+  longitude,
+  weather,
+  now,
+  issPass,
+}: {
+  latitude: number;
+  longitude: number;
+  weather: WeatherNow;
+  now: Date;
+  issPass?: IssVisiblePass | null;
+}): FutureQuestSuggestion[] {
+  const suggestions: FutureQuestSuggestion[] = [];
+  const seenTargets = new Set<string>();
+
+  for (let minutes = 30; minutes <= 24 * 60; minutes += 30) {
+    const date = new Date(now.getTime() + minutes * 60000);
+    const quests = generateQuests({
+      latitude,
+      longitude,
+      weather,
+      now: date,
+      issPass: isIssPassNearTime(issPass, date) ? issPass : null,
+      includeSunTest: false,
+      limit: 3,
+    }).filter((quest) => quest.targetType !== "free_observation");
+
+    for (const quest of quests) {
+      if (!seenTargets.has(quest.target)) {
+        suggestions.push({ availableAt: date.toISOString(), quest });
+        seenTargets.add(quest.target);
+      }
+
+      if (suggestions.length >= 5) {
+        return suggestions;
+      }
+    }
+  }
+
+  return suggestions;
 }
