@@ -1,0 +1,19 @@
+{
+  "name": "SkyQuest",
+  "short_name": "SkyQuest",
+  "description": "Découvre quoi observer dans le ciel maintenant.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#070816",
+  "theme_color": "#070816",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

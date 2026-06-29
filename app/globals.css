@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --background: #070816;
+  --surface: #0e1026;
+  --surface-strong: #161a35;
+  --text: #f7f7ff;
+  --muted: #b8bde6;
+  --faint: #7d84b8;
+  --accent: #7c5cff;
+  --accent-cyan: #38d5ff;
+  --success: #63e6a4;
+  --warning: #ffd166;
+  --danger: #ff6b8a;
+}
+
+@theme inline {
+  --font-sans: var(--font-outfit);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--background);
+}
+
+body {
+  min-height: 100dvh;
+  margin: 0;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(124, 92, 255, 0.24), transparent 28rem),
+    radial-gradient(circle at 82% 18%, rgba(56, 213, 255, 0.13), transparent 24rem),
+    linear-gradient(180deg, #070816 0%, #0b0d20 48%, #050610 100%);
+  color: var(--text);
+  font-family: var(--font-outfit), system-ui, sans-serif;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--accent-cyan);
+  outline-offset: 3px;
+}
+
+.glass-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(20, 24, 54, 0.68);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 22px 70px rgba(40, 33, 98, 0.3);
+  backdrop-filter: blur(18px);
+}
+
+.star-field {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.55) 1px, transparent 1px),
+    radial-gradient(circle, rgba(124, 92, 255, 0.28) 1px, transparent 1px);
+  background-position: 0 0, 22px 34px;
+  background-size: 86px 86px, 132px 132px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent 82%);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-card {
+    background: #161a35;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .soft-pulse {
+    animation: soft-pulse 4s ease-in-out infinite;
+  }
+
+  @keyframes soft-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.82;
+    }
+    50% {
+      transform: scale(1.04);
+      opacity: 1;
+    }
+  }
+}

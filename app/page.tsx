@@ -1,0 +1,203 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
+import { LoadingState } from "@/components/LoadingState";
+import { PermissionPanel } from "@/components/PermissionPanel";
+import { QuestCard } from "@/components/QuestCard";
+import { SecureContextNotice } from "@/components/SecureContextNotice";
+import { getInsecureContextMessage, isSecureBrowserContext } from "@/lib/browser-support";
+import { generateQuests } from "@/lib/quest-generator";
+import { addObservation, saveActiveQuest, saveLastLocation } from "@/lib/storage";
+import type { SkyQuest } from "@/lib/types";
+import { getFallbackWeather, fetchWeatherNow } from "@/lib/weather";
+
+type LoadState = "idle" | "loading" | "ready" | "error";
+
+type Position = {
+  latitude: number;
+  longitude: number;
+};
+
+function getCurrentPosition(): Promise<Position> {
+  return new Promise((resolve, reject) => {
+    if (!isSecureBrowserContext()) {
+      reject(new Error(getInsecureContextMessage("position")));
+      return;
+    }
+
+    if (!("geolocation" in navigator)) {
+      reject(new Error("La géolocalisation n'est pas disponible sur ce navigateur."));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+      },
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          reject(new Error("Position refusée. Vérifie Réglages > Safari > Position, puis réessaie."));
+          return;
+        }
+
+        if (error.code === error.TIMEOUT) {
+          reject(new Error("Position trop longue à obtenir. Essaie dehors, avec le GPS activé."));
+          return;
+        }
+
+        reject(new Error("Position indisponible sur cet appareil pour le moment."));
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 2 * 60 * 1000 },
+    );
+  });
+}
+
+export default function HomePage() {
+  const router = useRouter();
+  const [state, setState] = useState<LoadState>("idle");
+  const [quests, setQuests] = useState<SkyQuest[]>([]);
+  const [position, setPosition] = useState<Position | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function handleNow() {
+    setState("loading");
+    setNotice(null);
+    setQuests([]);
+
+    try {
+      const coords = await getCurrentPosition();
+      setPosition(coords);
+      saveLastLocation(coords);
+
+      let weatherNotice: string | null = null;
+      const weather = await fetchWeatherNow(coords.latitude, coords.longitude).catch(() => {
+        weatherNotice = "Météo indisponible : estimation prudente utilisée.";
+        return getFallbackWeather();
+      });
+
+      const nextQuests = generateQuests({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        weather,
+        now: new Date(),
+      });
+
+      setQuests(nextQuests);
+      setNotice(weatherNotice);
+      setState("ready");
+    } catch (error) {
+      const fallback = generateQuests({
+        latitude: null,
+        longitude: null,
+        weather: getFallbackWeather(),
+        now: new Date(),
+      });
+      setQuests(fallback);
+      setNotice(error instanceof Error ? error.message : "Position indisponible : observation libre sans localisation précise.");
+      setState("ready");
+    }
+  }
+
+  function handleStart(quest: SkyQuest) {
+    saveActiveQuest(quest);
+    router.push(`/quest/${quest.id}`);
+  }
+
+  function handleLog(quest: SkyQuest, status: "seen" | "missed") {
+    addObservation(quest, status, position ?? undefined);
+    setNotice(status === "seen" ? "Observation ajoutée au journal." : "Résultat noté dans le journal.");
+  }
+
+  return (
+    <main className="mx-auto flex min-h-[100dvh] w-full max-w-3xl flex-col px-5 pb-8 pt-6 sm:px-8">
+      <header className="flex items-center justify-between gap-4 py-2">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8ea0ff]">PWA mobile</p>
+          <h1 className="mt-1 text-3xl font-bold tracking-[-0.04em] text-white">SkyQuest</h1>
+        </div>
+        <Link
+          href="/journal"
+          className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98]"
+        >
+          Journal
+        </Link>
+      </header>
+
+      <section className="flex flex-1 flex-col justify-center py-8">
+        <div className="relative overflow-hidden rounded-[34px] border border-white/10 bg-[#101331]/70 p-6 shadow-[0_24px_90px_rgba(22,18,72,0.45)] sm:p-8">
+          <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#7c5cff]/30 blur-3xl" aria-hidden="true" />
+          <div className="absolute -bottom-20 left-10 h-48 w-48 rounded-full bg-[#38d5ff]/15 blur-3xl" aria-hidden="true" />
+
+          <div className="relative">
+            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-[#cbd0ff]">
+              <span className="h-2 w-2 rounded-full bg-[#63e6a4] soft-pulse" aria-hidden="true" />
+              Ciel actuel, sans carte compliquée
+            </div>
+
+            <h2 className="max-w-xl text-5xl font-black leading-[0.95] tracking-[-0.06em] text-white sm:text-6xl">
+              Découvre quoi observer maintenant.
+            </h2>
+            <p className="mt-5 max-w-md text-lg leading-7 text-[#c6caff]">
+              Position, météo et ciel actuel pour proposer 1 à 3 mini-quêtes simples.
+            </p>
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-[1fr_auto]">
+              <button
+                type="button"
+                onClick={handleNow}
+                disabled={state === "loading"}
+                className="min-h-16 rounded-full bg-[#7c5cff] px-7 text-lg font-extrabold text-white shadow-[0_18px_50px_rgba(124,92,255,0.45)] transition hover:bg-[#8a70ff] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {state === "loading" ? "Lecture du ciel..." : "Maintenant"}
+              </button>
+              <Link
+                href="/journal"
+                className="flex min-h-16 items-center justify-center rounded-full border border-white/10 bg-white/[0.07] px-7 text-lg font-bold text-white transition active:scale-[0.98]"
+              >
+                Journal
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <PermissionPanel />
+
+        <section className="mt-6" aria-live="polite">
+          <SecureContextNotice />
+          {notice ? <ErrorState tone="info" message={notice} /> : null}
+          {state === "loading" ? <LoadingState /> : null}
+          {state === "ready" && quests.length === 0 ? (
+            <EmptyState title="Aucune quête prête" message="Tu peux relancer maintenant ou tenter une observation libre du ciel." />
+          ) : null}
+          {state === "ready" && quests.length > 0 ? (
+            <div className="grid gap-4">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8ea0ff]">Quêtes proposées</p>
+                  <h3 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-white">À tenter maintenant</h3>
+                </div>
+                <p className="text-right text-sm text-[#9fa6d9]">Jamais garanti, toujours approximatif.</p>
+              </div>
+              {quests.map((quest) => (
+                <QuestCard
+                  key={quest.id}
+                  quest={quest}
+                  onStart={handleStart}
+                  onSeen={(nextQuest) => handleLog(nextQuest, "seen")}
+                  onMissed={(nextQuest) => handleLog(nextQuest, "missed")}
+                />
+              ))}
+            </div>
+          ) : null}
+        </section>
+      </section>
+    </main>
+  );
+}
