@@ -8,7 +8,7 @@ import { CameraGuide } from "@/components/CameraGuide";
 import { ErrorState } from "@/components/ErrorState";
 import { PageShell } from "@/components/PageShell";
 import { addObservation, getActiveQuest, getLastLocation } from "@/lib/storage";
-import type { SkyQuest } from "@/lib/types";
+import type { Observation, SkyQuest } from "@/lib/types";
 
 export default function QuestGuidePage() {
   const params = useParams<{ id: string }>();
@@ -22,9 +22,9 @@ export default function QuestGuidePage() {
     }
   }, [params.id]);
 
-  function logAndReturn(status: "seen" | "missed") {
+  function logAndReturn(status: "seen" | "missed", photo?: Pick<Observation, "photoDataUrl" | "photoThumbnailDataUrl">) {
     if (quest) {
-      addObservation(quest, status, getLastLocation() ?? undefined);
+      addObservation(quest, status, getLastLocation() ?? undefined, photo);
     }
     router.push("/journal");
   }
@@ -46,5 +46,5 @@ export default function QuestGuidePage() {
     );
   }
 
-  return <CameraGuide quest={quest} onSeen={() => logAndReturn("seen")} onMissed={() => logAndReturn("missed")} />;
+  return <CameraGuide quest={quest} onSeen={(photo) => logAndReturn("seen", photo)} onMissed={() => logAndReturn("missed")} />;
 }

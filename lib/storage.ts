@@ -50,6 +50,7 @@ export function addObservation(
   quest: SkyQuest,
   status: Observation["status"],
   location?: { latitude: number; longitude: number },
+  photo?: Pick<Observation, "photoDataUrl" | "photoThumbnailDataUrl">,
 ): Observation {
   const observation: Observation = {
     id: `${quest.id}-${status}-${Date.now()}`,
@@ -60,6 +61,8 @@ export function addObservation(
     visibilityScore: quest.visibilityScore,
     latitude: location ? roundCoordinate(location.latitude) : undefined,
     longitude: location ? roundCoordinate(location.longitude) : undefined,
+    photoDataUrl: photo?.photoDataUrl,
+    photoThumbnailDataUrl: photo?.photoThumbnailDataUrl,
   };
 
   const next = [observation, ...getObservations()].slice(0, 50);

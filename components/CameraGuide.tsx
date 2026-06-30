@@ -1,25 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { AppButton, getAppButtonClassName } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
 import {
   ALIGNMENT_TOLERANCE_DEGREES,
   angleDifference,
   azimuthToCardinal,
-  getCameraPointing,
   getAltitudeHint,
+  getCameraPointing,
   getDirectionHint,
 } from "@/lib/orientation";
 import { getInsecureContextMessage, isSecureBrowserContext } from "@/lib/browser-support";
 import { recalculateQuestPosition } from "@/lib/quest-generator";
 import { getLastLocation } from "@/lib/storage";
-import type { SkyQuest } from "@/lib/types";
+import type { Observation, SkyQuest } from "@/lib/types";
+
+const SHOW_CAMERA_DEBUG = false;
+const PHOTO_MAX_WIDTH = 1280;
+const THUMBNAIL_MAX_WIDTH = 360;
+const PHOTO_QUALITY = 0.75;
 
 type CameraGuideProps = {
   quest: SkyQuest;
-  onSeen: () => void;
+  onSeen: (photo?: Pick<Observation, "photoDataUrl" | "photoThumbnailDataUrl">) => void;
   onMissed: () => void;
 };
 
@@ -53,13 +58,18 @@ type CameraZoomConstraintSet = MediaTrackConstraintSet & {
   zoom?: number;
 };
 
+type PhotoDraft = {
+  photoDataUrl: string;
+  photoThumbnailDataUrl: string;
+};
+
 function getDirectionArrow(delta: number | null): string {
   if (delta === null) {
-    return "—";
+    return "";
   }
 
   if (Math.abs(delta) <= ALIGNMENT_TOLERANCE_DEGREES) {
-    return "◎";
+    return "•";
   }
 
   return delta > 0 ? "→" : "←";
@@ -67,19 +77,74 @@ function getDirectionArrow(delta: number | null): string {
 
 function getAltitudeArrow(delta: number | null): string {
   if (delta === null) {
-    return "—";
+    return "";
   }
 
   if (Math.abs(delta) <= ALIGNMENT_TOLERANCE_DEGREES) {
-    return "◎";
+    return "•";
   }
 
   return delta > 0 ? "↑" : "↓";
 }
 
+function getGearLabel(quest: SkyQuest): string {
+  return quest.requiredGear === "binoculars_recommended" ? "Jumelles" : "Oeil nu";
+}
+
+async function createResizedDataUrl(source: CanvasImageSource, sourceWidth: number, sourceHeight: number, maxWidth: number): Promise<string> {
+  const scale = Math.min(1, maxWidth / sourceWidth);
+  const width = Math.max(1, Math.round(sourceWidth * scale));
+  const height = Math.max(1, Math.round(sourceHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Canvas indisponible.");
+  }
+
+  context.drawImage(source, 0, 0, width, height);
+  return canvas.toDataURL("image/jpeg", PHOTO_QUALITY);
+}
+
+async function createPhotoDraftFromImage(source: CanvasImageSource, width: number, height: number): Promise<PhotoDraft> {
+  const photoDataUrl = await createResizedDataUrl(source, width, height, PHOTO_MAX_WIDTH);
+  const photoThumbnailDataUrl = await createResizedDataUrl(source, width, height, THUMBNAIL_MAX_WIDTH);
+
+  return { photoDataUrl, photoThumbnailDataUrl };
+}
+
+async function createPhotoDraftFromFile(file: File): Promise<PhotoDraft> {
+  const url = URL.createObjectURL(file);
+  const image = new Image();
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("Image illisible."));
+      image.src = url;
+    });
+
+    return await createPhotoDraftFromImage(image, image.naturalWidth, image.naturalHeight);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function DetailsRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-brand border border-brand-border bg-white/[0.05] p-3">
+      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-faint">{label}</p>
+      <p className="mt-1 text-base font-black text-white">{value}</p>
+    </div>
+  );
+}
+
 export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [cameraStatus, setCameraStatus] = useState<"idle" | "starting" | "active" | "error">("idle");
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [orientationStatus, setOrientationStatus] = useState<"idle" | "active" | "denied" | "unsupported">("idle");
@@ -90,7 +155,10 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [zoomRange, setZoomRange] = useState<CameraZoomRange | null>(null);
   const [currentZoom, setCurrentZoom] = useState<number | null>(null);
   const [zoomError, setZoomError] = useState<string | null>(null);
-  const [showHud, setShowHud] = useState(true);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
+  const [photoDraft, setPhotoDraft] = useState<PhotoDraft | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -111,11 +179,9 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
   useEffect(() => {
     const location = getLastLocation();
-
     if (!location) {
       return;
     }
-
     const lastLocation = location;
 
     function refreshPosition() {
@@ -147,7 +213,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraStatus("error");
-      setCameraError("La caméra n'est pas disponible dans ce navigateur. Essaie Safari à jour ou un déploiement HTTPS.");
+      setCameraError("La camera n'est pas disponible dans ce navigateur.");
       return;
     }
 
@@ -171,9 +237,8 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       }
       setCameraStatus("active");
     } catch (error) {
-      const fallbackMessage = getCameraErrorMessage(error);
       setCameraStatus("error");
-      setCameraError(fallbackMessage);
+      setCameraError(getCameraErrorMessage(error));
     }
   }
 
@@ -183,7 +248,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     }
 
     const zoom = (track.getCapabilities() as CameraZoomCapabilities).zoom;
-
     if (!zoom || typeof zoom.min !== "number" || typeof zoom.max !== "number" || zoom.max <= zoom.min) {
       return null;
     }
@@ -221,7 +285,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
   async function toggleCameraZoom() {
     const track = streamRef.current?.getVideoTracks()[0];
-
     if (!track || !zoomRange) {
       return;
     }
@@ -229,7 +292,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     const nextZoom = getNextZoom(zoomRange, currentZoom);
 
     try {
-      // This is optical/sensor zoom exposed by the camera track, not CSS scaling.
       await track.applyConstraints({
         advanced: [{ zoom: nextZoom } as CameraZoomConstraintSet],
       });
@@ -237,26 +299,26 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       setCurrentZoom(settings.zoom ?? nextZoom);
       setZoomError(null);
     } catch {
-      setZoomError("Zoom indisponible sur cette caméra.");
+      setZoomError("Zoom indisponible sur cette camera.");
     }
   }
 
   function getCameraErrorMessage(error: unknown): string {
     if (error instanceof DOMException) {
       if (error.name === "NotAllowedError") {
-        return "Caméra refusée. Vérifie Réglages > Safari > Caméra, puis relance le guidage.";
+        return "Camera refusee. Verifie les permissions, puis relance le guidage.";
       }
 
       if (error.name === "NotFoundError") {
-        return "Aucune caméra disponible. Utilise le guidage texte ci-dessous.";
+        return "Aucune camera disponible. Utilise le guidage texte.";
       }
 
       if (error.name === "NotReadableError") {
-        return "La caméra est déjà utilisée par une autre app ou indisponible momentanément.";
+        return "La camera est deja utilisee ou indisponible momentanement.";
       }
     }
 
-    return "Caméra indisponible. Tu peux quand même suivre la direction indiquée.";
+    return "Camera indisponible. Tu peux quand meme suivre la direction indiquee.";
   }
 
   function handleOrientation(event: CompassEvent) {
@@ -297,7 +359,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         const permission = await orientationEvent.requestPermission(true);
         if (permission !== "granted") {
           setOrientationStatus("denied");
-          setOrientationError("Orientation refusée. Vérifie Réglages > Safari > Mouvement et orientation.");
+          setOrientationError("Orientation refusee. Verifie les permissions mouvement et orientation.");
           return;
         }
       }
@@ -307,8 +369,55 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       setOrientationStatus("active");
     } catch {
       setOrientationStatus("denied");
-      setOrientationError("Orientation refusée ou indisponible. Utilise la direction texte comme repère.");
+      setOrientationError("Orientation refusee ou indisponible. Utilise la direction texte comme repere.");
     }
+  }
+
+  async function capturePhotoFromVideo() {
+    setPhotoError(null);
+    const video = videoRef.current;
+
+    if (!video || cameraStatus !== "active" || video.videoWidth <= 0 || video.videoHeight <= 0) {
+      fileInputRef.current?.click();
+      return;
+    }
+
+    try {
+      setPhotoDraft(await createPhotoDraftFromImage(video, video.videoWidth, video.videoHeight));
+    } catch {
+      setPhotoError("Photo impossible depuis la camera. Tu peux choisir une image.");
+      fileInputRef.current?.click();
+    }
+  }
+
+  async function handleFilePhoto(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    try {
+      setPhotoError(null);
+      setPhotoDraft(await createPhotoDraftFromFile(file));
+    } catch {
+      setPhotoError("Image impossible a lire.");
+    }
+  }
+
+  function openPhotoSheet() {
+    setPhotoDraft(null);
+    setPhotoError(null);
+    setPhotoSheetOpen(true);
+  }
+
+  function saveSeenWithPhoto() {
+    if (photoDraft) {
+      onSeen(photoDraft);
+      return;
+    }
+
+    onSeen();
   }
 
   const directionHint = liveQuest.azimuth !== null && currentAzimuth !== null
@@ -318,7 +427,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     ? getAltitudeHint(currentAltitude, liveQuest.altitude)
     : null;
   const close = directionHint === "Bonne direction" && altitudeHint === "Hauteur proche";
-  const mainHint = close ? "Tu es proche, regarde bien le ciel" : directionHint ?? "Active l'orientation ou suis la direction texte";
   const directionDelta = liveQuest.azimuth !== null && currentAzimuth !== null
     ? angleDifference(currentAzimuth, liveQuest.azimuth)
     : null;
@@ -327,205 +435,208 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     : null;
   const directionArrow = getDirectionArrow(directionDelta);
   const altitudeArrow = getAltitudeArrow(altitudeDelta);
-  const directionArrowLabel = directionDelta !== null ? `${directionArrow} ${Math.abs(Math.round(directionDelta))}°` : "—";
-  const altitudeArrowLabel = altitudeDelta !== null ? `${altitudeArrow} ${Math.abs(Math.round(altitudeDelta))}°` : "—";
+  const directionArrowLabel = directionDelta !== null ? `${directionArrow} ${Math.abs(Math.round(directionDelta))}°` : "-";
+  const altitudeArrowLabel = altitudeDelta !== null ? `${altitudeArrow} ${Math.abs(Math.round(altitudeDelta))}°` : "-";
   const currentPhoneDirection = currentAzimuth !== null ? azimuthToCardinal(currentAzimuth) : "Inconnu";
   const directionAligned = directionDelta !== null && Math.abs(directionDelta) <= ALIGNMENT_TOLERANCE_DEGREES;
   const altitudeAligned = altitudeDelta !== null && Math.abs(altitudeDelta) <= ALIGNMENT_TOLERANCE_DEGREES;
-  const directionTone = directionAligned
-    ? "border-success/35 bg-success/16 text-success"
-    : "border-accent-cyan/20 bg-accent-cyan/12 text-white";
-  const altitudeTone = altitudeAligned
-    ? "border-success/35 bg-success/16 text-success"
-    : "border-brand-border bg-white/[0.07] text-white";
   const hasPrecisePoint = liveQuest.azimuth !== null && liveQuest.altitude !== null;
+  const mainHint = close
+    ? "Tu es proche"
+    : directionHint && directionHint !== "Bonne direction"
+      ? directionHint
+      : altitudeHint && altitudeHint !== "Hauteur proche"
+        ? altitudeHint
+        : "Suis la direction";
+  const targetAltitudeLabel = liveQuest.altitude !== null ? `${Math.round(liveQuest.altitude)}°` : "Libre";
+  const zoomLabel = zoomRange && currentZoom !== null ? `${formatZoom(currentZoom)}x` : "Auto";
 
   return (
     <main className="relative min-h-[100dvh] overflow-hidden bg-background text-white">
-      <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover opacity-90" />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,color-mix(in_srgb,var(--background)_28%,transparent),color-mix(in_srgb,var(--background)_72%,transparent))]" aria-hidden="true" />
+      <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.30),rgba(0,0,0,0.08)_42%,rgba(0,0,0,0.62))]" aria-hidden="true" />
 
       {cameraStatus !== "active" ? (
-        <div className="absolute inset-0 bg-background" aria-hidden="true" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,color-mix(in_srgb,var(--accent-cyan)_16%,transparent),transparent_20rem),var(--background)]" aria-hidden="true" />
       ) : null}
 
-      {!showHud ? (
-        <AppButton
-          variant="ghost"
-          size="sm"
-          type="button"
-          onClick={() => setShowHud(true)}
-          className="absolute right-4 top-4 z-20 min-h-0 bg-background/72 py-2 backdrop-blur-xl"
-        >
-          Afficher
-        </AppButton>
-      ) : null}
+      <section className="relative z-10 flex min-h-[100dvh] flex-col justify-between px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)]">
+        <header className="flex min-h-14 items-center gap-2 rounded-brand-lg border border-white/10 bg-background/45 px-2 py-2 shadow-[0_12px_40px_rgba(0,0,0,0.25)] backdrop-blur-xl">
+          <Link href="/" aria-label="Quitter" className={getAppButtonClassName({ variant: "ghost", size: "sm", className: "min-h-0 h-10 w-10 px-0 text-lg" })}>
+            ←
+          </Link>
+          <h1 className="min-w-0 flex-1 truncate text-base font-black tracking-[-0.02em] text-white">{liveQuest.title}</h1>
+          <button
+            type="button"
+            onClick={() => setDetailsOpen(true)}
+            className="h-10 rounded-full border border-white/10 bg-white/[0.08] px-3 text-sm font-black text-white"
+          >
+            Details
+          </button>
+        </header>
 
-      <section className="relative z-10 flex min-h-[100dvh] flex-col justify-between px-5 pb-6 pt-5">
-        {showHud ? (
-          <AppCard as="section" className="rounded-[20px] p-3 sm:rounded-[24px] sm:p-4" padding="sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="hidden text-sm font-semibold uppercase tracking-[0.18em] text-accent-cyan sm:block">Guidage 2D</p>
-                <h1 className="truncate text-base font-extrabold tracking-[-0.03em] sm:mt-1 sm:text-2xl">{liveQuest.title}</h1>
-                <div className="mt-2 grid grid-cols-2 gap-2 sm:hidden">
-                  <div className="rounded-[14px] border border-brand-border bg-white/[0.07] px-3 py-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-accent-cyan">Cible</p>
-                    <p className="mt-0.5 text-sm font-black text-white">
-                      {liveQuest.cardinalDirection ?? "Zone libre"} {liveQuest.azimuth !== null ? `${Math.round(liveQuest.azimuth)}°` : ""}
-                    </p>
-                  </div>
-                  <div className={`rounded-[14px] border px-3 py-2 ${directionTone}`}>
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-accent-cyan">Direction tél.</p>
-                    <p className="mt-0.5 text-sm font-black">
-                      {currentAzimuth !== null ? `${currentPhoneDirection} ${Math.round(currentAzimuth)}°` : "Inconnu"}
-                    </p>
-                  </div>
-                  <div className="rounded-[14px] border border-brand-border bg-white/[0.07] px-3 py-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-accent-cyan">Hauteur cible</p>
-                    <p className="mt-0.5 text-sm font-black text-white">{liveQuest.altitude !== null ? `${Math.round(liveQuest.altitude)}°` : "Libre"}</p>
-                  </div>
-                  <div className={`rounded-[14px] border px-3 py-2 ${altitudeTone}`}>
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-accent-cyan">Hauteur tél.</p>
-                    <p className="mt-0.5 text-sm font-black">{currentAltitude !== null ? `${Math.round(currentAltitude)}°` : "Inconnu"}</p>
-                  </div>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2 sm:hidden">
-                  <span className={`rounded-full px-3 py-1 text-sm font-black ${directionAligned ? "bg-success/18 text-success" : "bg-white/[0.08] text-white"}`}>{directionArrowLabel}</span>
-                  <span className={`rounded-full px-3 py-1 text-sm font-black ${altitudeAligned ? "bg-success/18 text-success" : "bg-accent-cyan/12 text-accent-cyan"}`}>{altitudeArrowLabel}</span>
-                </div>
-                <p className="mt-1 text-xs font-semibold text-accent-cyan sm:hidden">Le but : rapprocher les deux valeurs de la cible.</p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <AppButton
-                  variant="ghost"
-                  size="sm"
-                  type="button"
-                  onClick={() => setShowHud(false)}
-                  className="min-h-0 px-3 py-2 text-xs sm:px-4 sm:text-sm"
-                >
-                  Masquer
-                </AppButton>
-                <Link href="/" className={getAppButtonClassName({ variant: "ghost", size: "sm", className: "min-h-0 px-3 py-2 text-xs sm:px-4 sm:text-sm" })}>
-                  Quitter
-                </Link>
-              </div>
+        <div className="pointer-events-none flex flex-1 flex-col items-center justify-center gap-5 py-8">
+          {hasPrecisePoint ? (
+            <div className="relative flex h-32 w-32 items-center justify-center">
+              <div className={`absolute h-28 w-28 rounded-full border ${directionAligned && altitudeAligned ? "border-success/80 bg-success/10" : "border-accent-cyan/70 bg-accent-cyan/10"} shadow-[0_0_55px_color-mix(in_srgb,var(--accent-cyan)_22%,transparent)]`} />
+              <div className="absolute h-px w-24 bg-white/28" />
+              <div className="absolute h-24 w-px bg-white/28" />
+              <div className={`h-3 w-3 rounded-full ${directionAligned && altitudeAligned ? "bg-success" : "bg-accent-cyan"}`} />
+              <div className="absolute -right-9 text-5xl font-black text-white drop-shadow-xl">{directionArrow === "→" ? "→" : ""}</div>
+              <div className="absolute -left-9 text-5xl font-black text-white drop-shadow-xl">{directionArrow === "←" ? "←" : ""}</div>
+              <div className="absolute -top-11 text-4xl font-black text-accent-cyan drop-shadow-xl">{altitudeArrow === "↑" ? "↑" : ""}</div>
+              <div className="absolute -bottom-11 text-4xl font-black text-accent-cyan drop-shadow-xl">{altitudeArrow === "↓" ? "↓" : ""}</div>
             </div>
-            <p className="mt-3 hidden text-sm leading-6 text-muted sm:block">
-              Orientation approximative : regarde vers {liveQuest.cardinalDirection ?? "le ciel"}
-              {liveQuest.altitude !== null ? `, environ ${Math.round(liveQuest.altitude)}° au-dessus de l'horizon.` : "."}
-            </p>
-          </AppCard>
-        ) : <div />}
+          ) : (
+            <div className="h-28 w-28 rounded-full border border-accent-cyan/60 bg-accent-cyan/10" />
+          )}
 
-        {showHud && hasPrecisePoint ? (
-          <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
-            <div className={`absolute -top-20 rounded-full border px-5 py-2 text-5xl font-black shadow-[0_0_40px_color-mix(in_srgb,var(--accent-cyan)_24%,transparent)] backdrop-blur-xl ${altitudeAligned ? "border-success/40 bg-success/18 text-success" : "border-brand-border bg-background/55 text-accent-cyan"}`}>
-              {altitudeArrow}
-            </div>
-            <div className={`absolute -left-24 rounded-full border px-5 py-2 text-5xl font-black shadow-[0_0_40px_color-mix(in_srgb,var(--accent)_22%,transparent)] backdrop-blur-xl ${directionAligned ? "border-success/40 bg-success/18 text-success" : "border-brand-border bg-background/55 text-white"}`}>
-              {directionArrow === "←" ? "←" : ""}
-            </div>
-            <div className={`absolute -right-24 rounded-full border px-5 py-2 text-5xl font-black shadow-[0_0_40px_color-mix(in_srgb,var(--accent)_22%,transparent)] backdrop-blur-xl ${directionAligned ? "border-success/40 bg-success/18 text-success" : "border-brand-border bg-background/55 text-white"}`}>
-              {directionArrow === "→" ? "→" : ""}
-            </div>
-            <div className={`h-28 w-28 rounded-full border shadow-[0_0_60px_color-mix(in_srgb,var(--accent-cyan)_22%,transparent)] ${directionAligned && altitudeAligned ? "border-success/70 bg-success/12" : "border-accent-cyan/55 bg-accent-cyan/10"}`} />
-            <div className={`absolute h-2 w-2 rounded-full ${directionAligned && altitudeAligned ? "bg-success" : "bg-accent-cyan"}`} />
-          </div>
-        ) : null}
-
-        {showHud ? (
-        <AppCard className="rounded-[24px] p-3 sm:rounded-[28px] sm:p-5" padding="sm">
-          {cameraError ? <p className="mb-4 rounded-[18px] border border-warning/25 bg-warning/10 p-3 text-sm text-warning">{cameraError}</p> : null}
-          {zoomError ? <p className="mb-4 rounded-[18px] border border-warning/25 bg-warning/10 p-3 text-sm text-warning">{zoomError}</p> : null}
-
-          {cameraStatus !== "active" ? (
-            <AppButton
-              onClick={startCamera}
-              disabled={cameraStatus === "starting"}
-              fullWidth
-              className="mb-4"
-            >
-              {cameraStatus === "starting" ? "Ouverture caméra..." : "Démarrer la caméra"}
-            </AppButton>
-          ) : null}
-          {cameraStatus === "active" && zoomRange ? (
-            <AppButton variant="ghost" size="sm" onClick={toggleCameraZoom} fullWidth className="mb-4">
-              Zoom réel {formatZoom(currentZoom ?? zoomRange.min)}x
-            </AppButton>
-          ) : null}
-
-          <div className="hidden gap-3 sm:grid sm:grid-cols-2">
-            <div className="rounded-[20px] border border-brand-border bg-white/[0.06] p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent-cyan">Direction cible</p>
-              <p className="mt-1 text-2xl font-black">{liveQuest.cardinalDirection ?? "Libre"}</p>
-              <p className="mt-1 text-sm font-semibold text-muted">
-                {liveQuest.azimuth !== null ? `${Math.round(liveQuest.azimuth)}°` : "Zone dégagée"}
-              </p>
-            </div>
-            <div className="rounded-[20px] border border-brand-border bg-white/[0.06] p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent-cyan">Altitude cible</p>
-              <p className="mt-1 text-2xl font-black">{liveQuest.altitude !== null ? `${Math.round(liveQuest.altitude)}°` : "Libre"}</p>
-              <p className="mt-1 text-sm font-semibold text-muted">0° = horizon, 90° = zénith</p>
-            </div>
-          </div>
-
-          <div className="mt-3 hidden gap-3 sm:grid sm:grid-cols-3">
-            <div className={`rounded-[18px] border p-3 ${directionTone}`}>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent-cyan">Téléphone</p>
-              <p className="mt-1 text-lg font-black">
-                {currentAzimuth !== null ? azimuthToCardinal(currentAzimuth) : "Inconnu"}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-accent-cyan">
-                {currentAzimuth !== null ? `${Math.round(currentAzimuth)}°` : "Boussole inactive"}
-              </p>
-            </div>
-            <div className={`rounded-[18px] border p-3 ${directionTone}`}>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent-cyan">Écart horizontal</p>
-              <p className="mt-1 text-3xl font-black">{directionArrowLabel}</p>
-              <p className="mt-1 text-sm font-semibold text-muted">Vise jusqu&apos;à 0°</p>
-            </div>
-            <div className={`rounded-[18px] border p-3 ${altitudeTone}`}>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent-cyan">Caméra</p>
-              <p className="mt-1 text-lg font-black">
-                {currentAltitude !== null ? `${Math.round(currentAltitude)}°` : "Inconnu"}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-muted">
-                {altitudeArrowLabel}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-4 hidden rounded-[22px] bg-accent/16 p-4 sm:block">
-            <p className="text-2xl font-black tracking-[-0.03em]">{mainHint}</p>
-            <p className="mt-2 text-base font-semibold text-muted">{altitudeHint ?? "La boussole mobile peut être imprécise."}</p>
-          </div>
-
-          <AppButton variant="secondary" onClick={requestOrientation} fullWidth className="mt-4">
-            {orientationStatus === "active" ? "Orientation active" : "Activer l'orientation"}
-          </AppButton>
-          <p className="mt-2 text-xs font-semibold leading-5 text-faint">
-            La direction utilise la vraie boussole du navigateur quand elle est disponible. Sinon, suis la direction texte.
+          <p className="rounded-full border border-white/10 bg-background/50 px-5 py-3 text-center text-lg font-black shadow-[0_12px_42px_rgba(0,0,0,0.25)] backdrop-blur-xl">
+            {mainHint}
           </p>
 
-          {orientationStatus === "denied" || orientationStatus === "unsupported" ? (
-            <p className="mt-3 text-sm leading-6 text-warning">
-              {orientationError ?? "La boussole n'est pas disponible."} Regarde vers {liveQuest.cardinalDirection ?? "la zone la plus dégagée"}
-              {liveQuest.altitude !== null ? `, environ ${Math.round(liveQuest.altitude)}° au-dessus de l'horizon.` : "."}
-            </p>
-          ) : null}
+          <div className="flex max-w-full flex-wrap justify-center gap-2">
+            <span className="rounded-full border border-white/10 bg-background/45 px-3 py-2 text-sm font-bold text-white backdrop-blur-xl">
+              {liveQuest.cardinalDirection ?? "Zone libre"}
+            </span>
+            <span className="rounded-full border border-white/10 bg-background/45 px-3 py-2 text-sm font-bold text-white backdrop-blur-xl">
+              {targetAltitudeLabel}
+            </span>
+            <span className="rounded-full border border-white/10 bg-background/45 px-3 py-2 text-sm font-bold text-white backdrop-blur-xl">
+              {getGearLabel(liveQuest)}
+            </span>
+          </div>
+        </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <AppButton variant="success" size="sm" onClick={onSeen}>
+        <div className="rounded-brand-lg border border-white/10 bg-background/48 p-3 shadow-[0_-12px_44px_rgba(0,0,0,0.30)] backdrop-blur-xl">
+          {cameraError ? <p className="mb-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">{cameraError}</p> : null}
+          {zoomError ? <p className="mb-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">{zoomError}</p> : null}
+
+          <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+            <AppButton variant="success" size="sm" onClick={openPhotoSheet} className="min-h-12">
               Je l&apos;ai vu
             </AppButton>
-            <AppButton variant="ghost" size="sm" onClick={onMissed}>
-              Pas trouvé
+            <AppButton variant="ghost" size="sm" onClick={onMissed} className="min-h-12">
+              Pas trouve
+            </AppButton>
+            <button
+              type="button"
+              onClick={openPhotoSheet}
+              aria-label="Photo"
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.08] text-xl font-black text-white"
+            >
+              ◉
+            </button>
+          </div>
+
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {cameraStatus !== "active" ? (
+              <AppButton variant="secondary" size="sm" onClick={startCamera} disabled={cameraStatus === "starting"} className="min-h-11">
+                {cameraStatus === "starting" ? "Camera..." : "Camera"}
+              </AppButton>
+            ) : zoomRange ? (
+              <AppButton variant="secondary" size="sm" onClick={toggleCameraZoom} className="min-h-11">
+                Zoom {zoomLabel}
+              </AppButton>
+            ) : (
+              <AppButton variant="secondary" size="sm" onClick={startCamera} className="min-h-11">
+                Camera active
+              </AppButton>
+            )}
+            <AppButton variant="secondary" size="sm" onClick={requestOrientation} className="min-h-11">
+              {orientationStatus === "active" ? "Orientation active" : "Orientation"}
             </AppButton>
           </div>
-        </AppCard>
-        ) : <div />}
+        </div>
       </section>
+
+      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFilePhoto} />
+
+      {detailsOpen ? (
+        <div className="fixed inset-0 z-40 flex items-end bg-black/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="details-title">
+          <AppCard className="max-h-[82dvh] w-full overflow-y-auto rounded-t-[28px] rounded-b-none pb-[calc(env(safe-area-inset-bottom)+1rem)]" padding="lg">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold uppercase tracking-[0.18em] text-accent-cyan">Details</p>
+                <h2 id="details-title" className="mt-1 text-2xl font-black tracking-[-0.03em] text-white">{liveQuest.title}</h2>
+              </div>
+              <AppButton variant="ghost" size="sm" onClick={() => setDetailsOpen(false)}>Fermer</AppButton>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <DetailsRow label="Direction cible" value={`${liveQuest.cardinalDirection ?? "Libre"}${liveQuest.azimuth !== null ? ` ${Math.round(liveQuest.azimuth)}°` : ""}`} />
+              <DetailsRow label="Direction tel." value={currentAzimuth !== null ? `${currentPhoneDirection} ${Math.round(currentAzimuth)}°` : "Inconnu"} />
+              <DetailsRow label="Hauteur cible" value={targetAltitudeLabel} />
+              <DetailsRow label="Hauteur tel." value={currentAltitude !== null ? `${Math.round(currentAltitude)}°` : "Inconnu"} />
+              <DetailsRow label="Delta direction" value={directionArrowLabel} />
+              <DetailsRow label="Delta hauteur" value={altitudeArrowLabel} />
+              <DetailsRow label="Zoom reel" value={zoomLabel} />
+              <DetailsRow label="Orientation" value={orientationStatus === "active" ? "Active" : "Inactive"} />
+            </div>
+
+            <div className="mt-4 rounded-brand-lg border border-brand-border bg-white/[0.05] p-4">
+              <p className="text-sm font-bold text-white">Conseil</p>
+              <p className="mt-2 text-sm leading-6 text-muted">{liveQuest.tip}</p>
+            </div>
+            <div className="mt-3 rounded-brand-lg border border-brand-border bg-white/[0.05] p-4">
+              <p className="text-sm font-bold text-white">Boussole</p>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                La direction utilise la boussole du navigateur quand elle est disponible. Elle peut etre approximative dehors : suis aussi la direction texte et ton regard.
+              </p>
+              {orientationError ? <p className="mt-2 text-sm text-warning">{orientationError}</p> : null}
+            </div>
+            {SHOW_CAMERA_DEBUG ? (
+              <div className="mt-3 rounded-brand-lg border border-warning/25 bg-warning/10 p-4 text-sm text-warning">
+                Debug active : tolerance {ALIGNMENT_TOLERANCE_DEGREES} deg.
+              </div>
+            ) : null}
+          </AppCard>
+        </div>
+      ) : null}
+
+      {photoSheetOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end bg-black/60 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="photo-title">
+          <AppCard className="w-full rounded-t-[28px] rounded-b-none pb-[calc(env(safe-area-inset-bottom)+1rem)]" padding="lg">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-bold uppercase tracking-[0.18em] text-accent-cyan">Journal</p>
+                <h2 id="photo-title" className="mt-1 text-2xl font-black tracking-[-0.03em] text-white">Ajouter une photo souvenir ?</h2>
+              </div>
+              <AppButton variant="ghost" size="sm" onClick={() => setPhotoSheetOpen(false)}>Fermer</AppButton>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-muted">
+              Tu peux garder une trace de cette observation dans ton journal.
+            </p>
+
+            {photoDraft ? (
+              <div
+                aria-label="Apercu de la photo"
+                className="mt-4 h-44 w-full rounded-brand-lg bg-cover bg-center"
+                role="img"
+                style={{ backgroundImage: `url(${photoDraft.photoThumbnailDataUrl})` }}
+              />
+            ) : null}
+            {photoError ? <p className="mt-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">{photoError}</p> : null}
+
+            <div className="mt-5 grid gap-3">
+              <AppButton onClick={capturePhotoFromVideo} fullWidth>
+                {photoDraft ? "Reprendre une photo" : "Prendre une photo"}
+              </AppButton>
+              {photoDraft ? (
+                <AppButton variant="success" onClick={saveSeenWithPhoto} fullWidth>
+                  Sauvegarder dans le journal
+                </AppButton>
+              ) : null}
+              <AppButton variant="ghost" onClick={() => onSeen()} fullWidth>
+                Continuer sans photo
+              </AppButton>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-faint">
+              Photo compressee localement. TODO: migrer les images vers IndexedDB si le journal grossit.
+            </p>
+          </AppCard>
+        </div>
+      ) : null}
     </main>
   );
 }

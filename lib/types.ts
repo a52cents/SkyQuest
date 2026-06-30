@@ -55,4 +55,6 @@ export type Observation = {
   visibilityScore: number;
   latitude?: number;
   longitude?: number;
+  photoDataUrl?: string;
+  photoThumbnailDataUrl?: string;
 };
