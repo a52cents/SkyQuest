@@ -23,14 +23,14 @@ export default function JournalPage() {
 
   return (
     <PageShell
-      eyebrow="Journal local"
+      eyebrow="Mémoire locale"
       title="Observations"
       action={(
         <Link href="/" className={getAppButtonClassName({ variant: "ghost", size: "sm" })}>
           Accueil
         </Link>
       )}
-      contentClassName="mt-8"
+      contentClassName="mt-4 sm:mt-6"
     >
         {observations.length > 0 ? (
           <JournalList observations={observations} onClear={handleClear} />

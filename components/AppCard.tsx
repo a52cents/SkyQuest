@@ -12,8 +12,8 @@ type AppCardProps = HTMLAttributes<HTMLElement> & {
 
 const variantClasses: Record<AppCardVariant, string> = {
   glass: "glass-card",
-  solid: "border border-brand-border bg-surface-strong",
-  subtle: "border border-brand-border-secondary bg-white/[0.05]",
+  solid: "border border-white/[0.10] bg-surface-strong shadow-[0_16px_40px_rgba(0,0,0,0.18)]",
+  subtle: "border border-white/[0.08] bg-white/[0.035]",
 };
 
 const paddingClasses: Record<AppCardPadding, string> = {

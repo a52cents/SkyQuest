@@ -8,5 +8,5 @@ export function ErrorState({ message, tone = "error" }: ErrorStateProps) {
     tone === "warning" ? "border-warning/25 bg-warning/10 text-warning" :
     "border-danger/25 bg-danger/10 text-danger";
 
-  return <div className={`mb-4 rounded-[22px] border p-4 text-sm leading-6 ${color}`}>{message}</div>;
+  return <div className={`mb-4 rounded-[16px] border p-4 text-sm leading-6 ${color}`}>{message}</div>;
 }

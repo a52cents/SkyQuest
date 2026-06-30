@@ -14,7 +14,7 @@ import { QuestCard } from "@/components/QuestCard";
 import { SecureContextNotice } from "@/components/SecureContextNotice";
 import { getInsecureContextMessage, isSecureBrowserContext } from "@/lib/browser-support";
 import { fetchNextIssVisiblePass } from "@/lib/iss";
-import { triggerPopunderAd } from "@/lib/popunder-ad";
+import { isPopunderAdOnCooldown, triggerPopunderAd } from "@/lib/popunder-ad";
 import { generateFutureQuestSuggestions, generateQuests, type FutureQuestSuggestion } from "@/lib/quest-generator";
 import { addObservation, saveActiveQuest, saveLastLocation } from "@/lib/storage";
 import type { SkyQuest } from "@/lib/types";
@@ -123,10 +123,11 @@ function AdConsentModal({
   const title = action === "now" ? "Avant de lire le ciel" : "Avant de calculer les possibilites";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 px-4 pb-4 backdrop-blur-sm sm:items-center sm:pb-0" role="dialog" aria-modal="true" aria-labelledby="ad-modal-title">
-      <AppCard className="w-full max-w-md rounded-brand-lg" padding="lg">
-        <p className="text-sm font-bold uppercase tracking-[0.18em] text-accent-cyan">Petite pause pub</p>
-        <h2 id="ad-modal-title" className="mt-3 text-3xl font-black tracking-[-0.04em] text-white">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#03050a]/80 px-3 pb-3 backdrop-blur-md sm:items-center sm:pb-0" role="dialog" aria-modal="true" aria-labelledby="ad-modal-title">
+      <AppCard className="w-full max-w-md rounded-[26px]" padding="lg">
+        <div className="mb-6 h-1 w-10 rounded-full bg-white/15 sm:hidden" />
+        <p className="premium-kicker">Avant de continuer</p>
+        <h2 id="ad-modal-title" className="mt-2 text-[1.85rem] font-bold tracking-[-0.045em] text-white">
           {title}
         </h2>
         <p className="mt-3 text-base leading-7 text-muted">
@@ -296,10 +297,20 @@ export default function HomePage() {
   }
 
   function handleNow() {
+    if (isPopunderAdOnCooldown()) {
+      void runNow();
+      return;
+    }
+
     setAdAction("now");
   }
 
   function handleFuturePossibilities() {
+    if (isPopunderAdOnCooldown()) {
+      void runFuturePossibilities();
+      return;
+    }
+
     setAdAction("future");
   }
 
@@ -334,14 +345,14 @@ export default function HomePage() {
 
   return (
     <PageShell
-      eyebrow="PWA mobile"
+      eyebrow="Guide du ciel"
       title="SkyQuest"
       action={(
         <Link href="/journal" className={getAppButtonClassName({ variant: "ghost", size: "sm" })}>
           Journal
         </Link>
       )}
-      contentClassName="flex flex-col justify-center py-8"
+      contentClassName="flex flex-col py-5 sm:py-8"
     >
       {adAction ? (
         <AdConsentModal
@@ -352,33 +363,40 @@ export default function HomePage() {
         />
       ) : null}
 
-      <AppCard className="relative overflow-hidden rounded-[34px] bg-surface-strong/70" padding="lg">
-        <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-accent/30 blur-3xl" aria-hidden="true" />
-        <div className="absolute -bottom-20 left-10 h-48 w-48 rounded-full bg-accent-cyan/15 blur-3xl" aria-hidden="true" />
+      <AppCard className="relative overflow-hidden rounded-[28px] bg-[#0e1321]/90" padding="lg">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent-cyan/35 to-transparent" aria-hidden="true" />
+        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full border border-accent/15" aria-hidden="true" />
+        <div className="absolute -right-9 -top-12 h-40 w-40 rounded-full border border-white/[0.06]" aria-hidden="true" />
 
         <div className="relative">
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-brand-border bg-white/[0.06] px-3 py-2 text-sm text-muted">
-            <span className="h-2 w-2 rounded-full bg-success soft-pulse" aria-hidden="true" />
-            Ciel actuel, sans carte compliquee
+          <div className="mb-9 flex items-center gap-3 text-sm text-muted">
+            <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-25" />
+              <span className="relative h-2.5 w-2.5 rounded-full bg-success" />
+            </span>
+            <span>Ciel actuel</span>
+            <span className="h-1 w-1 rounded-full bg-faint" />
+            <span>Conseils simples</span>
           </div>
 
-          <h2 className="max-w-xl text-5xl font-black leading-[0.95] tracking-[-0.06em] text-white sm:text-6xl">
-            Decouvre quoi observer maintenant.
+          <h2 className="max-w-[12ch] text-[2.65rem] font-semibold leading-[0.98] tracking-[-0.062em] text-white sm:text-[3.65rem]">
+            Le ciel a quelque chose à te montrer.
           </h2>
-          <p className="mt-5 max-w-md text-lg leading-7 text-muted">
-            Position, meteo et ciel actuel pour proposer 1 a 3 mini-quetes simples.
+          <p className="mt-5 max-w-lg text-[1.05rem] leading-7 text-muted">
+            Des observations choisies selon ta position, la météo et ce qui est réellement visible.
           </p>
 
-          <div className="mt-8 grid gap-3 sm:grid-cols-[1fr_auto]">
+          <div className="mt-8 grid gap-3 sm:grid-cols-2">
             <AppButton size="lg" onClick={handleNow} disabled={isBusy}>
               {state === "loading" ? "Lecture du ciel..." : "Maintenant"}
             </AppButton>
             <AppButton variant="secondary" size="lg" onClick={handleFuturePossibilities} disabled={isBusy}>
               {futureState === "loading" ? "Calcul..." : "Possibilites futures"}
             </AppButton>
-            <Link href="/journal" className={getAppButtonClassName({ variant: "ghost", size: "lg" })}>
-              Journal
-            </Link>
+          </div>
+          <div className="mt-6 flex items-center gap-3 border-t border-white/[0.08] pt-5 text-xs leading-5 text-faint">
+            <span className="shrink-0 rounded-md border border-white/[0.08] px-2 py-1 font-semibold text-muted">Local</span>
+            Position et journal restent sur ton appareil.
           </div>
         </div>
       </AppCard>
@@ -394,8 +412,8 @@ export default function HomePage() {
           <section className="mb-6 grid gap-4">
             <div className="flex items-end justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-accent-cyan">Possibilites futures</p>
-                <h3 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-white">Quand revenir</h3>
+                <p className="premium-kicker">Possibilites futures</p>
+                <h3 className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-white">Quand revenir</h3>
               </div>
               <p className="text-right text-sm text-faint">Estimation, a reverifier sur place.</p>
             </div>
@@ -405,22 +423,22 @@ export default function HomePage() {
             ) : (
               <div className="grid gap-3">
                 {futureSuggestions.map((suggestion) => (
-                  <AppCard as="article" key={`${suggestion.quest.id}-${suggestion.availableAt}`} className="rounded-[24px]" padding="sm">
+                  <AppCard as="article" key={`${suggestion.quest.id}-${suggestion.availableAt}`} className="rounded-[22px]" padding="sm">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-bold uppercase tracking-[0.16em] text-accent-cyan">
+                        <p className="premium-kicker">
                           Vers {new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(new Date(suggestion.availableAt))}
                         </p>
                         <h4 className="mt-1 text-xl font-extrabold tracking-[-0.03em] text-white">{suggestion.quest.title}</h4>
                         <p className="mt-2 text-sm leading-6 text-muted">{suggestion.quest.description}</p>
                       </div>
-                      <span className="rounded-full border border-brand-border bg-white/[0.06] px-3 py-1 text-sm font-bold text-muted">
+                      <span className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-sm font-bold text-muted">
                         {suggestion.quest.visibilityScore}
                       </span>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2 text-sm font-semibold text-muted">
-                      <span className="rounded-full bg-white/[0.06] px-3 py-1">{suggestion.quest.cardinalDirection ?? "Zone sombre"}</span>
-                      <span className="rounded-full bg-white/[0.06] px-3 py-1">
+                      <span className="rounded-lg bg-white/[0.045] px-3 py-1">{suggestion.quest.cardinalDirection ?? "Zone sombre"}</span>
+                      <span className="rounded-lg bg-white/[0.045] px-3 py-1">
                         {suggestion.quest.altitude !== null ? `${Math.round(suggestion.quest.altitude)} deg` : "Pas de cible precise"}
                       </span>
                     </div>
@@ -437,8 +455,8 @@ export default function HomePage() {
           <div className="grid gap-4">
             <div className="flex items-end justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-accent-cyan">Quetes proposees</p>
-                <h3 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-white">A tenter maintenant</h3>
+                <p className="premium-kicker">Quetes proposees</p>
+                <h3 className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-white">A tenter maintenant</h3>
               </div>
               <p className="text-right text-sm text-faint">Jamais garanti, toujours approximatif.</p>
             </div>

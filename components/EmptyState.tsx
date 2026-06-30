@@ -7,11 +7,11 @@ type EmptyStateProps = {
 
 export function EmptyState({ title, message }: EmptyStateProps) {
   return (
-    <AppCard className="rounded-[28px] text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[20px] border border-brand-border bg-white/[0.06] text-2xl text-accent-cyan">
+    <AppCard className="rounded-[24px] py-9 text-center">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[15px] border border-white/[0.09] bg-white/[0.035] text-xl text-accent-cyan">
         ✧
       </div>
-      <h2 className="mt-4 text-xl font-bold text-text">{title}</h2>
+      <h2 className="mt-4 text-xl font-semibold tracking-[-0.03em] text-text">{title}</h2>
       <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted">{message}</p>
     </AppCard>
   );

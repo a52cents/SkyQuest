@@ -8,12 +8,15 @@ const permissions = [
 
 export function PermissionPanel() {
   return (
-    <AppCard className="mt-5 rounded-[28px]" padding="sm">
-      <p className="text-sm font-semibold text-text">Permissions utiles</p>
-      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+    <AppCard variant="subtle" className="mt-4 rounded-[20px]" padding="sm">
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm font-semibold text-text">Accès utilisés à la demande</p>
+        <span className="text-xs text-faint">Rien en arrière-plan</span>
+      </div>
+      <div className="mt-3 grid divide-y divide-white/[0.07] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         {permissions.map((permission) => (
-          <div key={permission.label} className="rounded-[18px] border border-brand-border bg-white/[0.04] p-3">
-            <p className="text-sm font-bold text-text">{permission.label}</p>
+          <div key={permission.label} className="py-3 first:pt-0 last:pb-0 sm:px-3 sm:py-0 sm:first:pl-0 sm:last:pr-0">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-faint">{permission.label}</p>
             <p className="mt-1 text-sm leading-5 text-muted">{permission.text}</p>
           </div>
         ))}

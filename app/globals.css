@@ -4,17 +4,31 @@
 :root {
   color-scheme: dark;
   --brand-font-family: var(--font-inter), system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  --background: var(--brand-color-bg-layout);
-  --surface: var(--brand-color-bg-container);
-  --surface-strong: var(--brand-color-bg-elevated);
-  --text: var(--brand-color-text);
-  --muted: var(--brand-color-text-secondary);
-  --faint: var(--brand-color-text-tertiary);
-  --accent: var(--brand-color-primary);
-  --accent-cyan: var(--brand-color-link);
-  --success: var(--brand-color-success);
-  --warning: var(--brand-color-warning);
-  --danger: var(--brand-color-error);
+  --background: #070911;
+  --surface: #0c101b;
+  --surface-strong: #111624;
+  --text: #f4f5fb;
+  --muted: #a9b1c5;
+  --faint: #727b91;
+  --accent: #7568ee;
+  --accent-cyan: #73c9eb;
+  --success: #75c9a1;
+  --warning: #e0b86a;
+  --danger: #e48484;
+  --brand-color-primary: #7568ee;
+  --brand-color-primary-hover: #8579f4;
+  --brand-color-link: #73c9eb;
+  --brand-color-text: #f4f5fb;
+  --brand-color-text-secondary: #a9b1c5;
+  --brand-color-text-tertiary: #727b91;
+  --brand-color-bg-layout: #070911;
+  --brand-color-bg-container: #0c101b;
+  --brand-color-bg-elevated: #111624;
+  --brand-color-fill-quaternary: #090d17;
+  --brand-color-border: #262d40;
+  --brand-color-border-secondary: #1b2232;
+  --brand-border-radius: 14px;
+  --brand-border-radius-lg: 22px;
 }
 
 @theme inline {
@@ -74,11 +88,11 @@ body {
   min-height: 100dvh;
   margin: 0;
   background:
-    radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--brand-color-primary-hover) 42%, transparent), transparent 28rem),
-    radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--brand-color-link) 18%, transparent), transparent 24rem),
-    linear-gradient(180deg, var(--background) 0%, var(--brand-color-fill-quaternary) 48%, var(--brand-color-bg-container) 100%);
+    radial-gradient(ellipse 70% 38% at 50% -8%, rgba(117, 104, 238, 0.18), transparent 70%),
+    linear-gradient(180deg, #080b14 0%, var(--background) 54%, #090d16 100%);
   color: var(--text);
   font-family: var(--brand-font-family);
+  text-rendering: optimizeLegibility;
 }
 
 button,
@@ -93,12 +107,13 @@ a:focus-visible {
 }
 
 .glass-card {
-  border: var(--brand-line-width) solid color-mix(in srgb, var(--brand-color-border) 68%, transparent);
-  background: color-mix(in srgb, var(--surface-strong) 72%, transparent);
+  border: 1px solid rgba(154, 166, 199, 0.16);
+  background: rgba(15, 20, 34, 0.82);
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--brand-color-text) 8%, transparent),
-    0 22px 70px color-mix(in srgb, var(--brand-color-primary) 32%, transparent);
-  backdrop-filter: blur(18px);
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 18px 48px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(20px) saturate(115%);
+  -webkit-backdrop-filter: blur(20px) saturate(115%);
 }
 
 .star-field {
@@ -107,11 +122,25 @@ a:focus-visible {
   z-index: -1;
   pointer-events: none;
   background-image:
-    radial-gradient(circle, color-mix(in srgb, var(--brand-color-text) 55%, transparent) 1px, transparent 1px),
-    radial-gradient(circle, color-mix(in srgb, var(--brand-color-link) 28%, transparent) 1px, transparent 1px);
-  background-position: 0 0, 22px 34px;
-  background-size: 86px 86px, 132px 132px;
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent 82%);
+    radial-gradient(circle, rgba(236, 240, 255, 0.46) 0.7px, transparent 0.9px),
+    radial-gradient(circle, rgba(115, 201, 235, 0.25) 0.6px, transparent 0.8px);
+  background-position: 0 0, 37px 51px;
+  background-size: 121px 121px, 187px 187px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), transparent 72%);
+  opacity: 0.72;
+}
+
+.premium-kicker {
+  color: var(--accent-cyan);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.hairline {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(154, 166, 199, 0.2), transparent);
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {

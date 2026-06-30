@@ -158,7 +158,7 @@ async function createPhotoDraftFromFile(file: File): Promise<PhotoDraft> {
 
 function DetailsRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-brand border border-brand-border bg-white/[0.05] p-3">
+    <div className="rounded-[14px] border border-white/[0.08] bg-white/[0.035] p-3">
       <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-faint">{label}</p>
       <p className="mt-1 text-base font-black text-white">{value}</p>
     </div>
@@ -567,15 +567,15 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       ) : null}
 
       <section className="relative z-10 flex min-h-[100dvh] flex-col justify-between px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)]">
-        <header className="flex min-h-14 items-center gap-2 rounded-brand-lg border border-white/10 bg-background/45 px-2 py-2 shadow-[0_12px_40px_rgba(0,0,0,0.25)] backdrop-blur-xl">
+        <header className="flex min-h-14 items-center gap-2 rounded-[18px] border border-white/10 bg-[#080b14]/65 px-2 py-2 shadow-[0_12px_40px_rgba(0,0,0,0.22)] backdrop-blur-xl">
           <Link href="/" aria-label="Quitter" className={getAppButtonClassName({ variant: "ghost", size: "sm", className: "min-h-0 h-10 w-10 px-0 text-lg" })}>
             ←
           </Link>
-          <h1 className="min-w-0 flex-1 truncate text-base font-black tracking-[-0.02em] text-white">{liveQuest.title}</h1>
+          <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-[-0.025em] text-white">{liveQuest.title}</h1>
           <button
             type="button"
             onClick={() => setDetailsOpen(true)}
-            className="h-10 rounded-full border border-white/10 bg-white/[0.08] px-3 text-sm font-black text-white"
+            className="h-10 rounded-[13px] border border-white/10 bg-white/[0.06] px-3 text-sm font-semibold text-white"
           >
             Details
           </button>
@@ -597,7 +597,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             <div className="h-28 w-28 rounded-full border border-accent-cyan/60 bg-accent-cyan/10" />
           )}
 
-          <p className="rounded-full border border-white/10 bg-background/50 px-5 py-3 text-center text-lg font-black shadow-[0_12px_42px_rgba(0,0,0,0.25)] backdrop-blur-xl">
+          <p className="rounded-[16px] border border-white/10 bg-[#080b14]/65 px-5 py-3 text-center text-lg font-semibold shadow-[0_12px_42px_rgba(0,0,0,0.25)] backdrop-blur-xl">
             {mainHint}
           </p>
 
@@ -614,7 +614,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
           </div>
         </div>
 
-        <div className="rounded-brand-lg border border-white/10 bg-background/48 p-3 shadow-[0_-12px_44px_rgba(0,0,0,0.30)] backdrop-blur-xl">
+        <div className="rounded-[20px] border border-white/10 bg-[#080b14]/72 p-3 shadow-[0_-12px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl">
           {cameraError ? <p className="mb-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">{cameraError}</p> : null}
           {zoomError ? <p className="mb-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">{zoomError}</p> : null}
 

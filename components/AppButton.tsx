@@ -11,23 +11,23 @@ type AppButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const baseClasses = [
-  "inline-flex items-center justify-center rounded-full font-extrabold",
-  "transition duration-[var(--brand-motion-duration-mid)] ease-brand-out active:scale-[0.98]",
+  "inline-flex items-center justify-center rounded-[16px] border font-bold tracking-[-0.01em]",
+  "transition-[transform,background-color,border-color,box-shadow,color] duration-200 ease-brand-out active:scale-[0.985]",
   "disabled:cursor-not-allowed disabled:opacity-70",
 ].join(" ");
 
 const variantClasses: Record<AppButtonVariant, string> = {
-  primary: "bg-accent px-5 text-white shadow-[0_16px_40px_color-mix(in_srgb,var(--accent)_35%,transparent)] hover:bg-brand-primary-hover",
-  secondary: "border border-accent-cyan/25 bg-accent-cyan/12 text-accent-cyan",
-  ghost: "border border-brand-border bg-white/[0.06] text-white",
-  success: "border border-success/25 bg-success/12 text-success",
-  danger: "border border-danger/25 bg-danger/10 text-danger",
+  primary: "border-white/10 bg-accent px-5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_12px_30px_rgba(42,34,118,0.28)] hover:-translate-y-px hover:bg-brand-primary-hover hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_16px_34px_rgba(42,34,118,0.34)]",
+  secondary: "border-accent-cyan/20 bg-accent-cyan/[0.08] text-[#a8e1f5] hover:border-accent-cyan/35 hover:bg-accent-cyan/[0.12]",
+  ghost: "border-white/[0.10] bg-white/[0.045] text-[#e9ebf4] hover:border-white/[0.18] hover:bg-white/[0.075]",
+  success: "border-success/20 bg-success/[0.09] text-[#a8dfc2] hover:bg-success/[0.14]",
+  danger: "border-danger/20 bg-danger/[0.08] text-[#f0aaaa] hover:bg-danger/[0.13]",
 };
 
 const sizeClasses: Record<AppButtonSize, string> = {
-  sm: "min-h-12 px-4 text-sm",
-  md: "min-h-14 px-5 text-base",
-  lg: "min-h-16 px-7 text-lg",
+  sm: "min-h-11 px-4 text-sm",
+  md: "min-h-13 px-5 text-[0.95rem]",
+  lg: "min-h-15 px-6 text-base",
 };
 
 function joinClasses(...classes: Array<string | false | null | undefined>) {
