@@ -25,6 +25,7 @@ import { getRankProgress } from "@/lib/progression";
 import type { ProgressReward, SkyQuest } from "@/lib/types";
 import { getFallbackWeather, fetchWeatherNow } from "@/lib/weather";
 import { isOnboardingCompleted, setOnboardingCompleted } from "@/lib/onboarding";
+import {InstallButton} from "@/components/InstallButton";
 
 type LoadState = "idle" | "loading" | "ready";
 type FutureState = "idle" | "loading" | "ready";
@@ -395,6 +396,7 @@ export default function HomePage() {
           </p>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-2">
+            <InstallButton />
             <AppButton size="lg" onClick={handleNow} disabled={isBusy}>
               {state === "loading" ? "Lecture du ciel..." : "Maintenant"}
             </AppButton>
