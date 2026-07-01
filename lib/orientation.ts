@@ -32,6 +32,16 @@ export type CameraPointing = {
   source: "absolute" | "webkit-compass" | "tilt-only" | "unavailable";
 };
 
+export type PointingCalibration = {
+  azimuthOffset: number;
+  altitudeOffset: number;
+};
+
+export type PointingSample = {
+  azimuth: number;
+  altitude: number;
+};
+
 type Vector3 = [number, number, number];
 
 type FullOrientationReading = {
@@ -158,6 +168,58 @@ export function getCameraPointing(reading: DeviceOrientationReading): CameraPoin
     azimuth: null,
     altitude: null,
     source: "unavailable",
+  };
+}
+
+export function averagePointingSamples(samples: PointingSample[]): PointingSample | null {
+  if (samples.length === 0) {
+    return null;
+  }
+
+  const azimuthVectors = samples.reduce(
+    (total, sample) => {
+      const radians = degreesToRadians(sample.azimuth);
+      return {
+        x: total.x + Math.sin(radians),
+        y: total.y + Math.cos(radians),
+      };
+    },
+    { x: 0, y: 0 },
+  );
+  const altitude = samples.reduce((total, sample) => total + sample.altitude, 0) / samples.length;
+
+  return {
+    azimuth: normalizeAngle(radiansToDegrees(Math.atan2(azimuthVectors.x, azimuthVectors.y))),
+    altitude: Math.max(-90, Math.min(90, altitude)),
+  };
+}
+
+export function createPointingCalibration(
+  measured: PointingSample,
+  reference: PointingSample,
+): PointingCalibration {
+  return {
+    azimuthOffset: angleDifference(measured.azimuth, reference.azimuth),
+    altitudeOffset: reference.altitude - measured.altitude,
+  };
+}
+
+export function applyPointingCalibration(
+  pointing: CameraPointing,
+  calibration: PointingCalibration | null,
+): CameraPointing {
+  if (!calibration) {
+    return pointing;
+  }
+
+  return {
+    ...pointing,
+    azimuth: pointing.azimuth === null
+      ? null
+      : normalizeAngle(pointing.azimuth + calibration.azimuthOffset),
+    altitude: pointing.altitude === null
+      ? null
+      : Math.max(-90, Math.min(90, pointing.altitude + calibration.altitudeOffset)),
   };
 }
 

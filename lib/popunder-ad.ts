@@ -1,8 +1,10 @@
 const POPUNDER_SCRIPT_SRC = "https://pl30132581.effectivecpmnetwork.com/fa/d4/c9/fad4c94d2017ce5a73518ced0d75a611.js";
 const POPUNDER_STORAGE_KEY = "skyquest:last-popunder-ad-at";
 const POPUNDER_INTERVAL_MS = 10 * 60 * 1000;
+const POPUNDER_LOAD_TIMEOUT_MS = 10 * 1000;
 
 let lastTriggerFallback = 0;
+let pendingTrigger: Promise<boolean> | null = null;
 
 function readLastTrigger(): number {
   try {
@@ -34,25 +36,49 @@ export function isPopunderAdOnCooldown(now = Date.now()): boolean {
   return now - lastTrigger < POPUNDER_INTERVAL_MS;
 }
 
-export function triggerPopunderAd() {
+export function triggerPopunderAd(): Promise<boolean> {
   if (typeof window === "undefined" || typeof document === "undefined") {
-    return false;
+    return Promise.resolve(false);
   }
 
-  const now = Date.now();
-  if (isPopunderAdOnCooldown(now)) {
-    return false;
+  if (isPopunderAdOnCooldown()) {
+    return Promise.resolve(false);
   }
 
-  saveLastTrigger(now);
+  if (pendingTrigger) {
+    return pendingTrigger;
+  }
 
-  const script = document.createElement("script");
-  script.src = POPUNDER_SCRIPT_SRC;
-  script.async = true;
-  script.dataset.skyquestPopunder = "true";
-  script.onload = () => script.remove();
-  script.onerror = () => script.remove();
-  document.head.appendChild(script);
+  pendingTrigger = new Promise<boolean>((resolve) => {
+    const script = document.createElement("script");
+    let isSettled = false;
 
-  return true;
+    function finish(didLoad: boolean) {
+      if (isSettled) {
+        return;
+      }
+
+      isSettled = true;
+      window.clearTimeout(timeoutId);
+      script.remove();
+
+      // The cooldown starts only after the advertising script has loaded and run.
+      if (didLoad) {
+        saveLastTrigger(Date.now());
+      }
+
+      pendingTrigger = null;
+      resolve(didLoad);
+    }
+
+    const timeoutId = window.setTimeout(() => finish(false), POPUNDER_LOAD_TIMEOUT_MS);
+    script.src = POPUNDER_SCRIPT_SRC;
+    script.async = true;
+    script.dataset.skyquestPopunder = "true";
+    script.onload = () => finish(true);
+    script.onerror = () => finish(false);
+    document.head.appendChild(script);
+  });
+
+  return pendingTrigger;
 }

@@ -135,7 +135,7 @@ function AdConsentModal({
         </p>
         <div className="mt-6 grid gap-3">
           <AppButton onClick={onConfirm} disabled={isBusy} fullWidth>
-            Voir une pub et continuer
+            {isBusy ? "Affichage de la pub..." : "Voir une pub et continuer"}
           </AppButton>
           <AppButton variant="ghost" onClick={onClose} disabled={isBusy} fullWidth>
             Pas maintenant
@@ -156,6 +156,7 @@ export default function HomePage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [showAllQuests, setShowAllQuests] = useState(false);
   const [adAction, setAdAction] = useState<AdAction | null>(null);
+  const [isAdLoading, setIsAdLoading] = useState(false);
 
   useEffect(() => {
     const snapshot = readHomeSnapshot();
@@ -314,10 +315,16 @@ export default function HomePage() {
     setAdAction("future");
   }
 
-  function handleAdConfirm() {
+  async function handleAdConfirm() {
     const nextAction = adAction;
+    if (!nextAction || isAdLoading) {
+      return;
+    }
+
+    setIsAdLoading(true);
+    await triggerPopunderAd();
+    setIsAdLoading(false);
     setAdAction(null);
-    triggerPopunderAd();
 
     if (nextAction === "future") {
       void runFuturePossibilities();
@@ -341,7 +348,7 @@ export default function HomePage() {
 
   const visibleQuests = showAllQuests ? quests : quests.slice(0, 3);
   const hiddenQuestCount = Math.max(0, quests.length - visibleQuests.length);
-  const isBusy = state === "loading" || futureState === "loading";
+  const isBusy = state === "loading" || futureState === "loading" || isAdLoading;
 
   return (
     <PageShell
