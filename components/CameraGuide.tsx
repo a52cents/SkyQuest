@@ -24,7 +24,7 @@ import {
 import { getSkyObjects } from "@/lib/astro";
 import { getInsecureContextMessage, isSecureBrowserContext } from "@/lib/browser-support";
 import { recalculateQuestPosition } from "@/lib/quest-generator";
-import { getLastLocation } from "@/lib/storage";
+import { getLastLocation, getPointingCalibration, savePointingCalibration } from "@/lib/storage";
 import type { Observation, SkyQuest } from "@/lib/types";
 
 const SHOW_CAMERA_DEBUG = false;
@@ -102,7 +102,7 @@ type PhotoDraft = {
 };
 
 type CalibrationReference = PointingSample & {
-  name: "Lune";
+  name: string;
 };
 
 function getMoonCalibrationReference(latitude: number, longitude: number, now: Date): CalibrationReference | null {
@@ -213,7 +213,9 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [currentAzimuth, setCurrentAzimuth] = useState<number | null>(null);
   const [currentAltitude, setCurrentAltitude] = useState<number | null>(null);
   const [calibration, setCalibration] = useState<PointingCalibration | null>(null);
-  const [calibrationReference, setCalibrationReference] = useState<CalibrationReference | null>(null);
+  const [calibrationTarget, setCalibrationTarget] = useState<string | null>(null);
+  const [moonCalibrationReference, setMoonCalibrationReference] = useState<CalibrationReference | null>(null);
+  const [calibrationSheetReference, setCalibrationSheetReference] = useState<CalibrationReference | null>(null);
   const [calibrationSheetOpen, setCalibrationSheetOpen] = useState(false);
   const [calibrationError, setCalibrationError] = useState<string | null>(null);
   const [liveQuest, setLiveQuest] = useState<SkyQuest>(quest);
@@ -235,6 +237,15 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [observerLocation, setObserverLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [skyOverlayEnabled, setSkyOverlayEnabled] = useState(true);
+
+  useEffect(() => {
+    const storedCalibration = getPointingCalibration();
+    if (storedCalibration) {
+      calibrationRef.current = storedCalibration;
+      setCalibration(storedCalibration);
+      setCalibrationTarget(storedCalibration.target);
+    }
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -269,7 +280,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         longitude: lastLocation.longitude,
         now,
       }));
-      setCalibrationReference(getMoonCalibrationReference(lastLocation.latitude, lastLocation.longitude, now));
+      setMoonCalibrationReference(getMoonCalibrationReference(lastLocation.latitude, lastLocation.longitude, now));
     }
 
     refreshPosition();
@@ -282,16 +293,17 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     if (
       cameraStatus === "active" &&
       orientationStatus === "active" &&
-      calibrationReference &&
+      moonCalibrationReference &&
       currentAzimuth !== null &&
       currentAltitude !== null &&
       !calibration &&
       !calibrationPromptHandledRef.current
     ) {
       calibrationPromptHandledRef.current = true;
+      setCalibrationSheetReference(moonCalibrationReference);
       setCalibrationSheetOpen(true);
     }
-  }, [calibration, calibrationReference, cameraStatus, currentAltitude, currentAzimuth, orientationStatus]);
+  }, [calibration, cameraStatus, currentAltitude, currentAzimuth, moonCalibrationReference, orientationStatus]);
 
   useEffect(() => {
     const orientation = window.screen.orientation;
@@ -299,17 +311,16 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       return;
     }
 
-    function clearCalibrationAfterScreenRotation() {
-      calibrationRef.current = null;
+    function resetOrientationAfterScreenRotation() {
       calibrationPromptHandledRef.current = false;
       pointingSamplesRef.current = [];
-      setCalibration(null);
       setCalibrationSheetOpen(false);
+      setCalibrationSheetReference(null);
       cameraOrientationRef.current = null;
     }
 
-    orientation.addEventListener("change", clearCalibrationAfterScreenRotation);
-    return () => orientation.removeEventListener("change", clearCalibrationAfterScreenRotation);
+    orientation.addEventListener("change", resetOrientationAfterScreenRotation);
+    return () => orientation.removeEventListener("change", resetOrientationAfterScreenRotation);
   }, []);
 
   async function startCamera() {
@@ -531,28 +542,19 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     }
   }
 
-  function openCalibration() {
-    if (!calibrationReference) {
-      return;
-    }
-
-    setCalibrationError(null);
-    setCalibrationSheetOpen(true);
-  }
-
   function skipCalibration() {
     calibrationPromptHandledRef.current = true;
     setCalibrationError(null);
     setCalibrationSheetOpen(false);
+    setCalibrationSheetReference(null);
   }
 
-  function calibrateOnMoon() {
-    const location = getLastLocation();
+  function calibrateOnReference(reference: CalibrationReference): boolean {
     const samples = pointingSamplesRef.current.slice(-CALIBRATION_SAMPLE_COUNT);
     const measured = averagePointingSamples(samples);
-    if (!location || !measured || samples.length < MIN_CALIBRATION_SAMPLES) {
+    if (!measured || samples.length < MIN_CALIBRATION_SAMPLES) {
       setCalibrationError("Garde le téléphone immobile un instant, puis réessaie.");
-      return;
+      return false;
     }
 
     const isStable = samples.every((sample) =>
@@ -561,7 +563,34 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     );
     if (!isStable) {
       pointingSamplesRef.current = [];
-      setCalibrationError("Le téléphone bouge encore. Recentre la Lune et reste immobile une seconde.");
+      setCalibrationError(`Le téléphone bouge encore. Recentre ${reference.name} et reste immobile une seconde.`);
+      return false;
+    }
+
+    const nextCalibration = createPointingCalibration(measured, reference);
+    savePointingCalibration(nextCalibration, reference.name);
+    calibrationRef.current = nextCalibration;
+    calibrationPromptHandledRef.current = true;
+    setCalibration(nextCalibration);
+    setCalibrationTarget(reference.name);
+    setCalibrationError(null);
+    setCalibrationSheetOpen(false);
+    setCalibrationSheetReference(null);
+
+    const corrected = applyPointingCalibration({
+      azimuth: measured.azimuth,
+      altitude: measured.altitude,
+      source: "absolute",
+    }, nextCalibration);
+    setCurrentAzimuth(corrected.azimuth);
+    setCurrentAltitude(corrected.altitude);
+    return true;
+  }
+
+  function calibrateOnMoon() {
+    const location = getLastLocation();
+    if (!location) {
+      setCalibrationError("Position indisponible pour calculer la position de la Lune.");
       return;
     }
 
@@ -571,21 +600,20 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       return;
     }
 
-    const nextCalibration = createPointingCalibration(measured, reference);
-    calibrationRef.current = nextCalibration;
-    calibrationPromptHandledRef.current = true;
-    setCalibration(nextCalibration);
-    setCalibrationReference(reference);
-    setCalibrationError(null);
-    setCalibrationSheetOpen(false);
+    calibrateOnReference(reference);
+  }
 
-    const corrected = applyPointingCalibration({
-      azimuth: measured.azimuth,
-      altitude: measured.altitude,
-      source: "absolute",
-    }, nextCalibration);
-    setCurrentAzimuth(corrected.azimuth);
-    setCurrentAltitude(corrected.altitude);
+  function calibrateOnCurrentTarget() {
+    if (liveQuest.azimuth === null || liveQuest.altitude === null) {
+      setCalibrationError("Cette mission n'a pas de position assez précise pour calibrer.");
+      return;
+    }
+
+    calibrateOnReference({
+      name: liveQuest.target,
+      azimuth: liveQuest.azimuth,
+      altitude: liveQuest.altitude,
+    });
   }
 
   async function requestOrientation() {
@@ -851,14 +879,20 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               Reglages
             </AppButton>
           </div>
-          {calibrationReference && cameraStatus === "active" && orientationStatus === "active" ? (
+          {hasPrecisePoint ? (
             <button
               type="button"
-              onClick={openCalibration}
-              className={`mt-2 flex min-h-10 w-full items-center justify-center rounded-[13px] border px-3 text-sm font-semibold ${calibration ? "border-success/25 bg-success/10 text-success" : "border-accent-cyan/20 bg-accent-cyan/[0.08] text-accent-cyan"}`}
+              onClick={calibrateOnCurrentTarget}
+              disabled={cameraStatus !== "active" || orientationStatus !== "active" || currentAzimuth === null || currentAltitude === null}
+              className={`mt-2 flex min-h-10 w-full items-center justify-center rounded-[13px] border px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45 ${calibration ? "border-success/25 bg-success/10 text-success" : "border-accent-cyan/20 bg-accent-cyan/[0.08] text-accent-cyan"}`}
             >
-              {calibration ? "Précision ajustée · Recalibrer" : "Améliorer la précision avec la Lune"}
+              {calibration ? `Calibration active (${calibrationTarget ?? "cible"}) · Recalibrer sur ${liveQuest.target}` : `Cible centrée · Calibrer sur ${liveQuest.target}`}
             </button>
+          ) : null}
+          {calibrationError && !calibrationSheetOpen ? (
+            <p className="mt-2 rounded-[13px] border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">
+              {calibrationError}
+            </p>
           ) : null}
           {cameraStatus === "active" && observerLocation && overlaySupported ? (
             <button
@@ -875,19 +909,19 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
       <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFilePhoto} />
 
-      {calibrationSheetOpen && calibrationReference ? (
+      {calibrationSheetOpen && calibrationSheetReference ? (
         <div className="fixed inset-0 z-30 flex items-end bg-[linear-gradient(to_top,rgba(0,0,0,0.45),transparent_55%)] p-3" role="dialog" aria-modal="true" aria-labelledby="calibration-title">
           <AppCard className="mx-auto w-full max-w-xl rounded-[26px] pb-[calc(env(safe-area-inset-bottom)+1rem)]" padding="lg">
             <p className="premium-kicker">Calibration rapide</p>
             <h2 id="calibration-title" className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-white">
-              Centre la Lune
+              Centre {calibrationSheetReference.name}
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted">
-              Place la Lune pile au centre du cercle, garde le téléphone immobile, puis valide. On corrigera le décalage de la boussole pour cette mission.
+              Place {calibrationSheetReference.name} pile au centre du cercle, garde le téléphone immobile, puis valide. La correction sera conservée pour les prochaines missions.
             </p>
             <div className="mt-4 grid gap-3">
               <AppButton onClick={calibrateOnMoon} disabled={currentAzimuth === null || currentAltitude === null} fullWidth>
-                La Lune est centrée
+                {calibrationSheetReference.name} est centré{calibrationSheetReference.name === "Lune" ? "e" : ""}
               </AppButton>
               <AppButton variant="ghost" onClick={skipCalibration} fullWidth>
                 Je ne la vois pas · Passer
@@ -925,7 +959,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               <DetailsRow label="Delta hauteur" value={altitudeArrowLabel} />
               <DetailsRow label="Zoom reel" value={zoomLabel} />
               <DetailsRow label="Orientation" value={orientationStatus === "active" ? "Active" : "Inactive"} />
-              <DetailsRow label="Calibration" value={calibration ? "Ajustée sur la Lune" : "Standard"} />
+              <DetailsRow label="Calibration" value={calibration ? `Ajustée sur ${calibrationTarget ?? "une cible"}` : "Standard"} />
               <DetailsRow label="Torche" value={cameraCapabilities?.torch ? (torchEnabled ? "Allumee" : "Eteinte") : "Indispo"} />
               <DetailsRow label="Expo." value={currentExposureCompensation !== null ? currentExposureCompensation.toFixed(1) : "Auto"} />
               <DetailsRow label="Focus" value={currentFocusDistance !== null ? currentFocusDistance.toFixed(1) : currentFocusMode ?? "Auto"} />
