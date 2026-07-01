@@ -136,7 +136,7 @@ function AdConsentModal({
         </p>
         <div className="mt-6 grid gap-3">
           <AppButton onClick={onConfirm} disabled={isBusy} fullWidth>
-            {isBusy ? "Affichage de la pub..." : "Voir une pub et continuer"}
+            {isBusy ? "Affichage de la pub..." : "Regarder la pub"}
           </AppButton>
           <AppButton variant="ghost" onClick={onClose} disabled={isBusy} fullWidth>
             Pas maintenant

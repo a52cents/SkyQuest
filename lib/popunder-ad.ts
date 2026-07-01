@@ -1,10 +1,8 @@
-const POPUNDER_SCRIPT_SRC = "https://pl30132581.effectivecpmnetwork.com/fa/d4/c9/fad4c94d2017ce5a73518ced0d75a611.js";
+const POPUNDER_LANDING_URL = "https://www.effectivecpmnetwork.com/fu31afbd?key=d3c79b3e31b72dcc194c75aa618621ae";
 const POPUNDER_STORAGE_KEY = "skyquest:last-popunder-ad-at";
 const POPUNDER_INTERVAL_MS = 10 * 60 * 1000;
-const POPUNDER_LOAD_TIMEOUT_MS = 10 * 1000;
 
 let lastTriggerFallback = 0;
-let pendingTrigger: Promise<boolean> | null = null;
 
 function readLastTrigger(): number {
   try {
@@ -45,40 +43,13 @@ export function triggerPopunderAd(): Promise<boolean> {
     return Promise.resolve(false);
   }
 
-  if (pendingTrigger) {
-    return pendingTrigger;
+  const adWindow = window.open(POPUNDER_LANDING_URL, "_blank", "noopener,noreferrer");
+  if (!adWindow) {
+    return Promise.resolve(false);
   }
 
-  pendingTrigger = new Promise<boolean>((resolve) => {
-    const script = document.createElement("script");
-    let isSettled = false;
+  adWindow.focus();
+  saveLastTrigger(Date.now());
 
-    function finish(didLoad: boolean) {
-      if (isSettled) {
-        return;
-      }
-
-      isSettled = true;
-      window.clearTimeout(timeoutId);
-      script.remove();
-
-      // The cooldown starts only after the advertising script has loaded and run.
-      if (didLoad) {
-        saveLastTrigger(Date.now());
-      }
-
-      pendingTrigger = null;
-      resolve(didLoad);
-    }
-
-    const timeoutId = window.setTimeout(() => finish(false), POPUNDER_LOAD_TIMEOUT_MS);
-    script.src = POPUNDER_SCRIPT_SRC;
-    script.async = true;
-    script.dataset.skyquestPopunder = "true";
-    script.onload = () => finish(true);
-    script.onerror = () => finish(false);
-    document.head.appendChild(script);
-  });
-
-  return pendingTrigger;
+  return Promise.resolve(true);
 }
