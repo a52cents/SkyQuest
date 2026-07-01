@@ -30,8 +30,16 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="fr">
-      <body className={`${inter.variable} antialiased`}>
+    <html lang="fr" className={inter.variable} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "!function(){try{var e=localStorage.getItem('skyquest.night-mode.v1')==='1',t=document.documentElement;t.classList.toggle('night-mode',e);var n=document.querySelector('meta[name=\"theme-color\"]');n&&(n.content=e?'#1a0000':'#070911')}catch(e){}}();",
+          }}
+        />
+      </head>
+      <body className="antialiased">
         <div className="star-field" aria-hidden="true" />
         {children}
         <PwaRegister />

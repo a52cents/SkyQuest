@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { AppButton, getAppButtonClassName } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
+import { NightModeToggle } from "@/components/NightModeToggle";
 import { SkyOverlay, questSupportsSkyOverlay } from "@/components/SkyOverlay";
 import {
   ALIGNMENT_TOLERANCE_DEGREES,
@@ -795,13 +796,16 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             ←
           </Link>
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-[-0.025em] text-white">{liveQuest.title}</h1>
-          <button
-            type="button"
-            onClick={() => setDetailsOpen(true)}
-            className="h-10 rounded-[13px] border border-white/10 bg-white/[0.06] px-3 text-sm font-semibold text-white"
-          >
-            Details
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setDetailsOpen(true)}
+              className="h-10 rounded-[13px] border border-white/10 bg-white/[0.06] px-3 text-sm font-semibold text-white"
+            >
+              Details
+            </button>
+            <NightModeToggle />
+          </div>
         </header>
 
         <div className="pointer-events-none absolute left-4 right-4 top-[calc(env(safe-area-inset-top)+5rem)] flex flex-col items-center gap-3">

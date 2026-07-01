@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "../system/variables.dark.css";
 
+@custom-variant night-mode (&:where(.night-mode, .night-mode *));
+
 :root {
   color-scheme: dark;
   --brand-font-family: var(--font-inter), system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
@@ -75,13 +77,54 @@
   --ease-brand-out: var(--brand-motion-ease-out);
 }
 
+.night-mode {
+  color-scheme: dark;
+  --background: #0a0000;
+  --surface: #120000;
+  --surface-strong: #170000;
+  --text: #d97070;
+  --muted: #8a3838;
+  --faint: #6a2a2a;
+  --accent: #c0392b;
+  --accent-cyan: #c0392b;
+  --success: #c0392b;
+  --warning: #b54b3d;
+  --danger: #c0392b;
+  --brand-color-primary: #c0392b;
+  --brand-color-primary-hover: #d04a3c;
+  --brand-color-link: #c0392b;
+  --brand-color-text: #d97070;
+  --brand-color-text-secondary: #8a3838;
+  --brand-color-text-tertiary: #6a2a2a;
+  --brand-color-bg-layout: #0a0000;
+  --brand-color-bg-container: #120000;
+  --brand-color-bg-elevated: #170000;
+  --brand-color-fill-quaternary: #120000;
+  --brand-color-border: rgba(192, 57, 43, 0.25);
+  --brand-color-border-secondary: rgba(192, 57, 43, 0.18);
+}
+
 * {
   box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  transition-property: color, background-color, border-color, box-shadow, outline-color, fill, stroke, text-decoration-color;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
 }
 
 html {
   min-height: 100%;
   background: var(--background);
+}
+
+html.night-mode body {
+  background:
+    radial-gradient(ellipse 72% 42% at 50% -10%, rgba(192, 57, 43, 0.18), transparent 68%),
+    linear-gradient(180deg, #120000 0%, var(--background) 54%, #0b0000 100%);
 }
 
 body {
@@ -93,6 +136,42 @@ body {
   color: var(--text);
   font-family: var(--brand-font-family);
   text-rendering: optimizeLegibility;
+}
+
+html.night-mode .glass-card {
+  border-color: rgba(192, 57, 43, 0.22);
+  background: rgba(18, 0, 0, 0.84);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 18px 48px rgba(0, 0, 0, 0.24);
+}
+
+html.night-mode .star-field {
+  background-image:
+    radial-gradient(circle, rgba(255, 132, 108, 0.42) 0.7px, transparent 0.9px),
+    radial-gradient(circle, rgba(192, 57, 43, 0.24) 0.6px, transparent 0.8px);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.78), transparent 72%);
+  opacity: 0.62;
+}
+
+html.night-mode [class*="text-white"] {
+  color: var(--text) !important;
+}
+
+html.night-mode [class*="bg-white"] {
+  background-color: rgba(18, 0, 0, 0.56) !important;
+}
+
+html.night-mode [class*="border-white"] {
+  border-color: rgba(192, 57, 43, 0.25) !important;
+}
+
+html.night-mode [class*="a8e1f5"],
+html.night-mode [class*="e9ebf4"],
+html.night-mode [class*="a8dfc2"],
+html.night-mode [class*="f0aaaa"],
+html.night-mode [class*="bdb7ff"] {
+  color: var(--text) !important;
 }
 
 button,
