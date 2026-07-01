@@ -248,7 +248,7 @@ export function getCameraPointing(reading: DeviceOrientationReading): CameraPoin
   // 1) iOS : webkitCompassHeading est la boussole native.
   if (compassHeading !== null) {
     const azimuth = getWebkitCameraHeading(compassHeading, reading.beta);
-    
+
     const altitude = typeof reading.beta === "number" ? betaToCameraAltitude(reading.beta) : null;
     return {
       azimuth,
