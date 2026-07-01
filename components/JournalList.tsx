@@ -68,7 +68,10 @@ export function JournalList({ observations, onClear }: JournalListProps) {
             </span>
           </div>
           <div className="mt-4 flex flex-wrap gap-2 border-t border-white/[0.07] pt-3 text-xs text-muted">
-            <span className="rounded-md bg-white/[0.035] px-2.5 py-1">Score {observation.visibilityScore}</span>
+            <span className="rounded-md bg-white/[0.035] px-2.5 py-1">Conditions {observation.visibilityScore}/100</span>
+            {typeof observation.xpEarned === "number" ? (
+              <span className="rounded-md bg-accent/[0.09] px-2.5 py-1 font-semibold text-[#bdb7ff]">+{observation.xpEarned} Éclats</span>
+            ) : null}
             {observation.latitude !== undefined && observation.longitude !== undefined ? (
               <span className="rounded-md bg-white/[0.035] px-2.5 py-1">
                 {observation.latitude.toFixed(2)}, {observation.longitude.toFixed(2)}

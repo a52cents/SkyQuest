@@ -16,7 +16,7 @@ export function VisibilityBadge({ label, score, className }: VisibilityBadgeProp
 
   return (
     <span className={joinClasses("inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-bold", tone, className)}>
-      {label} {"\u00b7"} {score}
+      {label} {"\u00b7"} Conditions {score}/100
     </span>
   );
 }

@@ -11,13 +11,14 @@ import { LoadingState } from "@/components/LoadingState";
 import { PageShell } from "@/components/PageShell";
 import { PermissionPanel } from "@/components/PermissionPanel";
 import { QuestCard } from "@/components/QuestCard";
+import { ProgressFeedback } from "@/components/ProgressFeedback";
 import { SecureContextNotice } from "@/components/SecureContextNotice";
 import { getInsecureContextMessage, isSecureBrowserContext } from "@/lib/browser-support";
 import { fetchNextIssVisiblePass } from "@/lib/iss";
 import { isPopunderAdOnCooldown, triggerPopunderAd } from "@/lib/popunder-ad";
 import { generateFutureQuestSuggestions, generateQuests, type FutureQuestSuggestion } from "@/lib/quest-generator";
 import { addObservation, saveActiveQuest, saveLastLocation } from "@/lib/storage";
-import type { SkyQuest } from "@/lib/types";
+import type { ProgressReward, SkyQuest } from "@/lib/types";
 import { getFallbackWeather, fetchWeatherNow } from "@/lib/weather";
 
 type LoadState = "idle" | "loading" | "ready";
@@ -157,6 +158,7 @@ export default function HomePage() {
   const [showAllQuests, setShowAllQuests] = useState(false);
   const [adAction, setAdAction] = useState<AdAction | null>(null);
   const [isAdLoading, setIsAdLoading] = useState(false);
+  const [lastReward, setLastReward] = useState<ProgressReward | null>(null);
 
   useEffect(() => {
     const snapshot = readHomeSnapshot();
@@ -189,6 +191,7 @@ export default function HomePage() {
     setNotice(null);
     setQuests([]);
     setShowAllQuests(false);
+    setLastReward(null);
 
     try {
       const coords = await getCurrentPosition();
@@ -340,7 +343,8 @@ export default function HomePage() {
   }
 
   function handleLog(quest: SkyQuest, status: "seen" | "missed") {
-    addObservation(quest, status, position ?? undefined);
+    const result = addObservation(quest, status, position ?? undefined);
+    setLastReward(result.reward);
     const nextNotice = status === "seen" ? "Observation ajoutee au journal." : "Resultat note dans le journal.";
     setNotice(nextNotice);
     persistSnapshot({ notice: nextNotice });
@@ -412,6 +416,7 @@ export default function HomePage() {
 
       <section className="mt-6" aria-live="polite">
         <SecureContextNotice />
+        {lastReward ? <div className="mb-4"><ProgressFeedback reward={lastReward} /></div> : null}
         {notice ? <ErrorState tone="info" message={notice} /> : null}
         {state === "loading" ? <LoadingState /> : null}
         {futureState === "loading" ? <LoadingState /> : null}
@@ -440,7 +445,7 @@ export default function HomePage() {
                         <p className="mt-2 text-sm leading-6 text-muted">{suggestion.quest.description}</p>
                       </div>
                       <span className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-sm font-bold text-muted">
-                        {suggestion.quest.visibilityScore}
+                        Conditions {suggestion.quest.visibilityScore}/100
                       </span>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2 text-sm font-semibold text-muted">

@@ -1,19 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { getAppButtonClassName } from "@/components/AppButton";
 import { CameraGuide } from "@/components/CameraGuide";
 import { ErrorState } from "@/components/ErrorState";
 import { PageShell } from "@/components/PageShell";
+import { ProgressFeedback } from "@/components/ProgressFeedback";
 import { addObservation, getActiveQuest, getLastLocation } from "@/lib/storage";
-import type { Observation, SkyQuest } from "@/lib/types";
+import type { Observation, ProgressReward, SkyQuest } from "@/lib/types";
 
 export default function QuestGuidePage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const [quest, setQuest] = useState<SkyQuest | null>(null);
+  const [reward, setReward] = useState<ProgressReward | null>(null);
+  const isLoggingRef = useRef(false);
 
   useEffect(() => {
     const stored = getActiveQuest();
@@ -23,10 +25,21 @@ export default function QuestGuidePage() {
   }, [params.id]);
 
   function logAndReturn(status: "seen" | "missed", photo?: Pick<Observation, "photoDataUrl" | "photoThumbnailDataUrl">) {
-    if (quest) {
-      addObservation(quest, status, getLastLocation() ?? undefined, photo);
+    if (!quest || isLoggingRef.current) {
+      return;
     }
-    router.push("/journal");
+    isLoggingRef.current = true;
+    const result = addObservation(quest, status, getLastLocation() ?? undefined, photo);
+    setReward(result.reward);
+  }
+
+  if (reward) {
+    return (
+      <PageShell eyebrow="Observation notée" title="Une trace dans ton ciel" className="max-w-2xl justify-center" contentClassName="flex flex-col justify-center gap-3">
+        <ProgressFeedback reward={reward} showJournalLink />
+        <Link href="/" className={getAppButtonClassName({ variant: "ghost", className: "w-full" })}>Retour à l’accueil</Link>
+      </PageShell>
+    );
   }
 
   if (!quest) {

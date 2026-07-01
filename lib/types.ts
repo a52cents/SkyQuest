@@ -14,6 +14,17 @@ export type QuestTargetType =
 
 export type RequiredGear = "naked_eye" | "binoculars_recommended";
 
+export type QuestDifficulty = "easy" | "medium";
+
+export type AchievementId =
+  | "first-look"
+  | "planet-tour"
+  | "night-landmarks"
+  | "orbital-watcher"
+  | "persistent"
+  | "explorer"
+  | "confirmed-watcher";
+
 export type SkyObject = {
   name: SkyObjectName;
   azimuth: number;
@@ -34,7 +45,7 @@ export type SkyQuest = {
   target: string;
   targetType: QuestTargetType;
   title: string;
-  difficulty: "easy" | "medium";
+  difficulty: QuestDifficulty;
   azimuth: number | null;
   altitude: number | null;
   cardinalDirection: string | null;
@@ -53,8 +64,53 @@ export type Observation = {
   target: string;
   status: "seen" | "missed";
   visibilityScore: number;
+  targetType?: QuestTargetType;
+  difficulty?: QuestDifficulty;
+  xpEarned?: number;
+  isFirstDiscovery?: boolean;
+  unlockedAchievements?: AchievementId[];
   latitude?: number;
   longitude?: number;
   photoDataUrl?: string;
   photoThumbnailDataUrl?: string;
+};
+
+export type DiscoveredTarget = {
+  target: string;
+  targetType: QuestTargetType;
+  discoveredAt: string;
+};
+
+export type UnlockedAchievement = {
+  id: AchievementId;
+  unlockedAt: string;
+};
+
+export type RewardHistoryEntry = {
+  key: string;
+  target: string;
+  localNight: string;
+  awardedXp: number;
+  status: Observation["status"];
+  hadMissed: boolean;
+  updatedAt: string;
+};
+
+export type ProgressProfile = {
+  version: 1;
+  totalXp: number;
+  discoveredTargets: DiscoveredTarget[];
+  unlockedAchievements: UnlockedAchievement[];
+  rewardHistory: RewardHistoryEntry[];
+  updatedAt: string;
+};
+
+export type ProgressReward = {
+  xpEarned: number;
+  totalXp: number;
+  isFirstDiscovery: boolean;
+  unlockedAchievements: AchievementId[];
+  rankName: string;
+  nextRankName: string | null;
+  xpToNextRank: number;
 };
