@@ -21,7 +21,6 @@ import {
   type PointingSample,
   type CameraOrientation3D,
 } from "@/lib/orientation";
-import { getSkyObjects } from "@/lib/astro";
 import { getInsecureContextMessage, isSecureBrowserContext } from "@/lib/browser-support";
 import { recalculateQuestPosition } from "@/lib/quest-generator";
 import { getLastLocation, getPointingCalibration, savePointingCalibration } from "@/lib/storage";
@@ -34,7 +33,6 @@ const PHOTO_QUALITY = 0.75;
 const CALIBRATION_SAMPLE_COUNT = 18;
 const MIN_CALIBRATION_SAMPLES = 6;
 const MAX_CALIBRATION_MOVEMENT_DEGREES = 3;
-const MIN_CALIBRATION_ALTITUDE = 8;
 
 type CameraGuideProps = {
   quest: SkyQuest;
@@ -104,19 +102,6 @@ type PhotoDraft = {
 type CalibrationReference = PointingSample & {
   name: string;
 };
-
-function getMoonCalibrationReference(latitude: number, longitude: number, now: Date): CalibrationReference | null {
-  const moon = getSkyObjects(latitude, longitude, now).find((object) => object.name === "Moon");
-  if (!moon || moon.altitude < MIN_CALIBRATION_ALTITUDE) {
-    return null;
-  }
-
-  return {
-    name: "Lune",
-    azimuth: moon.azimuth,
-    altitude: moon.altitude,
-  };
-}
 
 function getDirectionArrow(delta: number | null): string {
   if (delta === null) {
@@ -201,8 +186,8 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pointingSamplesRef = useRef<PointingSample[]>([]);
+  const photoPointingSamplesRef = useRef<PointingSample[]>([]);
   const calibrationRef = useRef<PointingCalibration | null>(null);
-  const calibrationPromptHandledRef = useRef(false);
   const cameraOrientationRef = useRef<CameraOrientation3D | null>(null);
   const orientationConfidenceRef = useRef<"high" | "medium" | "low">("low");
   const [cameraStatus, setCameraStatus] = useState<"idle" | "starting" | "active" | "error">("idle");
@@ -214,9 +199,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [currentAltitude, setCurrentAltitude] = useState<number | null>(null);
   const [calibration, setCalibration] = useState<PointingCalibration | null>(null);
   const [calibrationTarget, setCalibrationTarget] = useState<string | null>(null);
-  const [moonCalibrationReference, setMoonCalibrationReference] = useState<CalibrationReference | null>(null);
-  const [calibrationSheetReference, setCalibrationSheetReference] = useState<CalibrationReference | null>(null);
-  const [calibrationSheetOpen, setCalibrationSheetOpen] = useState(false);
   const [calibrationError, setCalibrationError] = useState<string | null>(null);
   const [liveQuest, setLiveQuest] = useState<SkyQuest>(quest);
   const [zoomRange, setZoomRange] = useState<CameraZoomRange | null>(null);
@@ -232,8 +214,12 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [cameraSettingsOpen, setCameraSettingsOpen] = useState(false);
   const [cameraSettingsError, setCameraSettingsError] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [setupModalOpen, setSetupModalOpen] = useState(true);
+  const [setupStarting, setSetupStarting] = useState(false);
   const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
   const [photoDraft, setPhotoDraft] = useState<PhotoDraft | null>(null);
+  const [photoSource, setPhotoSource] = useState<"camera" | "file" | null>(null);
+  const [photoCaptureStatus, setPhotoCaptureStatus] = useState<"idle" | "capturing" | "ready" | "error">("idle");
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [observerLocation, setObserverLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [skyOverlayEnabled, setSkyOverlayEnabled] = useState(true);
@@ -280,7 +266,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         longitude: lastLocation.longitude,
         now,
       }));
-      setMoonCalibrationReference(getMoonCalibrationReference(lastLocation.latitude, lastLocation.longitude, now));
     }
 
     refreshPosition();
@@ -290,32 +275,13 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   }, []);
 
   useEffect(() => {
-    if (
-      cameraStatus === "active" &&
-      orientationStatus === "active" &&
-      moonCalibrationReference &&
-      currentAzimuth !== null &&
-      currentAltitude !== null &&
-      !calibration &&
-      !calibrationPromptHandledRef.current
-    ) {
-      calibrationPromptHandledRef.current = true;
-      setCalibrationSheetReference(moonCalibrationReference);
-      setCalibrationSheetOpen(true);
-    }
-  }, [calibration, cameraStatus, currentAltitude, currentAzimuth, moonCalibrationReference, orientationStatus]);
-
-  useEffect(() => {
     const orientation = window.screen.orientation;
     if (!orientation?.addEventListener) {
       return;
     }
 
     function resetOrientationAfterScreenRotation() {
-      calibrationPromptHandledRef.current = false;
       pointingSamplesRef.current = [];
-      setCalibrationSheetOpen(false);
-      setCalibrationSheetReference(null);
       cameraOrientationRef.current = null;
     }
 
@@ -323,7 +289,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     return () => orientation.removeEventListener("change", resetOrientationAfterScreenRotation);
   }, []);
 
-  async function startCamera() {
+  async function startCamera(): Promise<boolean> {
     setCameraError(null);
     setZoomError(null);
     setZoomRange(null);
@@ -340,13 +306,13 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     if (!isSecureBrowserContext()) {
       setCameraStatus("error");
       setCameraError(getInsecureContextMessage("camera"));
-      return;
+      return false;
     }
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraStatus("error");
       setCameraError("La camera n'est pas disponible dans ce navigateur.");
-      return;
+      return false;
     }
 
     setCameraStatus("starting");
@@ -368,9 +334,11 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         await videoRef.current.play().catch(() => undefined);
       }
       setCameraStatus("active");
+      return true;
     } catch (error) {
       setCameraStatus("error");
       setCameraError(getCameraErrorMessage(error));
+      return false;
     }
   }
 
@@ -542,15 +510,11 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     }
   }
 
-  function skipCalibration() {
-    calibrationPromptHandledRef.current = true;
-    setCalibrationError(null);
-    setCalibrationSheetOpen(false);
-    setCalibrationSheetReference(null);
-  }
-
-  function calibrateOnReference(reference: CalibrationReference): boolean {
-    const samples = pointingSamplesRef.current.slice(-CALIBRATION_SAMPLE_COUNT);
+  function calibrateOnReference(
+    reference: CalibrationReference,
+    capturedSamples?: PointingSample[],
+  ): boolean {
+    const samples = (capturedSamples ?? pointingSamplesRef.current).slice(-CALIBRATION_SAMPLE_COUNT);
     const measured = averagePointingSamples(samples);
     if (!measured || samples.length < MIN_CALIBRATION_SAMPLES) {
       setCalibrationError("Garde le téléphone immobile un instant, puis réessaie.");
@@ -570,12 +534,9 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     const nextCalibration = createPointingCalibration(measured, reference);
     savePointingCalibration(nextCalibration, reference.name);
     calibrationRef.current = nextCalibration;
-    calibrationPromptHandledRef.current = true;
     setCalibration(nextCalibration);
     setCalibrationTarget(reference.name);
     setCalibrationError(null);
-    setCalibrationSheetOpen(false);
-    setCalibrationSheetReference(null);
 
     const corrected = applyPointingCalibration({
       azimuth: measured.azimuth,
@@ -585,22 +546,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     setCurrentAzimuth(corrected.azimuth);
     setCurrentAltitude(corrected.altitude);
     return true;
-  }
-
-  function calibrateOnMoon() {
-    const location = getLastLocation();
-    if (!location) {
-      setCalibrationError("Position indisponible pour calculer la position de la Lune.");
-      return;
-    }
-
-    const reference = getMoonCalibrationReference(location.latitude, location.longitude, new Date());
-    if (!reference) {
-      setCalibrationError("La Lune est trop basse pour une calibration fiable.");
-      return;
-    }
-
-    calibrateOnReference(reference);
   }
 
   function calibrateOnCurrentTarget() {
@@ -616,19 +561,19 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     });
   }
 
-  async function requestOrientation() {
+  async function requestOrientation(): Promise<boolean> {
     setOrientationError(null);
 
     if (!isSecureBrowserContext()) {
       setOrientationStatus("denied");
       setOrientationError(getInsecureContextMessage("orientation"));
-      return;
+      return false;
     }
 
     if (!("DeviceOrientationEvent" in window)) {
       setOrientationStatus("unsupported");
       setOrientationError("L'orientation n'est pas disponible sur ce navigateur.");
-      return;
+      return false;
     }
 
     const orientationEvent = DeviceOrientationEvent as OrientationPermissionEvent;
@@ -639,33 +584,51 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         if (permission !== "granted") {
           setOrientationStatus("denied");
           setOrientationError("Orientation refusee. Verifie les permissions mouvement et orientation.");
-          return;
+          return false;
         }
       }
 
       window.addEventListener("deviceorientation", handleOrientation as EventListener, true);
       window.addEventListener("deviceorientationabsolute", handleOrientation as EventListener, true);
       setOrientationStatus("active");
+      return true;
     } catch {
       setOrientationStatus("denied");
       setOrientationError("Orientation refusee ou indisponible. Utilise la direction texte comme repere.");
+      return false;
     }
   }
 
-  async function capturePhotoFromVideo() {
+  async function activateGuidance() {
+    if (setupStarting) {
+      return;
+    }
+
+    setSetupStarting(true);
+    // iOS requires the orientation request to begin directly from this click.
+    const orientationReady = orientationStatus === "active" || await requestOrientation();
+    const cameraReady = cameraStatus === "active" || await startCamera();
+    setSetupStarting(false);
+
+    if (orientationReady || cameraReady) {
+      setSetupModalOpen(false);
+    }
+  }
+
+  async function capturePhotoFromVideo(): Promise<PhotoDraft | null> {
     setPhotoError(null);
     const video = videoRef.current;
 
     if (!video || cameraStatus !== "active" || video.videoWidth <= 0 || video.videoHeight <= 0) {
-      fileInputRef.current?.click();
-      return;
+      setPhotoError("La caméra n'est pas prête. Tu peux choisir une photo ou continuer sans photo.");
+      return null;
     }
 
     try {
-      setPhotoDraft(await createPhotoDraftFromImage(video, video.videoWidth, video.videoHeight));
+      return await createPhotoDraftFromImage(video, video.videoWidth, video.videoHeight);
     } catch {
-      setPhotoError("Photo impossible depuis la camera. Tu peux choisir une image.");
-      fileInputRef.current?.click();
+      setPhotoError("Photo impossible depuis la caméra. Tu peux choisir une image ou continuer sans photo.");
+      return null;
     }
   }
 
@@ -679,15 +642,26 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     try {
       setPhotoError(null);
       setPhotoDraft(await createPhotoDraftFromFile(file));
+      setPhotoSource("file");
+      setPhotoCaptureStatus("ready");
     } catch {
       setPhotoError("Image impossible a lire.");
+      setPhotoCaptureStatus("error");
     }
   }
 
-  function openPhotoSheet() {
+  async function handleTargetFound() {
+    photoPointingSamplesRef.current = pointingSamplesRef.current.slice(-CALIBRATION_SAMPLE_COUNT);
     setPhotoDraft(null);
+    setPhotoSource(null);
     setPhotoError(null);
+    setCalibrationError(null);
     setPhotoSheetOpen(true);
+    setPhotoCaptureStatus("capturing");
+    const draft = await capturePhotoFromVideo();
+    setPhotoDraft(draft);
+    setPhotoSource(draft ? "camera" : null);
+    setPhotoCaptureStatus(draft ? "ready" : "error");
   }
 
   function saveSeenWithPhoto() {
@@ -697,6 +671,32 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     }
 
     onSeen();
+  }
+
+  function calibrateFromPhotoAndSave() {
+    if (!photoDraft || photoSource !== "camera" || liveQuest.azimuth === null || liveQuest.altitude === null) {
+      setPhotoError("Cette photo ne permet pas de calibrer le guidage.");
+      return;
+    }
+
+    const calibrated = calibrateOnReference({
+      name: liveQuest.target,
+      azimuth: liveQuest.azimuth,
+      altitude: liveQuest.altitude,
+    }, photoPointingSamplesRef.current);
+    if (calibrated) {
+      onSeen(photoDraft);
+    }
+  }
+
+  function retakeTargetPhoto() {
+    setPhotoSheetOpen(false);
+    setPhotoDraft(null);
+    setPhotoSource(null);
+    setPhotoError(null);
+    setCalibrationError(null);
+    setPhotoCaptureStatus("idle");
+    photoPointingSamplesRef.current = [];
   }
 
   const directionHint = liveQuest.azimuth !== null && currentAzimuth !== null
@@ -720,15 +720,15 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const directionAligned = directionDelta !== null && Math.abs(directionDelta) <= ALIGNMENT_TOLERANCE_DEGREES;
   const altitudeAligned = altitudeDelta !== null && Math.abs(altitudeDelta) <= ALIGNMENT_TOLERANCE_DEGREES;
   const hasPrecisePoint = liveQuest.azimuth !== null && liveQuest.altitude !== null;
-  const mainHint = calibrationSheetOpen
-    ? "Centre la Lune dans le cercle"
-    : close
-      ? "Tu es proche"
-      : directionHint && directionHint !== "Bonne direction"
-        ? directionHint
-        : altitudeHint && altitudeHint !== "Hauteur proche"
-          ? altitudeHint
-          : "Suis la direction";
+  const canCalibratePhoto = photoSource === "camera" && hasPrecisePoint && orientationStatus === "active" &&
+    photoPointingSamplesRef.current.length >= MIN_CALIBRATION_SAMPLES;
+  const mainHint = close
+    ? `${liveQuest.target} est près du centre`
+    : directionHint && directionHint !== "Bonne direction"
+      ? directionHint
+      : altitudeHint && altitudeHint !== "Hauteur proche"
+        ? altitudeHint
+        : `Cherche ${liveQuest.target} dans le ciel`;
   const targetAltitudeLabel = liveQuest.altitude !== null ? `${Math.round(liveQuest.altitude)}°` : "Libre";
   const zoomLabel = zoomRange && currentZoom !== null ? `${formatZoom(currentZoom)}x` : "Auto";
   const exposureCompensationRange = getRangeValue(cameraCapabilities?.exposureCompensation, 0.1);
@@ -775,18 +775,14 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       <div className="pointer-events-none absolute left-1/2 top-1/2 z-[11] -translate-x-1/2 -translate-y-1/2">
         {hasPrecisePoint ? (
           <div className="relative flex h-32 w-32 items-center justify-center">
-            <div className={`absolute h-28 w-28 rounded-full border ${!calibrationSheetOpen && directionAligned && altitudeAligned ? "border-success/80 bg-success/10" : "border-accent-cyan/70 bg-accent-cyan/10"} shadow-[0_0_55px_color-mix(in_srgb,var(--accent-cyan)_22%,transparent)]`} />
+            <div className={`absolute h-28 w-28 rounded-full border ${directionAligned && altitudeAligned ? "border-success/80 bg-success/10" : "border-accent-cyan/70 bg-accent-cyan/10"} shadow-[0_0_55px_color-mix(in_srgb,var(--accent-cyan)_22%,transparent)]`} />
             <div className="absolute h-px w-24 bg-white/28" />
             <div className="absolute h-24 w-px bg-white/28" />
-            <div className={`h-3 w-3 rounded-full ${!calibrationSheetOpen && directionAligned && altitudeAligned ? "bg-success" : "bg-accent-cyan"}`} />
-            {!calibrationSheetOpen ? (
-              <>
-                <div className="absolute -right-9 text-5xl font-black text-white drop-shadow-xl">{directionArrow === "→" ? "→" : ""}</div>
-                <div className="absolute -left-9 text-5xl font-black text-white drop-shadow-xl">{directionArrow === "←" ? "←" : ""}</div>
-                <div className="absolute -top-11 text-4xl font-black text-accent-cyan drop-shadow-xl">{altitudeArrow === "↑" ? "↑" : ""}</div>
-                <div className="absolute -bottom-11 text-4xl font-black text-accent-cyan drop-shadow-xl">{altitudeArrow === "↓" ? "↓" : ""}</div>
-              </>
-            ) : null}
+            <div className={`h-3 w-3 rounded-full ${directionAligned && altitudeAligned ? "bg-success" : "bg-accent-cyan"}`} />
+            <div className="absolute -right-9 text-5xl font-black text-white drop-shadow-xl">{directionArrow === "→" ? "→" : ""}</div>
+            <div className="absolute -left-9 text-5xl font-black text-white drop-shadow-xl">{directionArrow === "←" ? "←" : ""}</div>
+            <div className="absolute -top-11 text-4xl font-black text-accent-cyan drop-shadow-xl">{altitudeArrow === "↑" ? "↑" : ""}</div>
+            <div className="absolute -bottom-11 text-4xl font-black text-accent-cyan drop-shadow-xl">{altitudeArrow === "↓" ? "↓" : ""}</div>
           </div>
         ) : (
           <div className="h-28 w-28 rounded-full border border-accent-cyan/60 bg-accent-cyan/10" />
@@ -841,21 +837,13 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
           {cameraError ? <p className="mb-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">{cameraError}</p> : null}
           {zoomError ? <p className="mb-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">{zoomError}</p> : null}
 
-          <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
-            <AppButton variant="success" size="sm" onClick={openPhotoSheet} className="min-h-12">
-              Je l&apos;ai vu
+          <div className="grid grid-cols-2 gap-2">
+            <AppButton variant="success" size="sm" onClick={handleTargetFound} className="min-h-12" disabled={photoCaptureStatus === "capturing"}>
+              {photoCaptureStatus === "capturing" ? "Photo..." : "Je l&apos;ai trouvée"}
             </AppButton>
             <AppButton variant="ghost" size="sm" onClick={onMissed} className="min-h-12">
               Pas trouve
             </AppButton>
-            <button
-              type="button"
-              onClick={openPhotoSheet}
-              aria-label="Photo"
-              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.08] text-xl font-black text-white"
-            >
-              ◉
-            </button>
           </div>
 
           <div className="mt-2 grid grid-cols-3 gap-2">
@@ -889,7 +877,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               {calibration ? `Calibration active (${calibrationTarget ?? "cible"}) · Recalibrer sur ${liveQuest.target}` : `Cible centrée · Calibrer sur ${liveQuest.target}`}
             </button>
           ) : null}
-          {calibrationError && !calibrationSheetOpen ? (
+          {calibrationError ? (
             <p className="mt-2 rounded-[13px] border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">
               {calibrationError}
             </p>
@@ -909,32 +897,43 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
       <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFilePhoto} />
 
-      {calibrationSheetOpen && calibrationSheetReference ? (
-        <div className="fixed inset-0 z-30 flex items-end bg-[linear-gradient(to_top,rgba(0,0,0,0.45),transparent_55%)] p-3" role="dialog" aria-modal="true" aria-labelledby="calibration-title">
-          <AppCard className="mx-auto w-full max-w-xl rounded-[26px] pb-[calc(env(safe-area-inset-bottom)+1rem)]" padding="lg">
-            <p className="premium-kicker">Calibration rapide</p>
-            <h2 id="calibration-title" className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-white">
-              Centre {calibrationSheetReference.name}
+      {setupModalOpen ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#050711]/88 p-4 backdrop-blur-xl" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+          <AppCard className="w-full max-w-md rounded-[28px]" padding="lg">
+            <p className="premium-kicker">Avant de commencer</p>
+            <h2 id="setup-title" className="mt-2 text-3xl font-black tracking-[-0.04em] text-white">
+              Prépare ton guidage
             </h2>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              Place {calibrationSheetReference.name} pile au centre du cercle, garde le téléphone immobile, puis valide. La correction sera conservée pour les prochaines missions.
+            <p className="mt-3 text-sm leading-6 text-muted">
+              La caméra montre le ciel devant toi. L&apos;orientation aide SkyQuest à placer la cible. Aucune photo n&apos;est envoyée.
             </p>
-            <div className="mt-4 grid gap-3">
-              <AppButton onClick={calibrateOnMoon} disabled={currentAzimuth === null || currentAltitude === null} fullWidth>
-                {calibrationSheetReference.name} est centré{calibrationSheetReference.name === "Lune" ? "e" : ""}
+
+            <div className="mt-5 grid gap-3">
+              <div className="rounded-[16px] border border-white/10 bg-white/[0.04] p-3">
+                <p className="font-bold text-white">Caméra</p>
+                <p className="mt-1 text-sm text-muted">Active uniquement pendant cette mission.</p>
+              </div>
+              <div className="rounded-[16px] border border-white/10 bg-white/[0.04] p-3">
+                <p className="font-bold text-white">Mouvement et orientation</p>
+                <p className="mt-1 text-sm text-muted">Utilisés pour les indications et le repère céleste.</p>
+              </div>
+            </div>
+
+            {cameraError || orientationError ? (
+              <div className="mt-4 rounded-[14px] border border-warning/25 bg-warning/10 px-3 py-3 text-sm leading-5 text-warning">
+                {orientationError ? <p>{orientationError}</p> : null}
+                {cameraError ? <p>{cameraError}</p> : null}
+              </div>
+            ) : null}
+
+            <div className="mt-5 grid gap-3">
+              <AppButton onClick={activateGuidance} disabled={setupStarting} fullWidth>
+                {setupStarting ? "Activation..." : "Activer le guidage"}
               </AppButton>
-              <AppButton variant="ghost" onClick={skipCalibration} fullWidth>
-                Je ne la vois pas · Passer
+              <AppButton variant="ghost" onClick={() => setSetupModalOpen(false)} disabled={setupStarting} fullWidth>
+                Continuer avec les indications simples
               </AppButton>
             </div>
-            {calibrationError ? (
-              <p className="mt-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">
-                {calibrationError}
-              </p>
-            ) : null}
-            <p className="mt-3 text-xs leading-5 text-faint">
-              Éloigne-toi si possible des voitures, aimants et structures métalliques.
-            </p>
           </AppCard>
         </div>
       ) : null}
@@ -1160,46 +1159,76 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       ) : null}
 
       {photoSheetOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/60 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="photo-title">
-          <AppCard className="w-full rounded-t-[28px] rounded-b-none pb-[calc(env(safe-area-inset-bottom)+1rem)]" padding="lg">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-bold uppercase tracking-[0.18em] text-accent-cyan">Journal</p>
-                <h2 id="photo-title" className="mt-1 text-2xl font-black tracking-[-0.03em] text-white">Ajouter une photo souvenir ?</h2>
-              </div>
-              <AppButton variant="ghost" size="sm" onClick={() => setPhotoSheetOpen(false)}>Fermer</AppButton>
+        <div className="fixed inset-0 z-50 overflow-hidden bg-[#050711]" role="dialog" aria-modal="true" aria-labelledby="photo-title">
+          {photoDraft ? (
+            <div
+              aria-label="Aperçu de la photo"
+              className="absolute inset-0 bg-cover bg-center"
+              role="img"
+              style={{ backgroundImage: `url(${photoDraft.photoDataUrl})` }}
+            />
+          ) : null}
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,5,12,0.72),transparent_28%,transparent_55%,rgba(3,5,12,0.92))]" aria-hidden="true" />
+
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 flex h-32 w-32 -translate-x-1/2 -translate-y-1/2 items-center justify-center">
+            <div className="absolute h-28 w-28 rounded-full border border-accent-cyan/90 bg-accent-cyan/[0.06] shadow-[0_0_55px_color-mix(in_srgb,var(--accent-cyan)_25%,transparent)]" />
+            <div className="absolute h-px w-24 bg-white/45" />
+            <div className="absolute h-24 w-px bg-white/45" />
+            <div className="h-3 w-3 rounded-full bg-accent-cyan" />
+          </div>
+
+          <div className="relative z-20 flex h-[100dvh] flex-col justify-between px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)]">
+            <div className="rounded-[18px] border border-white/10 bg-[#080b14]/72 px-4 py-3 text-center backdrop-blur-xl">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent-cyan">Vérification</p>
+              <h2 id="photo-title" className="mt-1 text-lg font-black text-white">
+                {photoCaptureStatus === "capturing" ? "Capture en cours..." : `${liveQuest.target} est-elle au centre ?`}
+              </h2>
+              <p className="mt-1 text-xs text-muted">Le cercle correspond exactement au centre utilisé pour la calibration.</p>
             </div>
-            <p className="mt-3 text-sm leading-6 text-muted">
-              Tu peux garder une trace de cette observation dans ton journal.
-            </p>
 
-            {photoDraft ? (
-              <div
-                aria-label="Apercu de la photo"
-                className="mt-4 h-44 w-full rounded-brand-lg bg-cover bg-center"
-                role="img"
-                style={{ backgroundImage: `url(${photoDraft.photoThumbnailDataUrl})` }}
-              />
-            ) : null}
-            {photoError ? <p className="mt-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">{photoError}</p> : null}
-
-            <div className="mt-5 grid gap-3">
-              <AppButton onClick={capturePhotoFromVideo} fullWidth>
-                {photoDraft ? "Reprendre une photo" : "Prendre une photo"}
-              </AppButton>
-              {photoDraft ? (
-                <AppButton variant="success" onClick={saveSeenWithPhoto} fullWidth>
-                  Sauvegarder dans le journal
-                </AppButton>
+            <div className="rounded-[22px] border border-white/10 bg-[#080b14]/82 p-3 shadow-[0_-12px_44px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+              {photoError || calibrationError ? (
+                <p className="mb-3 rounded-[13px] border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">
+                  {photoError ?? calibrationError}
+                </p>
               ) : null}
-              <AppButton variant="ghost" onClick={() => onSeen()} fullWidth>
-                Continuer sans photo
-              </AppButton>
+
+              {photoCaptureStatus === "capturing" ? (
+                <p className="py-4 text-center text-sm font-semibold text-muted">Un instant, SkyQuest fige l’image et l’orientation.</p>
+              ) : photoDraft ? (
+                <div className="grid gap-2">
+                  {canCalibratePhoto ? (
+                    <AppButton variant="success" onClick={calibrateFromPhotoAndSave} fullWidth>
+                      Cible centrée · Calibrer et enregistrer
+                    </AppButton>
+                  ) : (
+                    <p className="rounded-[13px] border border-white/10 bg-white/[0.05] px-3 py-2 text-center text-xs text-muted">
+                      Calibration indisponible pour cette image, mais tu peux la conserver dans le journal.
+                    </p>
+                  )}
+                  <AppButton variant="secondary" onClick={saveSeenWithPhoto} fullWidth>
+                    Enregistrer sans calibrer
+                  </AppButton>
+                  <AppButton variant="ghost" onClick={retakeTargetPhoto} fullWidth>
+                    Pas centrée · Reprendre le guidage
+                  </AppButton>
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  <AppButton onClick={() => fileInputRef.current?.click()} fullWidth>
+                    Choisir une photo
+                  </AppButton>
+                  <AppButton variant="secondary" onClick={() => onSeen()} fullWidth>
+                    Enregistrer sans photo
+                  </AppButton>
+                  <AppButton variant="ghost" onClick={retakeTargetPhoto} fullWidth>
+                    Retour au guidage
+                  </AppButton>
+                </div>
+              )}
+              <p className="mt-3 text-center text-xs leading-5 text-faint">Photo compressée et conservée uniquement dans le journal local.</p>
             </div>
-            <p className="mt-3 text-xs leading-5 text-faint">
-              Photo compressee localement. TODO: migrer les images vers IndexedDB si le journal grossit.
-            </p>
-          </AppCard>
+          </div>
         </div>
       ) : null}
     </main>
