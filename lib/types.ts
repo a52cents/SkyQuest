@@ -55,6 +55,7 @@ export type SkyQuest = {
   tip: string;
   requiredGear: RequiredGear;
   warning?: string;
+  targetTime?: string;
 };
 
 export type Observation = {

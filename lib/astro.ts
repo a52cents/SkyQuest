@@ -84,14 +84,42 @@ export function equatorialToHorizontal({
   longitude: number;
   date: Date;
 }): { altitude: number; azimuth: number } {
+  return equatorialJ2000ToHorizontal({
+    rightAscensionHours,
+    declinationDegrees,
+    latitude,
+    longitude,
+    date,
+  });
+}
+
+export function equatorialJ2000ToHorizontal({
+  rightAscensionHours,
+  declinationDegrees,
+  latitude,
+  longitude,
+  date,
+}: {
+  rightAscensionHours: number;
+  declinationDegrees: number;
+  latitude: number;
+  longitude: number;
+  date: Date;
+}): { altitude: number; azimuth: number } {
   const observer = createObserver(latitude, longitude);
-  // Catalog RA/Dec values are fixed guide targets. They are adequate for simple
-  // quests, while planets and the Moon use full topocentric ephemerides above.
-  const horizon = Astronomy.Horizon(date, observer, rightAscensionHours, declinationDegrees, "normal");
+  const equatorialVector = Astronomy.VectorFromSphere(
+    new Astronomy.Spherical(declinationDegrees, rightAscensionHours * 15, 1),
+    date,
+  );
+  const horizontalVector = Astronomy.RotateVector(
+    Astronomy.Rotation_EQJ_HOR(date, observer),
+    equatorialVector,
+  );
+  const horizon = Astronomy.HorizonFromVector(horizontalVector, "normal");
 
   return {
-    altitude: horizon.altitude,
-    azimuth: horizon.azimuth,
+    altitude: horizon.lat,
+    azimuth: horizon.lon,
   };
 }
 

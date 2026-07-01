@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { AppButton, getAppButtonClassName } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
+import { SkyOverlay, questSupportsSkyOverlay } from "@/components/SkyOverlay";
 import {
   ALIGNMENT_TOLERANCE_DEGREES,
   angleDifference,
@@ -11,11 +12,14 @@ import {
   averagePointingSamples,
   azimuthToCardinal,
   createPointingCalibration,
+  applyCameraOrientationCalibration,
+  getCameraOrientation3D,
   getAltitudeHint,
   getCameraPointing,
   getDirectionHint,
   type PointingCalibration,
   type PointingSample,
+  type CameraOrientation3D,
 } from "@/lib/orientation";
 import { getSkyObjects } from "@/lib/astro";
 import { getInsecureContextMessage, isSecureBrowserContext } from "@/lib/browser-support";
@@ -199,10 +203,13 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const pointingSamplesRef = useRef<PointingSample[]>([]);
   const calibrationRef = useRef<PointingCalibration | null>(null);
   const calibrationPromptHandledRef = useRef(false);
+  const cameraOrientationRef = useRef<CameraOrientation3D | null>(null);
+  const orientationConfidenceRef = useRef<"high" | "medium" | "low">("low");
   const [cameraStatus, setCameraStatus] = useState<"idle" | "starting" | "active" | "error">("idle");
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [orientationStatus, setOrientationStatus] = useState<"idle" | "active" | "denied" | "unsupported">("idle");
   const [orientationError, setOrientationError] = useState<string | null>(null);
+  const [orientationConfidence, setOrientationConfidence] = useState<"high" | "medium" | "low">("low");
   const [currentAzimuth, setCurrentAzimuth] = useState<number | null>(null);
   const [currentAltitude, setCurrentAltitude] = useState<number | null>(null);
   const [calibration, setCalibration] = useState<PointingCalibration | null>(null);
@@ -226,6 +233,8 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
   const [photoDraft, setPhotoDraft] = useState<PhotoDraft | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [observerLocation, setObserverLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [skyOverlayEnabled, setSkyOverlayEnabled] = useState(true);
 
   useEffect(() => {
     return () => {
@@ -250,6 +259,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       return;
     }
     const lastLocation = location;
+    setObserverLocation({ latitude: lastLocation.latitude, longitude: lastLocation.longitude });
 
     function refreshPosition() {
       const now = new Date();
@@ -295,6 +305,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       pointingSamplesRef.current = [];
       setCalibration(null);
       setCalibrationSheetOpen(false);
+      cameraOrientationRef.current = null;
     }
 
     orientation.addEventListener("change", clearCalibrationAfterScreenRotation);
@@ -483,13 +494,24 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   }
 
   function handleOrientation(event: CompassEvent) {
-    const rawPointing = getCameraPointing({
+    const reading = {
       alpha: event.alpha,
       beta: event.beta,
       gamma: event.gamma,
       absolute: event.absolute === true,
       webkitCompassHeading: event.webkitCompassHeading,
-    });
+    };
+    const rawPointing = getCameraPointing(reading);
+    const screenAngle = window.screen.orientation?.angle ?? (window as Window & { orientation?: number }).orientation ?? 0;
+    const cameraOrientation = getCameraOrientation3D(reading, screenAngle);
+    cameraOrientationRef.current = cameraOrientation
+      ? applyCameraOrientationCalibration(cameraOrientation, calibrationRef.current)
+      : null;
+    const nextConfidence = cameraOrientation?.confidence ?? "low";
+    if (orientationConfidenceRef.current !== nextConfidence) {
+      orientationConfidenceRef.current = nextConfidence;
+      setOrientationConfidence(nextConfidence);
+    }
     if (rawPointing.azimuth !== null && rawPointing.altitude !== null) {
       pointingSamplesRef.current = [
         ...pointingSamplesRef.current.slice(-(CALIBRATION_SAMPLE_COUNT - 1)),
@@ -692,11 +714,28 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       exposureModes.length > 0 ||
       focusModes.length > 0,
   );
+  const overlaySupported = questSupportsSkyOverlay(liveQuest);
+  const overlayReady = Boolean(
+    skyOverlayEnabled &&
+      overlaySupported &&
+      observerLocation &&
+      cameraStatus === "active" &&
+      orientationStatus === "active" &&
+      orientationConfidence !== "low",
+  );
 
   return (
     <main className="relative min-h-[100dvh] overflow-hidden bg-background text-white">
       <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.30),rgba(0,0,0,0.08)_42%,rgba(0,0,0,0.62))]" aria-hidden="true" />
+      <SkyOverlay
+        quest={liveQuest}
+        location={observerLocation}
+        orientationRef={cameraOrientationRef}
+        videoRef={videoRef}
+        zoom={currentZoom}
+        enabled={overlayReady}
+      />
 
       {cameraStatus !== "active" ? (
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,color-mix(in_srgb,var(--accent-cyan)_16%,transparent),transparent_20rem),var(--background)]" aria-hidden="true" />
@@ -740,6 +779,17 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
           <p className="rounded-[16px] border border-white/10 bg-[#080b14]/65 px-5 py-3 text-center text-lg font-semibold shadow-[0_12px_42px_rgba(0,0,0,0.25)] backdrop-blur-xl">
             {mainHint}
           </p>
+
+          {overlayReady ? (
+            <p className="rounded-full border border-accent-cyan/20 bg-[#080b14]/65 px-3 py-2 text-center text-xs font-semibold text-accent-cyan backdrop-blur-xl">
+              Repère approximatif — aligne-le avec le vrai ciel.
+            </p>
+          ) : null}
+          {orientationStatus === "active" && orientationConfidence === "medium" ? (
+            <p className="rounded-full border border-warning/20 bg-[#080b14]/65 px-3 py-2 text-center text-xs font-semibold text-warning backdrop-blur-xl">
+              Boussole imprécise — utilise surtout la direction indiquée.
+            </p>
+          ) : null}
 
           <div className="flex max-w-full flex-wrap justify-center gap-2">
             <span className="rounded-full border border-white/10 bg-background/45 px-3 py-2 text-sm font-bold text-white backdrop-blur-xl">
@@ -803,6 +853,16 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               className={`mt-2 flex min-h-10 w-full items-center justify-center rounded-[13px] border px-3 text-sm font-semibold ${calibration ? "border-success/25 bg-success/10 text-success" : "border-accent-cyan/20 bg-accent-cyan/[0.08] text-accent-cyan"}`}
             >
               {calibration ? "Précision ajustée · Recalibrer" : "Améliorer la précision avec la Lune"}
+            </button>
+          ) : null}
+          {cameraStatus === "active" && observerLocation && overlaySupported ? (
+            <button
+              type="button"
+              onClick={() => setSkyOverlayEnabled((enabled) => !enabled)}
+              className="mt-2 flex min-h-10 w-full items-center justify-center rounded-[13px] border border-white/10 bg-white/[0.05] px-3 text-sm font-semibold text-muted"
+              aria-pressed={skyOverlayEnabled}
+            >
+              Repère céleste : {skyOverlayEnabled ? "activé" : "désactivé"}
             </button>
           ) : null}
         </div>

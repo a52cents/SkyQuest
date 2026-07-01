@@ -1,3 +1,17 @@
+import {
+  calculateCameraRoll,
+  applyCameraBasisOffsets,
+  crossProduct,
+  horizontalCoordinatesToVector,
+  normalizeVector,
+  rotateBasisForScreenOrientation,
+  rotateVectorAroundAxis,
+  vectorToHorizontalCoordinates,
+  type CameraBasis,
+  type CameraConfidence,
+  type Vector3 as ProjectionVector3,
+} from "@/lib/sky-projection";
+
 export const ALIGNMENT_TOLERANCE_DEGREES = 4;
 
 export function normalizeAngle(angle: number): number {
@@ -40,6 +54,11 @@ export type PointingCalibration = {
 export type PointingSample = {
   azimuth: number;
   altitude: number;
+};
+
+export type CameraOrientation3D = CameraBasis & {
+  roll: number;
+  screenAngle: number;
 };
 
 type Vector3 = [number, number, number];
@@ -110,6 +129,105 @@ function getBackCameraHorizontal(reading: FullOrientationReading): {
   return {
     camera: vectorToHorizontal(deviceToEarthVector(rotation, [0, 0, -1])),
     top: vectorToHorizontal(deviceToEarthVector(rotation, [0, 1, 0])),
+  };
+}
+
+function tupleToVector(vector: Vector3): ProjectionVector3 {
+  return { x: vector[0], y: vector[1], z: vector[2] };
+}
+
+function getBackCameraBasis(reading: FullOrientationReading, confidence: CameraConfidence): CameraBasis | null {
+  const rotation = getOrientationRotation(reading.alpha, reading.beta, reading.gamma);
+  const forward = normalizeVector(tupleToVector(deviceToEarthVector(rotation, [0, 0, -1])));
+  const right = normalizeVector(tupleToVector(deviceToEarthVector(rotation, [1, 0, 0])));
+  const up = normalizeVector(tupleToVector(deviceToEarthVector(rotation, [0, 1, 0])));
+  return forward && right && up ? { forward, right, up, confidence } : null;
+}
+
+function rotateBasisAroundEarthUp(basis: CameraBasis, degrees: number): CameraBasis {
+  const earthUp = { x: 0, y: 0, z: 1 };
+  return {
+    ...basis,
+    forward: rotateVectorAroundAxis(basis.forward, earthUp, -degrees),
+    right: rotateVectorAroundAxis(basis.right, earthUp, -degrees),
+    up: rotateVectorAroundAxis(basis.up, earthUp, -degrees),
+  };
+}
+
+/**
+ * Returns the complete back-camera basis in the local east/north/up frame.
+ * iOS alpha is used only to recover tilt/roll: webkitCompassHeading supplies north.
+ */
+export function getCameraOrientation3D(
+  reading: DeviceOrientationReading,
+  screenAngle = 0,
+): CameraOrientation3D | null {
+  if (typeof reading.beta !== "number" || typeof reading.gamma !== "number") {
+    return null;
+  }
+
+  const hasAlpha = typeof reading.alpha === "number";
+  const compassHeading = typeof reading.webkitCompassHeading === "number"
+    ? normalizeAngle(reading.webkitCompassHeading)
+    : null;
+  let basis: CameraBasis | null = null;
+
+  if (compassHeading !== null) {
+    basis = getBackCameraBasis({ alpha: hasAlpha ? reading.alpha as number : 0, beta: reading.beta, gamma: reading.gamma }, "medium");
+    if (basis) {
+      const rawHorizontal = vectorToHorizontalCoordinates(basis.forward);
+      if (rawHorizontal && Math.abs(rawHorizontal.altitude) < 87) {
+        basis = rotateBasisAroundEarthUp(basis, angleDifference(rawHorizontal.azimuth, compassHeading));
+      } else {
+        const altitude = rawHorizontal?.altitude ?? betaToCameraAltitude(reading.beta);
+        const forward = horizontalCoordinatesToVector(compassHeading, altitude);
+        const roll = calculateCameraRoll(basis);
+        const levelRight = normalizeVector(crossProduct(forward, { x: 0, y: 0, z: 1 }));
+        const levelUp = levelRight ? normalizeVector(crossProduct(levelRight, forward)) : null;
+        if (levelRight && levelUp) {
+          basis = {
+            ...basis,
+            forward,
+            right: rotateVectorAroundAxis(levelRight, forward, roll),
+            up: rotateVectorAroundAxis(levelUp, forward, roll),
+          };
+        }
+      }
+    }
+  } else if (reading.absolute && hasAlpha) {
+    basis = getBackCameraBasis({ alpha: reading.alpha as number, beta: reading.beta, gamma: reading.gamma }, "high");
+  }
+
+  if (!basis) {
+    return null;
+  }
+
+  const screenBasis = rotateBasisForScreenOrientation(basis, screenAngle);
+  return {
+    ...screenBasis,
+    roll: calculateCameraRoll(screenBasis),
+    screenAngle: normalizeAngle(screenAngle),
+  };
+}
+
+export function applyCameraOrientationCalibration(
+  orientation: CameraOrientation3D,
+  calibration: PointingCalibration | null,
+): CameraOrientation3D {
+  if (!calibration) {
+    return orientation;
+  }
+
+  const calibrated = applyCameraBasisOffsets(
+    orientation,
+    calibration.azimuthOffset,
+    calibration.altitudeOffset,
+  );
+
+  return {
+    ...calibrated,
+    roll: calculateCameraRoll(calibrated),
+    screenAngle: orientation.screenAngle,
   };
 }
 

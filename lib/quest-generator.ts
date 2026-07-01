@@ -184,6 +184,7 @@ function createIssQuest(pass: IssVisiblePass, score: number, now: Date): SkyQues
     description: `Passage visible prévu vers ${startTime}, pendant environ ${durationMinutes} min si le ciel est dégagé.`,
     tip: "Elle ressemble à une étoile très brillante qui traverse lentement le ciel sans clignoter.",
     requiredGear: "naked_eye",
+    targetTime: pass.maxTime.toISOString(),
   };
 }
 
