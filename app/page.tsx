@@ -8,12 +8,13 @@ import { AppCard } from "@/components/AppCard";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
+import { Onboarding } from "@/components/Onboarding";
 import { PageShell } from "@/components/PageShell";
 import { PermissionPanel } from "@/components/PermissionPanel";
 import { QuestCard } from "@/components/QuestCard";
 import { ProgressFeedback } from "@/components/ProgressFeedback";
 import { SecureContextNotice } from "@/components/SecureContextNotice";
-import { getInsecureContextMessage, isSecureBrowserContext } from "@/lib/browser-support";
+import { getCurrentPosition, type GeoPosition } from "@/lib/browser-support";
 import { haptic } from "@/lib/haptics";
 import { fetchNextIssVisiblePass } from "@/lib/iss";
 import { isPopunderAdOnCooldown, triggerPopunderAd } from "@/lib/popunder-ad";
@@ -22,22 +23,18 @@ import { addObservation, getProgressProfile, saveActiveQuest, saveLastLocation }
 import { getRankProgress } from "@/lib/progression";
 import type { ProgressReward, SkyQuest } from "@/lib/types";
 import { getFallbackWeather, fetchWeatherNow } from "@/lib/weather";
+import { isOnboardingCompleted, setOnboardingCompleted } from "@/lib/onboarding";
 
 type LoadState = "idle" | "loading" | "ready";
 type FutureState = "idle" | "loading" | "ready";
 type AdAction = "now" | "future";
-
-type Position = {
-  latitude: number;
-  longitude: number;
-};
 
 type HomeSnapshot = {
   state: LoadState;
   futureState: FutureState;
   quests: SkyQuest[];
   futureSuggestions: FutureQuestSuggestion[];
-  position: Position | null;
+  position: GeoPosition | null;
   notice: string | null;
   savedAt: number;
 };
@@ -49,43 +46,6 @@ type RewardSnapshot = {
 
 const HOME_SNAPSHOT_KEY = "skyquest:home-snapshot";
 const HOME_SNAPSHOT_MAX_AGE_MS = 30 * 60 * 1000;
-
-function getCurrentPosition(): Promise<Position> {
-  return new Promise((resolve, reject) => {
-    if (!isSecureBrowserContext()) {
-      reject(new Error(getInsecureContextMessage("position")));
-      return;
-    }
-
-    if (!("geolocation" in navigator)) {
-      reject(new Error("La geolocalisation n'est pas disponible sur ce navigateur."));
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-      },
-      (error) => {
-        if (error.code === error.PERMISSION_DENIED) {
-          reject(new Error("Position refusee. Verifie Reglages > Safari > Position, puis reessaie."));
-          return;
-        }
-
-        if (error.code === error.TIMEOUT) {
-          reject(new Error("Position trop longue a obtenir. Essaie dehors, avec le GPS active."));
-          return;
-        }
-
-        reject(new Error("Position indisponible sur cet appareil pour le moment."));
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 2 * 60 * 1000 },
-    );
-  });
-}
 
 function readHomeSnapshot(): HomeSnapshot | null {
   try {
@@ -160,12 +120,19 @@ export default function HomePage() {
   const [futureState, setFutureState] = useState<FutureState>("idle");
   const [quests, setQuests] = useState<SkyQuest[]>([]);
   const [futureSuggestions, setFutureSuggestions] = useState<FutureQuestSuggestion[]>([]);
-  const [position, setPosition] = useState<Position | null>(null);
+  const [position, setPosition] = useState<GeoPosition | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showAllQuests, setShowAllQuests] = useState(false);
   const [adAction, setAdAction] = useState<AdAction | null>(null);
   const [isAdLoading, setIsAdLoading] = useState(false);
   const [lastReward, setLastReward] = useState<RewardSnapshot | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [isOnboardingReady, setIsOnboardingReady] = useState(false);
+
+  useEffect(() => {
+    setShowOnboarding(!isOnboardingCompleted());
+    setIsOnboardingReady(true);
+  }, []);
 
   useEffect(() => {
     const snapshot = readHomeSnapshot();
@@ -366,26 +333,34 @@ export default function HomePage() {
   const isBusy = state === "loading" || futureState === "loading" || isAdLoading;
 
   return (
-    <PageShell
-      eyebrow="Guide du ciel"
-      title="SkyQuest"
-      action={(
-        <Link href="/journal" className={getAppButtonClassName({ variant: "ghost", size: "sm" })}>
-          Journal
-        </Link>
-      )}
-      contentClassName="flex flex-col py-5 sm:py-8"
-    >
-      {adAction ? (
-        <AdConsentModal
-          action={adAction}
-          onClose={() => setAdAction(null)}
-          onConfirm={handleAdConfirm}
-          isBusy={isBusy}
-        />
+    <>
+      {isOnboardingReady && showOnboarding ? (
+        <Onboarding onFinish={() => {
+          setShowOnboarding(false);
+          setOnboardingCompleted();
+        }} />
       ) : null}
 
-      <AppCard className="relative overflow-hidden rounded-[28px] bg-[#0e1321]/90" padding="lg">
+      <PageShell
+        eyebrow="Guide du ciel"
+        title="SkyQuest"
+        action={(
+          <Link href="/journal" className={getAppButtonClassName({ variant: "ghost", size: "sm" })}>
+            Journal
+          </Link>
+        )}
+        contentClassName="flex flex-col py-5 sm:py-8"
+      >
+        {adAction ? (
+          <AdConsentModal
+            action={adAction}
+            onClose={() => setAdAction(null)}
+            onConfirm={handleAdConfirm}
+            isBusy={isBusy}
+          />
+        ) : null}
+
+        <AppCard className="relative overflow-hidden rounded-[28px] bg-[#0e1321]/90" padding="lg">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent-cyan/35 to-transparent" aria-hidden="true" />
         <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full border border-accent/15" aria-hidden="true" />
         <div className="absolute -right-9 -top-12 h-40 w-40 rounded-full border border-white/[0.06]" aria-hidden="true" />
@@ -500,6 +475,7 @@ export default function HomePage() {
           </div>
         ) : null}
       </section>
-    </PageShell>
+      </PageShell>
+    </>
   );
 }
