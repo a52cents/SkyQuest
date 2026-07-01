@@ -504,13 +504,16 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     const rawPointing = getCameraPointing(reading);
     const screenAngle = window.screen.orientation?.angle ?? (window as Window & { orientation?: number }).orientation ?? 0;
     const cameraOrientation = getCameraOrientation3D(reading, screenAngle);
-    cameraOrientationRef.current = cameraOrientation
-      ? applyCameraOrientationCalibration(cameraOrientation, calibrationRef.current)
-      : null;
-    const nextConfidence = cameraOrientation?.confidence ?? "low";
-    if (orientationConfidenceRef.current !== nextConfidence) {
-      orientationConfidenceRef.current = nextConfidence;
-      setOrientationConfidence(nextConfidence);
+    // Chrome can emit a relative `deviceorientation` event immediately after a
+    // useful `deviceorientationabsolute` event. Do not let that second event
+    // erase the reliable 3D basis and make the sky marker jump or disappear.
+    if (cameraOrientation) {
+      cameraOrientationRef.current = applyCameraOrientationCalibration(cameraOrientation, calibrationRef.current);
+      const nextConfidence = cameraOrientation.confidence;
+      if (orientationConfidenceRef.current !== nextConfidence) {
+        orientationConfidenceRef.current = nextConfidence;
+        setOrientationConfidence(nextConfidence);
+      }
     }
     if (rawPointing.azimuth !== null && rawPointing.altitude !== null) {
       pointingSamplesRef.current = [
