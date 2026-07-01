@@ -728,7 +728,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   );
 
   return (
-    <main className="relative min-h-[100dvh] overflow-hidden bg-background text-white">
+    <main className="relative h-[100dvh] overflow-hidden bg-background text-white">
       <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.30),rgba(0,0,0,0.08)_42%,rgba(0,0,0,0.62))]" aria-hidden="true" />
       <SkyOverlay
@@ -744,7 +744,28 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,color-mix(in_srgb,var(--accent-cyan)_16%,transparent),transparent_20rem),var(--background)]" aria-hidden="true" />
       ) : null}
 
-      <section className="relative z-10 flex min-h-[100dvh] flex-col justify-between px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)]">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 z-[11] -translate-x-1/2 -translate-y-1/2">
+        {hasPrecisePoint ? (
+          <div className="relative flex h-32 w-32 items-center justify-center">
+            <div className={`absolute h-28 w-28 rounded-full border ${!calibrationSheetOpen && directionAligned && altitudeAligned ? "border-success/80 bg-success/10" : "border-accent-cyan/70 bg-accent-cyan/10"} shadow-[0_0_55px_color-mix(in_srgb,var(--accent-cyan)_22%,transparent)]`} />
+            <div className="absolute h-px w-24 bg-white/28" />
+            <div className="absolute h-24 w-px bg-white/28" />
+            <div className={`h-3 w-3 rounded-full ${!calibrationSheetOpen && directionAligned && altitudeAligned ? "bg-success" : "bg-accent-cyan"}`} />
+            {!calibrationSheetOpen ? (
+              <>
+                <div className="absolute -right-9 text-5xl font-black text-white drop-shadow-xl">{directionArrow === "→" ? "→" : ""}</div>
+                <div className="absolute -left-9 text-5xl font-black text-white drop-shadow-xl">{directionArrow === "←" ? "←" : ""}</div>
+                <div className="absolute -top-11 text-4xl font-black text-accent-cyan drop-shadow-xl">{altitudeArrow === "↑" ? "↑" : ""}</div>
+                <div className="absolute -bottom-11 text-4xl font-black text-accent-cyan drop-shadow-xl">{altitudeArrow === "↓" ? "↓" : ""}</div>
+              </>
+            ) : null}
+          </div>
+        ) : (
+          <div className="h-28 w-28 rounded-full border border-accent-cyan/60 bg-accent-cyan/10" />
+        )}
+      </div>
+
+      <section className="relative z-10 flex h-[100dvh] flex-col justify-between px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)]">
         <header className="flex min-h-14 items-center gap-2 rounded-[18px] border border-white/10 bg-[#080b14]/65 px-2 py-2 shadow-[0_12px_40px_rgba(0,0,0,0.22)] backdrop-blur-xl">
           <Link href="/" aria-label="Quitter" className={getAppButtonClassName({ variant: "ghost", size: "sm", className: "min-h-0 h-10 w-10 px-0 text-lg" })}>
             ←
@@ -759,26 +780,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
           </button>
         </header>
 
-        <div className="pointer-events-none flex flex-1 flex-col items-center justify-center gap-5 py-8">
-          {hasPrecisePoint ? (
-            <div className="relative flex h-32 w-32 items-center justify-center">
-              <div className={`absolute h-28 w-28 rounded-full border ${!calibrationSheetOpen && directionAligned && altitudeAligned ? "border-success/80 bg-success/10" : "border-accent-cyan/70 bg-accent-cyan/10"} shadow-[0_0_55px_color-mix(in_srgb,var(--accent-cyan)_22%,transparent)]`} />
-              <div className="absolute h-px w-24 bg-white/28" />
-              <div className="absolute h-24 w-px bg-white/28" />
-              <div className={`h-3 w-3 rounded-full ${!calibrationSheetOpen && directionAligned && altitudeAligned ? "bg-success" : "bg-accent-cyan"}`} />
-              {!calibrationSheetOpen ? (
-                <>
-                  <div className="absolute -right-9 text-5xl font-black text-white drop-shadow-xl">{directionArrow === "→" ? "→" : ""}</div>
-                  <div className="absolute -left-9 text-5xl font-black text-white drop-shadow-xl">{directionArrow === "←" ? "←" : ""}</div>
-                  <div className="absolute -top-11 text-4xl font-black text-accent-cyan drop-shadow-xl">{altitudeArrow === "↑" ? "↑" : ""}</div>
-                  <div className="absolute -bottom-11 text-4xl font-black text-accent-cyan drop-shadow-xl">{altitudeArrow === "↓" ? "↓" : ""}</div>
-                </>
-              ) : null}
-            </div>
-          ) : (
-            <div className="h-28 w-28 rounded-full border border-accent-cyan/60 bg-accent-cyan/10" />
-          )}
-
+        <div className="pointer-events-none absolute left-4 right-4 top-[calc(env(safe-area-inset-top)+5rem)] flex flex-col items-center gap-3">
           <p className="rounded-[16px] border border-white/10 bg-[#080b14]/65 px-5 py-3 text-center text-lg font-semibold shadow-[0_12px_42px_rgba(0,0,0,0.25)] backdrop-blur-xl">
             {mainHint}
           </p>
