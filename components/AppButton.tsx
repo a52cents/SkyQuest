@@ -1,4 +1,5 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, MouseEvent } from "react";
+import { haptic } from "@/lib/haptics";
 
 type AppButtonVariant = "primary" | "secondary" | "ghost" | "success" | "danger";
 type AppButtonSize = "sm" | "md" | "lg";
@@ -59,13 +60,21 @@ export function AppButton({
   type = "button",
   ...props
 }: AppButtonProps) {
+  const handleClick = props.onClick
+    ? (event: MouseEvent<HTMLButtonElement>) => {
+        haptic("tap");
+        props.onClick?.(event);
+      }
+    : undefined;
+
   return (
     <button
+      {...props}
       type={type}
       disabled={disabled || isLoading}
       aria-busy={isLoading || undefined}
       className={getAppButtonClassName({ variant, size, fullWidth, className })}
-      {...props}
+      onClick={handleClick}
     >
       {children}
     </button>

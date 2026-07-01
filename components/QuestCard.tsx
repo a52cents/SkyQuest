@@ -1,6 +1,7 @@
 import { AppButton } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
 import { VisibilityBadge } from "@/components/VisibilityBadge";
+import { haptic } from "@/lib/haptics";
 import type { QuestTargetType, SkyQuest } from "@/lib/types";
 
 type QuestCardProps = {
@@ -41,6 +42,11 @@ function getGearLabel(quest: SkyQuest): string {
 }
 
 export function QuestCard({ quest, onStart, onSeen, onMissed }: QuestCardProps) {
+  function handleStart() {
+    haptic("select");
+    onStart(quest);
+  }
+
   return (
     <AppCard as="article" className="group relative overflow-hidden rounded-[24px] transition-colors duration-200 hover:border-white/[0.20]">
       <div className="absolute inset-y-6 left-0 w-px bg-gradient-to-b from-transparent via-accent/70 to-transparent" aria-hidden="true" />
@@ -88,7 +94,7 @@ export function QuestCard({ quest, onStart, onSeen, onMissed }: QuestCardProps) 
       ) : null}
 
       <div className="mt-5 grid gap-3">
-        <AppButton onClick={() => onStart(quest)} fullWidth>
+        <AppButton onClick={handleStart} fullWidth>
           Commencer
         </AppButton>
         <div className="grid grid-cols-2 gap-3">

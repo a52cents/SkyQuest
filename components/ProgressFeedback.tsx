@@ -1,11 +1,39 @@
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { AppCard } from "@/components/AppCard";
 import { getAppButtonClassName } from "@/components/AppButton";
 import { ACHIEVEMENTS, getRankProgress } from "@/lib/progression";
+import { haptic } from "@/lib/haptics";
 import type { ProgressReward } from "@/lib/types";
 
-export function ProgressFeedback({ reward, showJournalLink = false }: { reward: ProgressReward; showJournalLink?: boolean }) {
+export function ProgressFeedback({
+  reward,
+  showJournalLink = false,
+  previousRankName,
+}: {
+  reward: ProgressReward;
+  showJournalLink?: boolean;
+  previousRankName?: string | null;
+}) {
   const rank = getRankProgress(reward.totalXp);
+  const currentRankName = rank.current.name;
+  const didAnnounceRef = useRef(false);
+
+  useEffect(() => {
+    if (didAnnounceRef.current) {
+      return;
+    }
+
+    didAnnounceRef.current = true;
+
+    if (reward.unlockedAchievements.length > 0) {
+      haptic("achievement");
+    }
+
+    if (previousRankName && previousRankName !== currentRankName) {
+      haptic("rank-up");
+    }
+  }, [previousRankName, currentRankName, reward.unlockedAchievements.length]);
 
   return (
     <AppCard className="border-accent/25 bg-[linear-gradient(145deg,rgba(117,104,238,0.14),rgba(15,20,34,0.9))]" aria-live="polite">

@@ -8,13 +8,15 @@ import { CameraGuide } from "@/components/CameraGuide";
 import { ErrorState } from "@/components/ErrorState";
 import { PageShell } from "@/components/PageShell";
 import { ProgressFeedback } from "@/components/ProgressFeedback";
-import { addObservation, getActiveQuest, getLastLocation } from "@/lib/storage";
+import { addObservation, getActiveQuest, getLastLocation, getProgressProfile } from "@/lib/storage";
+import { getRankProgress } from "@/lib/progression";
+import { haptic } from "@/lib/haptics";
 import type { Observation, ProgressReward, SkyQuest } from "@/lib/types";
 
 export default function QuestGuidePage() {
   const params = useParams<{ id: string }>();
   const [quest, setQuest] = useState<SkyQuest | null>(null);
-  const [reward, setReward] = useState<ProgressReward | null>(null);
+  const [reward, setReward] = useState<{ reward: ProgressReward; previousRankName: string | null } | null>(null);
   const isLoggingRef = useRef(false);
 
   useEffect(() => {
@@ -29,14 +31,16 @@ export default function QuestGuidePage() {
       return;
     }
     isLoggingRef.current = true;
+    const previousRankName = getRankProgress(getProgressProfile().totalXp).current.name;
     const result = addObservation(quest, status, getLastLocation() ?? undefined, photo);
-    setReward(result.reward);
+    haptic(status === "seen" ? "success" : "missed");
+    setReward({ reward: result.reward, previousRankName });
   }
 
   if (reward) {
     return (
       <PageShell eyebrow="Observation notée" title="Une trace dans ton ciel" className="max-w-2xl justify-center" contentClassName="flex flex-col justify-center gap-3">
-        <ProgressFeedback reward={reward} showJournalLink />
+        <ProgressFeedback reward={reward.reward} previousRankName={reward.previousRankName} showJournalLink />
         <Link href="/" className={getAppButtonClassName({ variant: "ghost", className: "w-full" })}>Retour à l’accueil</Link>
       </PageShell>
     );

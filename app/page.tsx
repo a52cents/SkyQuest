@@ -14,10 +14,12 @@ import { QuestCard } from "@/components/QuestCard";
 import { ProgressFeedback } from "@/components/ProgressFeedback";
 import { SecureContextNotice } from "@/components/SecureContextNotice";
 import { getInsecureContextMessage, isSecureBrowserContext } from "@/lib/browser-support";
+import { haptic } from "@/lib/haptics";
 import { fetchNextIssVisiblePass } from "@/lib/iss";
 import { isPopunderAdOnCooldown, triggerPopunderAd } from "@/lib/popunder-ad";
 import { generateFutureQuestSuggestions, generateQuests, type FutureQuestSuggestion } from "@/lib/quest-generator";
-import { addObservation, saveActiveQuest, saveLastLocation } from "@/lib/storage";
+import { addObservation, getProgressProfile, saveActiveQuest, saveLastLocation } from "@/lib/storage";
+import { getRankProgress } from "@/lib/progression";
 import type { ProgressReward, SkyQuest } from "@/lib/types";
 import { getFallbackWeather, fetchWeatherNow } from "@/lib/weather";
 
@@ -38,6 +40,11 @@ type HomeSnapshot = {
   position: Position | null;
   notice: string | null;
   savedAt: number;
+};
+
+type RewardSnapshot = {
+  reward: ProgressReward;
+  previousRankName: string | null;
 };
 
 const HOME_SNAPSHOT_KEY = "skyquest:home-snapshot";
@@ -158,7 +165,7 @@ export default function HomePage() {
   const [showAllQuests, setShowAllQuests] = useState(false);
   const [adAction, setAdAction] = useState<AdAction | null>(null);
   const [isAdLoading, setIsAdLoading] = useState(false);
-  const [lastReward, setLastReward] = useState<ProgressReward | null>(null);
+  const [lastReward, setLastReward] = useState<RewardSnapshot | null>(null);
 
   useEffect(() => {
     const snapshot = readHomeSnapshot();
@@ -301,6 +308,7 @@ export default function HomePage() {
   }
 
   function handleNow() {
+    haptic("select");
     if (isPopunderAdOnCooldown()) {
       void runNow();
       return;
@@ -338,13 +346,16 @@ export default function HomePage() {
   }
 
   function handleStart(quest: SkyQuest) {
+    haptic("select");
     saveActiveQuest(quest);
     router.push(`/quest/${quest.id}`);
   }
 
   function handleLog(quest: SkyQuest, status: "seen" | "missed") {
+    const previousRankName = getRankProgress(getProgressProfile().totalXp).current.name;
     const result = addObservation(quest, status, position ?? undefined);
-    setLastReward(result.reward);
+    haptic(status === "seen" ? "success" : "missed");
+    setLastReward({ reward: result.reward, previousRankName });
     const nextNotice = status === "seen" ? "Observation ajoutee au journal." : "Resultat note dans le journal.";
     setNotice(nextNotice);
     persistSnapshot({ notice: nextNotice });
@@ -416,7 +427,7 @@ export default function HomePage() {
 
       <section className="mt-6" aria-live="polite">
         <SecureContextNotice />
-        {lastReward ? <div className="mb-4"><ProgressFeedback reward={lastReward} /></div> : null}
+        {lastReward ? <div className="mb-4"><ProgressFeedback reward={lastReward.reward} previousRankName={lastReward.previousRankName} /></div> : null}
         {notice ? <ErrorState tone="info" message={notice} /> : null}
         {state === "loading" ? <LoadingState /> : null}
         {futureState === "loading" ? <LoadingState /> : null}

@@ -6,6 +6,7 @@ import { AppButton, getAppButtonClassName } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
 import { NightModeToggle } from "@/components/NightModeToggle";
 import { SkyOverlay, questSupportsSkyOverlay } from "@/components/SkyOverlay";
+import { haptic } from "@/lib/haptics";
 import {
   ALIGNMENT_TOLERANCE_DEGREES,
   angleDifference,
@@ -34,6 +35,8 @@ const PHOTO_QUALITY = 0.75;
 const CALIBRATION_SAMPLE_COUNT = 18;
 const MIN_CALIBRATION_SAMPLES = 6;
 const MAX_CALIBRATION_MOVEMENT_DEGREES = 3;
+const DIRECTION_ALIGNMENT_THRESHOLD_DEGREES = 15;
+const ALTITUDE_ALIGNMENT_THRESHOLD_DEGREES = 10;
 
 type CameraGuideProps = {
   quest: SkyQuest;
@@ -109,8 +112,8 @@ function getDirectionArrow(delta: number | null): string {
     return "";
   }
 
-  if (Math.abs(delta) <= ALIGNMENT_TOLERANCE_DEGREES) {
-    return "•";
+  if (Math.abs(delta) <= DIRECTION_ALIGNMENT_THRESHOLD_DEGREES) {
+    return "◎";
   }
 
   return delta > 0 ? "→" : "←";
@@ -121,8 +124,8 @@ function getAltitudeArrow(delta: number | null): string {
     return "";
   }
 
-  if (Math.abs(delta) <= ALIGNMENT_TOLERANCE_DEGREES) {
-    return "•";
+  if (Math.abs(delta) <= ALTITUDE_ALIGNMENT_THRESHOLD_DEGREES) {
+    return "◎";
   }
 
   return delta > 0 ? "↑" : "↓";
@@ -224,6 +227,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [observerLocation, setObserverLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [skyOverlayEnabled, setSkyOverlayEnabled] = useState(true);
+  const wasAlignedRef = useRef(false);
 
   useEffect(() => {
     const storedCalibration = getPointingCalibration();
@@ -337,6 +341,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       setCameraStatus("active");
       return true;
     } catch (error) {
+      haptic("error");
       setCameraStatus("error");
       setCameraError(getCameraErrorMessage(error));
       return false;
@@ -583,6 +588,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       if (typeof orientationEvent.requestPermission === "function") {
         const permission = await orientationEvent.requestPermission(true);
         if (permission !== "granted") {
+          haptic("error");
           setOrientationStatus("denied");
           setOrientationError("Orientation refusee. Verifie les permissions mouvement et orientation.");
           return false;
@@ -594,6 +600,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       setOrientationStatus("active");
       return true;
     } catch {
+      haptic("error");
       setOrientationStatus("denied");
       setOrientationError("Orientation refusee ou indisponible. Utilise la direction texte comme repere.");
       return false;
@@ -667,11 +674,18 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
   function saveSeenWithPhoto() {
     if (photoDraft) {
+      haptic("success");
       onSeen(photoDraft);
       return;
     }
 
+    haptic("success");
     onSeen();
+  }
+
+  function handleMissed() {
+    haptic("missed");
+    onMissed();
   }
 
   function calibrateFromPhotoAndSave() {
@@ -686,6 +700,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       altitude: liveQuest.altitude,
     }, photoPointingSamplesRef.current);
     if (calibrated) {
+      haptic("success");
       onSeen(photoDraft);
     }
   }
@@ -706,23 +721,24 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const altitudeHint = liveQuest.altitude !== null && currentAltitude !== null
     ? getAltitudeHint(currentAltitude, liveQuest.altitude)
     : null;
-  const close = directionHint === "Bonne direction" && altitudeHint === "Hauteur proche";
   const directionDelta = liveQuest.azimuth !== null && currentAzimuth !== null
     ? angleDifference(currentAzimuth, liveQuest.azimuth)
     : null;
   const altitudeDelta = liveQuest.altitude !== null && currentAltitude !== null
     ? liveQuest.altitude - currentAltitude
     : null;
+  const directionAligned = directionDelta !== null && Math.abs(directionDelta) <= DIRECTION_ALIGNMENT_THRESHOLD_DEGREES;
+  const altitudeAligned = altitudeDelta !== null && Math.abs(altitudeDelta) <= ALTITUDE_ALIGNMENT_THRESHOLD_DEGREES;
+  const isAligned = directionAligned && altitudeAligned;
   const directionArrow = getDirectionArrow(directionDelta);
   const altitudeArrow = getAltitudeArrow(altitudeDelta);
   const directionArrowLabel = directionDelta !== null ? `${directionArrow} ${Math.abs(Math.round(directionDelta))}°` : "-";
   const altitudeArrowLabel = altitudeDelta !== null ? `${altitudeArrow} ${Math.abs(Math.round(altitudeDelta))}°` : "-";
   const currentPhoneDirection = currentAzimuth !== null ? azimuthToCardinal(currentAzimuth) : "Inconnu";
-  const directionAligned = directionDelta !== null && Math.abs(directionDelta) <= ALIGNMENT_TOLERANCE_DEGREES;
-  const altitudeAligned = altitudeDelta !== null && Math.abs(altitudeDelta) <= ALIGNMENT_TOLERANCE_DEGREES;
   const hasPrecisePoint = liveQuest.azimuth !== null && liveQuest.altitude !== null;
   const canCalibratePhoto = photoSource === "camera" && hasPrecisePoint && orientationStatus === "active" &&
     photoPointingSamplesRef.current.length >= MIN_CALIBRATION_SAMPLES;
+  const close = isAligned;
   const mainHint = close
     ? `${liveQuest.target} est près du centre`
     : directionHint && directionHint !== "Bonne direction"
@@ -755,6 +771,14 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       orientationStatus === "active" &&
       orientationConfidence !== "low",
   );
+
+  useEffect(() => {
+    if (isAligned && !wasAlignedRef.current) {
+      haptic("align");
+    }
+
+    wasAlignedRef.current = isAligned;
+  }, [isAligned]);
 
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-background text-white">
@@ -845,7 +869,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             <AppButton variant="success" size="sm" onClick={handleTargetFound} className="min-h-12" disabled={photoCaptureStatus === "capturing"}>
               {photoCaptureStatus === "capturing" ? "Photo..." : "Je l&apos;ai trouvée"}
             </AppButton>
-            <AppButton variant="ghost" size="sm" onClick={onMissed} className="min-h-12">
+            <AppButton variant="ghost" size="sm" onClick={handleMissed} className="min-h-12">
               Pas trouve
             </AppButton>
           </div>
@@ -1222,7 +1246,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
                   <AppButton onClick={() => fileInputRef.current?.click()} fullWidth>
                     Choisir une photo
                   </AppButton>
-                  <AppButton variant="secondary" onClick={() => onSeen()} fullWidth>
+                  <AppButton variant="secondary" onClick={saveSeenWithPhoto} fullWidth>
                     Enregistrer sans photo
                   </AppButton>
                   <AppButton variant="ghost" onClick={retakeTargetPhoto} fullWidth>

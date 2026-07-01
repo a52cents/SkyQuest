@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { HapticsToggle } from "@/components/HapticsToggle";
 import { NightModeToggle } from "@/components/NightModeToggle";
 
 type PageShellProps = {
@@ -46,6 +47,7 @@ export function PageShell({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {action ? <div className="shrink-0">{action}</div> : null}
+            <HapticsToggle />
             <NightModeToggle />
           </div>
         </div>
