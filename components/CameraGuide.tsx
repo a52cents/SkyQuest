@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 import { AppButton, getAppButtonClassName } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
 import { NightModeToggle } from "@/components/NightModeToggle";
@@ -228,6 +229,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [observerLocation, setObserverLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [skyOverlayEnabled, setSkyOverlayEnabled] = useState(true);
   const wasAlignedRef = useRef(false);
+  const prefersReducedMotion = useReducedMotion() ?? false;
 
   useEffect(() => {
     const storedCalibration = getPointingCalibration();
@@ -780,6 +782,30 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     wasAlignedRef.current = isAligned;
   }, [isAligned]);
 
+  const statusBadgeVariants: Variants = prefersReducedMotion
+    ? {
+        hidden: { opacity: 1, y: 0 },
+        show: { opacity: 1, y: 0 },
+        exit: { opacity: 0 },
+      }
+    : {
+        hidden: { opacity: 0, y: -10 },
+        show: { opacity: 1, y: 0, transition: { duration: 0.18, ease: "easeOut" } },
+        exit: { opacity: 0, y: -6, transition: { duration: 0.12, ease: "easeIn" } },
+      };
+
+  const arrowVariants: Variants = prefersReducedMotion
+    ? {
+        hidden: { opacity: 1, scale: 1, y: 0 },
+        show: { opacity: 1, scale: 1, y: 0 },
+        exit: { opacity: 0 },
+      }
+    : {
+        hidden: { opacity: 0, scale: 0.85, y: 4 },
+        show: { opacity: 1, scale: 1, y: 0, transition: { type: "spring", stiffness: 700, damping: 40 } },
+        exit: { opacity: 0, scale: 0.9, y: -2, transition: { duration: 0.15 } },
+      };
+
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-background text-white">
       <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />
@@ -804,10 +830,34 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             <div className="absolute h-px w-24 bg-white/28" />
             <div className="absolute h-24 w-px bg-white/28" />
             <div className={`h-3 w-3 rounded-full ${directionAligned && altitudeAligned ? "bg-success" : "bg-accent-cyan"}`} />
-            <div className="absolute -right-9 text-5xl font-black text-white drop-shadow-xl">{directionArrow === "→" ? "→" : ""}</div>
-            <div className="absolute -left-9 text-5xl font-black text-white drop-shadow-xl">{directionArrow === "←" ? "←" : ""}</div>
-            <div className="absolute -top-11 text-4xl font-black text-accent-cyan drop-shadow-xl">{altitudeArrow === "↑" ? "↑" : ""}</div>
-            <div className="absolute -bottom-11 text-4xl font-black text-accent-cyan drop-shadow-xl">{altitudeArrow === "↓" ? "↓" : ""}</div>
+            <AnimatePresence mode="wait" initial={false}>
+              {directionArrow === "→" ? (
+                <motion.span key={directionArrow} variants={arrowVariants} initial="hidden" animate="show" exit="exit" className="absolute -right-9 text-5xl font-black text-white drop-shadow-xl">
+                  →
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
+            <AnimatePresence mode="wait" initial={false}>
+              {directionArrow === "←" ? (
+                <motion.span key={directionArrow} variants={arrowVariants} initial="hidden" animate="show" exit="exit" className="absolute -left-9 text-5xl font-black text-white drop-shadow-xl">
+                  ←
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
+            <AnimatePresence mode="wait" initial={false}>
+              {altitudeArrow === "↑" ? (
+                <motion.span key={altitudeArrow} variants={arrowVariants} initial="hidden" animate="show" exit="exit" className="absolute -top-11 text-4xl font-black text-accent-cyan drop-shadow-xl">
+                  ↑
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
+            <AnimatePresence mode="wait" initial={false}>
+              {altitudeArrow === "↓" ? (
+                <motion.span key={altitudeArrow} variants={arrowVariants} initial="hidden" animate="show" exit="exit" className="absolute -bottom-11 text-4xl font-black text-accent-cyan drop-shadow-xl">
+                  ↓
+                </motion.span>
+              ) : null}
+            </AnimatePresence>
           </div>
         ) : (
           <div className="h-28 w-28 rounded-full border border-accent-cyan/60 bg-accent-cyan/10" />
@@ -877,7 +927,18 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
           <div className="mt-2 grid grid-cols-3 gap-2">
             {cameraStatus !== "active" ? (
               <AppButton variant="secondary" size="sm" onClick={startCamera} disabled={cameraStatus === "starting"} className="min-h-11">
-                {cameraStatus === "starting" ? "Camera..." : "Camera"}
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={cameraStatus === "starting" ? "camera-starting" : "camera-idle"}
+                    variants={statusBadgeVariants}
+                    initial="hidden"
+                    animate="show"
+                    exit="exit"
+                    className="inline-flex items-center gap-1 rounded-full px-1 text-sm font-semibold"
+                  >
+                    {cameraStatus === "starting" ? "Camera..." : "Camera"}
+                  </motion.span>
+                </AnimatePresence>
               </AppButton>
             ) : zoomRange ? (
               <AppButton variant="secondary" size="sm" onClick={toggleCameraZoom} className="min-h-11">
@@ -885,11 +946,33 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               </AppButton>
             ) : (
               <AppButton variant="secondary" size="sm" onClick={startCamera} className="min-h-11">
-                Camera active
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key="camera-active"
+                    variants={statusBadgeVariants}
+                    initial="hidden"
+                    animate="show"
+                    exit="exit"
+                    className="inline-flex items-center gap-1 rounded-full px-1 text-sm font-semibold"
+                  >
+                    Camera active
+                  </motion.span>
+                </AnimatePresence>
               </AppButton>
             )}
             <AppButton variant="secondary" size="sm" onClick={requestOrientation} className="min-h-11">
-              {orientationStatus === "active" ? "Orientation active" : "Orientation"}
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span
+                  key={orientationStatus === "active" ? "orientation-active" : "orientation-idle"}
+                  variants={statusBadgeVariants}
+                  initial="hidden"
+                  animate="show"
+                  exit="exit"
+                  className="inline-flex items-center gap-1 rounded-full px-1 text-sm font-semibold"
+                >
+                  {orientationStatus === "active" ? "Orientation active" : "Orientation"}
+                </motion.span>
+              </AnimatePresence>
             </AppButton>
             <AppButton variant="ghost" size="sm" onClick={() => setCameraSettingsOpen(true)} disabled={!hasCameraSettings} className="min-h-11">
               Reglages

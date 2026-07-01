@@ -1,10 +1,12 @@
-import type { ButtonHTMLAttributes, MouseEvent } from "react";
+import type { MouseEvent } from "react";
+import type { HTMLMotionProps } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { haptic } from "@/lib/haptics";
 
 type AppButtonVariant = "primary" | "secondary" | "ghost" | "success" | "danger";
 type AppButtonSize = "sm" | "md" | "lg";
 
-type AppButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+type AppButtonProps = Omit<HTMLMotionProps<"button">, "ref"> & {
   variant?: AppButtonVariant;
   size?: AppButtonSize;
   fullWidth?: boolean;
@@ -66,17 +68,21 @@ export function AppButton({
         props.onClick?.(event);
       }
     : undefined;
+  const prefersReducedMotion = useReducedMotion() ?? false;
+  const canAnimate = !disabled && !isLoading && !prefersReducedMotion;
 
   return (
-    <button
+    <motion.button
       {...props}
       type={type}
       disabled={disabled || isLoading}
       aria-busy={isLoading || undefined}
       className={getAppButtonClassName({ variant, size, fullWidth, className })}
       onClick={handleClick}
+      whileHover={canAnimate ? { scale: 1.02 } : undefined}
+      whileTap={canAnimate ? { scale: 0.96 } : undefined}
     >
       {children}
-    </button>
+    </motion.button>
   );
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { AppButton, getAppButtonClassName } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
 import { EmptyState } from "@/components/EmptyState";
@@ -128,6 +129,7 @@ export default function HomePage() {
   const [lastReward, setLastReward] = useState<RewardSnapshot | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isOnboardingReady, setIsOnboardingReady] = useState(false);
+  const prefersReducedMotion = useReducedMotion() ?? false;
 
   useEffect(() => {
     setShowOnboarding(!isOnboardingCompleted());
@@ -331,6 +333,15 @@ export default function HomePage() {
   const visibleQuests = showAllQuests ? quests : quests.slice(0, 3);
   const hiddenQuestCount = Math.max(0, quests.length - visibleQuests.length);
   const isBusy = state === "loading" || futureState === "loading" || isAdLoading;
+  const questListVariants: Variants = prefersReducedMotion
+    ? {
+        hidden: { opacity: 1 },
+        show: { opacity: 1 },
+      }
+    : {
+        hidden: {},
+        show: { transition: { staggerChildren: 0.08 } },
+      };
 
   return (
     <>
@@ -458,15 +469,18 @@ export default function HomePage() {
               </div>
               <p className="text-right text-sm text-faint">Jamais garanti, toujours approximatif.</p>
             </div>
-            {visibleQuests.map((quest) => (
-              <QuestCard
-                key={quest.id}
-                quest={quest}
-                onStart={handleStart}
-                onSeen={(nextQuest) => handleLog(nextQuest, "seen")}
-                onMissed={(nextQuest) => handleLog(nextQuest, "missed")}
-              />
-            ))}
+            <motion.div variants={questListVariants} initial={prefersReducedMotion ? false : "hidden"} animate="show" className="grid gap-4">
+              {visibleQuests.map((quest) => (
+                <QuestCard
+                  key={quest.id}
+                  quest={quest}
+                  onStart={handleStart}
+                  onSeen={(nextQuest) => handleLog(nextQuest, "seen")}
+                  onMissed={(nextQuest) => handleLog(nextQuest, "missed")}
+                  layout
+                />
+              ))}
+            </motion.div>
             {quests.length > 3 ? (
               <AppButton variant="secondary" onClick={() => setShowAllQuests((current) => !current)}>
                 {showAllQuests ? "Masquer les autres" : `Afficher ${hiddenQuestCount} autre${hiddenQuestCount > 1 ? "s" : ""}`}
