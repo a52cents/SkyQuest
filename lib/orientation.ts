@@ -91,9 +91,9 @@ function vectorToHorizontal(vector: Vector3): { azimuth: number; altitude: numbe
 
 function deviceToEarthVector(rotation: number[], vector: Vector3): Vector3 {
   return [
-    rotation[0] * vector[0] + rotation[3] * vector[1] + rotation[6] * vector[2],
-    rotation[1] * vector[0] + rotation[4] * vector[1] + rotation[7] * vector[2],
-    rotation[2] * vector[0] + rotation[5] * vector[1] + rotation[8] * vector[2],
+    rotation[0] * vector[0] + rotation[1] * vector[1] + rotation[2] * vector[2],
+    rotation[3] * vector[0] + rotation[4] * vector[1] + rotation[5] * vector[2],
+    rotation[6] * vector[0] + rotation[7] * vector[1] + rotation[8] * vector[2],
   ];
 }
 
@@ -144,6 +144,14 @@ function getBackCameraBasis(reading: FullOrientationReading, confidence: CameraC
   return forward && right && up ? { forward, right, up, confidence } : null;
 }
 
+function getWebkitCameraHeading(compassHeading: number, beta: number | null): number {
+  // When the phone is tilted far past vertical, Safari reports the opposite
+  // end of the device as its heading. Keep the compass tied to the back camera.
+  return beta !== null && beta >= 135
+    ? normalizeAngle(compassHeading + 180)
+    : compassHeading;
+}
+
 function rotateBasisAroundEarthUp(basis: CameraBasis, degrees: number): CameraBasis {
   const earthUp = { x: 0, y: 0, z: 1 };
   return {
@@ -168,7 +176,7 @@ export function getCameraOrientation3D(
 
   const hasAlpha = typeof reading.alpha === "number";
   const compassHeading = typeof reading.webkitCompassHeading === "number"
-    ? normalizeAngle(reading.webkitCompassHeading)
+    ? getWebkitCameraHeading(normalizeAngle(reading.webkitCompassHeading), reading.beta)
     : null;
   let basis: CameraBasis | null = null;
 
@@ -239,15 +247,7 @@ export function getCameraPointing(reading: DeviceOrientationReading): CameraPoin
 
   // 1) iOS : webkitCompassHeading est la boussole native.
   if (compassHeading !== null) {
-    let azimuth = compassHeading;
-    
-    // CORRECTION DU GIMBAL LOCK SUR iOS :
-    // Sur iOS, webkitCompassHeading saute de 180° uniquement quand on lève le téléphone 
-    // au-dessus de 45° (ce qui correspond à un angle beta >= 135).
-    // On compense en ajoutant 180° SEULEMENT dans cette zone spécifique.
-    if (typeof reading.beta === "number" && reading.beta >= 135) {
-      azimuth = normalizeAngle(compassHeading + 180);
-    }
+    const azimuth = getWebkitCameraHeading(compassHeading, reading.beta);
     
     const altitude = typeof reading.beta === "number" ? betaToCameraAltitude(reading.beta) : null;
     return {
