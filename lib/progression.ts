@@ -63,6 +63,11 @@ export function createEmptyProgressProfile(now = new Date(0).toISOString()): Pro
     discoveredTargets: [],
     unlockedAchievements: [],
     rewardHistory: [],
+    currentStreak: 0,
+    longestStreak: 0,
+    lastObservationNightKey: null,
+    streakFreezeCount: 1,
+    lastFreezeRegenerationKey: null,
     updatedAt: now,
   };
 }
@@ -100,6 +105,80 @@ export function getRankProgress(totalXp: number): {
     : 100;
 
   return { current, next, progressPercent, xpToNext: next ? Math.max(0, next.minimumXp - safeXp) : 0 };
+}
+
+function getNightDayNumber(nightKey: string): number {
+  const [yearText, monthText, dayText] = nightKey.split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
+}
+
+function getNightDifference(currentNightKey: string, previousNightKey: string): number {
+  return getNightDayNumber(currentNightKey) - getNightDayNumber(previousNightKey);
+}
+
+type StreakUpdateResult = {
+  profile: ProgressProfile;
+  previousStreak: number;
+  streakMessage: string | null;
+};
+
+function computeStreakOnSuccess(profile: ProgressProfile, now: Date): StreakUpdateResult {
+  const currentNightKey = getLocalNightKey(now);
+  const previousNightKey = profile.lastObservationNightKey;
+  const previousStreak = profile.currentStreak;
+
+  if (previousNightKey === currentNightKey) {
+    return { profile, previousStreak, streakMessage: null };
+  }
+
+  const timestamp = now.toISOString();
+  const nightDifference = previousNightKey ? getNightDifference(currentNightKey, previousNightKey) : null;
+  let currentStreak = 1;
+  let streakFreezeCount = Math.min(1, Math.max(0, profile.streakFreezeCount));
+  let lastFreezeRegenerationKey = profile.lastFreezeRegenerationKey;
+  let streakMessage: string | null = null;
+
+  if (nightDifference === null || nightDifference <= 1) {
+    currentStreak = previousStreak > 0 ? previousStreak + 1 : 1;
+    streakMessage = `Série de ${currentStreak} nuit${currentStreak > 1 ? "s" : ""} !`;
+  } else if (previousStreak > 0) {
+    const freezeDifference = lastFreezeRegenerationKey ? getNightDifference(currentNightKey, lastFreezeRegenerationKey) : Number.POSITIVE_INFINITY;
+    if (streakFreezeCount < 1 && freezeDifference >= 7) {
+      streakFreezeCount = 1;
+      lastFreezeRegenerationKey = currentNightKey;
+    }
+
+    if (streakFreezeCount > 0) {
+      streakFreezeCount = 0;
+      currentStreak = previousStreak + 1;
+      streakMessage = `Série de ${currentStreak} nuit${currentStreak > 1 ? "s" : ""} !`;
+    } else {
+      currentStreak = 1;
+      streakMessage = "Ouch, série perdue";
+    }
+  } else {
+    currentStreak = 1;
+    streakMessage = "Série de 1 nuit !";
+  }
+
+  const nextProfile: ProgressProfile = {
+    ...profile,
+    currentStreak,
+    longestStreak: Math.max(profile.longestStreak, currentStreak),
+    lastObservationNightKey: currentNightKey,
+    streakFreezeCount,
+    lastFreezeRegenerationKey,
+    updatedAt: timestamp,
+  };
+
+  return { profile: nextProfile, previousStreak, streakMessage };
+}
+
+export function updateStreakOnSuccess(profile: ProgressProfile, now: Date): ProgressProfile {
+  return computeStreakOnSuccess(profile, now).profile;
 }
 
 function getSuccessfulObservationCount(profile: ProgressProfile): number {
@@ -182,12 +261,16 @@ export function applyQuestReward(
     rewardHistory,
     updatedAt: timestamp,
   };
-  const newlyUnlocked = getAchievementProgress(intermediate)
+  const streakResult = status === "seen"
+    ? computeStreakOnSuccess(intermediate, now)
+    : { profile: intermediate, previousStreak: intermediate.currentStreak, streakMessage: null };
+  const streakProfile = streakResult.profile;
+  const newlyUnlocked = getAchievementProgress(streakProfile)
     .filter((achievement) => achievement.progress >= achievement.goal)
     .map((achievement) => achievement.id)
     .filter((id) => !profile.unlockedAchievements.some((item) => item.id === id));
   const nextProfile: ProgressProfile = {
-    ...intermediate,
+    ...streakProfile,
     unlockedAchievements: [
       ...profile.unlockedAchievements,
       ...newlyUnlocked.map((id) => ({ id, unlockedAt: timestamp })),
@@ -202,6 +285,11 @@ export function applyQuestReward(
       totalXp: nextProfile.totalXp,
       isFirstDiscovery,
       unlockedAchievements: newlyUnlocked,
+      previousStreak: streakResult.previousStreak,
+      currentStreak: nextProfile.currentStreak,
+      longestStreak: nextProfile.longestStreak,
+      streakFreezeCount: nextProfile.streakFreezeCount,
+      streakMessage: streakResult.streakMessage,
       rankName: rank.current.name,
       nextRankName: rank.next?.name ?? null,
       xpToNextRank: rank.xpToNext,

@@ -103,6 +103,11 @@ export type ProgressProfile = {
   discoveredTargets: DiscoveredTarget[];
   unlockedAchievements: UnlockedAchievement[];
   rewardHistory: RewardHistoryEntry[];
+  currentStreak: number;
+  longestStreak: number;
+  lastObservationNightKey: string | null;
+  streakFreezeCount: number;
+  lastFreezeRegenerationKey: string | null;
   updatedAt: string;
 };
 
@@ -111,6 +116,11 @@ export type ProgressReward = {
   totalXp: number;
   isFirstDiscovery: boolean;
   unlockedAchievements: AchievementId[];
+  previousStreak: number;
+  currentStreak: number;
+  longestStreak: number;
+  streakFreezeCount: number;
+  streakMessage: string | null;
   rankName: string;
   nextRankName: string | null;
   xpToNextRank: number;

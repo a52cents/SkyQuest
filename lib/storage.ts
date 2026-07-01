@@ -62,6 +62,44 @@ function roundCoordinate(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+function normalizeProgressProfile(value: Partial<ProgressProfile>, fallbackUpdatedAt: string): ProgressProfile {
+  const currentStreak = typeof value.currentStreak === "number" && Number.isFinite(value.currentStreak) ? Math.max(0, Math.trunc(value.currentStreak)) : 0;
+  const longestStreak = typeof value.longestStreak === "number" && Number.isFinite(value.longestStreak)
+    ? Math.max(0, Math.trunc(value.longestStreak))
+    : currentStreak;
+
+  return {
+    version: 1,
+    totalXp: typeof value.totalXp === "number" && Number.isFinite(value.totalXp) ? Math.max(0, value.totalXp) : 0,
+    discoveredTargets: Array.isArray(value.discoveredTargets)
+      ? value.discoveredTargets.filter((item) => item && typeof item.target === "string" && isTargetType(item.targetType) && typeof item.discoveredAt === "string")
+      : [],
+    unlockedAchievements: Array.isArray(value.unlockedAchievements)
+      ? value.unlockedAchievements.filter((item) => item && isAchievementId(item.id) && typeof item.unlockedAt === "string")
+      : [],
+    rewardHistory: Array.isArray(value.rewardHistory)
+      ? value.rewardHistory.filter((item) => item && typeof item.key === "string" && typeof item.target === "string" &&
+        typeof item.localNight === "string" && typeof item.awardedXp === "number" &&
+        (item.status === "seen" || item.status === "missed") && typeof item.updatedAt === "string")
+        .map((item) => ({ ...item, hadMissed: item.hadMissed === true }))
+      : [],
+    currentStreak,
+    longestStreak,
+    lastObservationNightKey: typeof value.lastObservationNightKey === "string" ? value.lastObservationNightKey : null,
+    streakFreezeCount: typeof value.streakFreezeCount === "number" && Number.isFinite(value.streakFreezeCount)
+      ? Math.min(1, Math.max(0, Math.trunc(value.streakFreezeCount)))
+      : 1,
+    lastFreezeRegenerationKey: typeof value.lastFreezeRegenerationKey === "string" ? value.lastFreezeRegenerationKey : null,
+    updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : fallbackUpdatedAt,
+  };
+}
+
+export function saveProgressProfile(profile: ProgressProfile): ProgressProfile {
+  memoryProfile = profile;
+  writeJson(PROGRESS_PROFILE_KEY, profile);
+  return profile;
+}
+
 export function getObservations(): Observation[] {
   const stored = readJson<unknown>(OBSERVATIONS_KEY, memoryObservations);
   if (!Array.isArray(stored)) {
@@ -97,36 +135,24 @@ export function getProgressProfile(): ProgressProfile {
   }
 
   const value = stored as Partial<ProgressProfile>;
-  const discoveredTargets = Array.isArray(value.discoveredTargets)
-    ? value.discoveredTargets.filter((item) => item && typeof item.target === "string" && isTargetType(item.targetType) && typeof item.discoveredAt === "string")
-    : [];
-  const unlockedAchievements = Array.isArray(value.unlockedAchievements)
-    ? value.unlockedAchievements.filter((item) => item && isAchievementId(item.id) && typeof item.unlockedAt === "string")
-    : [];
-  const rewardHistory = Array.isArray(value.rewardHistory)
-    ? value.rewardHistory.filter((item) => item && typeof item.key === "string" && typeof item.target === "string" &&
-      typeof item.localNight === "string" && typeof item.awardedXp === "number" &&
-      (item.status === "seen" || item.status === "missed") && typeof item.updatedAt === "string")
-      .map((item) => ({ ...item, hadMissed: item.hadMissed === true }))
-    : [];
+  const profile = normalizeProgressProfile(value, fallback.updatedAt);
+  const needsMigration =
+    typeof value.currentStreak !== "number" ||
+    typeof value.longestStreak !== "number" ||
+    !(value.lastObservationNightKey === null || typeof value.lastObservationNightKey === "string") ||
+    typeof value.streakFreezeCount !== "number" ||
+    !(value.lastFreezeRegenerationKey === null || typeof value.lastFreezeRegenerationKey === "string");
 
-  const profile: ProgressProfile = {
-    version: 1,
-    totalXp: typeof value.totalXp === "number" && Number.isFinite(value.totalXp) ? Math.max(0, value.totalXp) : 0,
-    discoveredTargets,
-    unlockedAchievements,
-    rewardHistory,
-    updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : fallback.updatedAt,
-  };
   memoryProfile = profile;
+  if (needsMigration) {
+    writeJson(PROGRESS_PROFILE_KEY, profile);
+  }
   return profile;
 }
 
 export function resetProgressProfile(): ProgressProfile {
   const profile = createEmptyProgressProfile(new Date().toISOString());
-  memoryProfile = profile;
-  writeJson(PROGRESS_PROFILE_KEY, profile);
-  return profile;
+  return saveProgressProfile(profile);
 }
 
 export function addObservation(
@@ -156,11 +182,10 @@ export function addObservation(
   };
 
   const next = [observation, ...getObservations()].slice(0, 50);
-  memoryProfile = profile;
+  saveProgressProfile(profile);
   memoryObservations = next;
-  const profilePersisted = writeJson(PROGRESS_PROFILE_KEY, profile);
   const observationPersisted = writeJson(OBSERVATIONS_KEY, next);
-  return { observation, profile, reward, persisted: profilePersisted && observationPersisted };
+  return { observation, profile, reward, persisted: observationPersisted };
 }
 
 export function clearObservations(): void {

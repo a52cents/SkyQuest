@@ -43,6 +43,31 @@ export function ProgressDashboard({ profile }: { profile: ProgressProfile }) {
         </div>
       </AppCard>
 
+      <AppCard as="section" className="border-accent-cyan/15 bg-[linear-gradient(145deg,rgba(17,25,41,0.92),rgba(10,14,24,0.96))]">
+        <p className="premium-kicker">Série en cours</p>
+        <div className="mt-3 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-[-0.04em] text-white">
+              {profile.currentStreak} nuit{profile.currentStreak > 1 ? "s" : ""}
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              Record · {profile.longestStreak} nuit{profile.longestStreak > 1 ? "s" : ""}
+            </p>
+          </div>
+          <span className="text-3xl text-accent-cyan" aria-hidden="true">🔥</span>
+        </div>
+        <div className="mt-4 flex items-center justify-between rounded-[16px] border border-white/[0.07] bg-white/[0.03] px-3 py-2">
+          <div>
+            <p className="text-sm font-semibold text-white">Streak Freeze</p>
+            <p className="text-xs text-muted">Protège une nuit manquée.</p>
+          </div>
+          <div className={`flex items-center gap-2 text-sm font-bold ${profile.streakFreezeCount > 0 ? "text-white" : "text-faint"}`}>
+            <span aria-hidden="true">❄</span>
+            <span>{profile.streakFreezeCount}/1</span>
+          </div>
+        </div>
+      </AppCard>
+
       <AppCard as="section">
         <p className="premium-kicker">Accomplissements</p>
         <div className="mt-4 grid gap-2">

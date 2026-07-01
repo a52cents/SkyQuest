@@ -41,6 +41,7 @@ export function ProgressFeedback({
       <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">
         {reward.xpEarned > 0 ? `+${reward.xpEarned} Éclats d’étoile` : "Déjà compté cette nuit"}
       </h2>
+      {reward.streakMessage ? <p className="mt-2 text-sm font-semibold text-accent-cyan">{reward.streakMessage}</p> : null}
       {reward.isFirstDiscovery ? <p className="mt-2 text-sm font-semibold text-accent-cyan">Nouvelle cible dans ton ciel découvert.</p> : null}
       {reward.unlockedAchievements.map((id) => (
         <p key={id} className="mt-2 text-sm font-semibold text-success">
