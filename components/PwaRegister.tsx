@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { registerSkyQuestServiceWorker } from "@/lib/service-worker-client";
 
 export function PwaRegister() {
   useEffect(() => {
@@ -9,7 +10,7 @@ export function PwaRegister() {
     let disposed = false;
     const register = async () => {
       try {
-        const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+        const registration = await registerSkyQuestServiceWorker();
         if (!disposed) void registration.update().catch(() => undefined);
       } catch {
         // Offline support is progressive enhancement; registration must never crash the app.

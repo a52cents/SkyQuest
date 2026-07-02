@@ -6,6 +6,7 @@ import {
   type NotificationPreferences,
   type NotificationTopic,
 } from "@/lib/push-types";
+import { registerSkyQuestServiceWorker } from "@/lib/service-worker-client";
 
 export {
   DEFAULT_NOTIFICATION_PREFERENCES,
@@ -71,7 +72,7 @@ async function getPushRegistration(): Promise<ServiceWorkerRegistration | null> 
   try {
     return (
       (await navigator.serviceWorker.getRegistration("/")) ??
-      (await navigator.serviceWorker.register("/sw.js", { scope: "/" }))
+      (await registerSkyQuestServiceWorker())
     );
   } catch {
     return null;

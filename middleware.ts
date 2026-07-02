@@ -24,7 +24,7 @@ export function middleware(request: NextRequest) {
       : [
           "upgrade-insecure-requests",
           "require-trusted-types-for 'script'",
-          "trusted-types skyquest default",
+          "trusted-types skyquest skyquest-sw default",
         ]),
   ].join("; ");
 

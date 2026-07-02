@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { PushPermissionCard } from "@/components/PushPermissionCard";
+import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 
 const HERO_IMAGE = "/HERO_IMAGE.webp";
 const OBSERVATION_IMAGE = "/OBSERVATION_IMAGE.webp";
@@ -74,6 +75,7 @@ function Reveal({ children, className = "" }: { children: ReactNode; className?:
 export function LandingPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const prefersReducedMotion = useReducedMotion() ?? false;
+  const { canPrompt, installed, promptInstall } = useInstallPrompt();
   const [skyStatus, setSkyStatus] = useState(SKY_STATUSES[0]);
   const [skyStatusVisible, setSkyStatusVisible] = useState(true);
 
@@ -159,10 +161,16 @@ export function LandingPage() {
     };
   }, []);
 
-  const showInstallInstructions = (event: MouseEvent<HTMLAnchorElement>) => {
+  const showInstallInstructions = async (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
+    if (canPrompt) {
+      await promptInstall();
+      return;
+    }
     window.alert(
-      "SkyQuest PWA — ajoute cette page à ton écran d'accueil depuis le menu de ton navigateur.",
+      installed
+        ? "SkyQuest est déjà installée sur cet appareil."
+        : "Dans Chrome, ouvre le menu ⋮ puis choisis « Installer SkyQuest ».",
     );
   };
 
@@ -222,7 +230,7 @@ export function LandingPage() {
             Ton compagnon de poche pour explorer la voûte céleste.
           </motion.p>
           <motion.div className="hero-cta" variants={heroItemVariants}>
-            <a href="#cta" className="btn btn-primary">
+            <a href="#cta" className="btn btn-primary" onClick={showInstallInstructions}>
               {"Ajouter à l'écran d'accueil"} <ArrowIcon />
             </a>
             <a href="#features" className="btn btn-secondary">
