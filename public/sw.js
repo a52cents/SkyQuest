@@ -1,5 +1,5 @@
-const CACHE_NAME = "skyquest-v0";
-const APP_SHELL = ["/", "/journal", "/manifest.webmanifest", "/icon.svg"];
+const CACHE_NAME = "skyquest-v1";
+const APP_SHELL = ["/", "/journal", "/manifest.webmanifest", "/newicon.png", "/newlogo.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
+import { AppHeader } from "@/components/AppHeader";
 import { Onboarding } from "@/components/Onboarding";
 import { getCurrentPosition, type GeoPosition } from "@/lib/browser-support";
 import { getUpcomingCelestialEvents, type CelestialEventType } from "@/lib/celestial-events";
@@ -176,24 +177,6 @@ function cacheAnalysis(analysis: DashboardAnalysis) {
   }
 }
 
-function LogoMark() {
-  return (
-    <span className="logo-mark" aria-hidden="true">
-      <svg viewBox="0 0 24 24">
-        <circle className="star" cx="12" cy="5" r="1.2" />
-        <circle className="star" cx="7" cy="16" r="0.8" />
-        <circle className="star" cx="19" cy="14" r="1" />
-        <path
-          d="M12 5 L7 16 L19 14 Z"
-          fill="none"
-          stroke="rgba(255,255,255,0.2)"
-          strokeWidth="0.5"
-        />
-      </svg>
-    </span>
-  );
-}
-
 function AnimatedValue({ value }: { value: string }) {
   return (
     <AnimatePresence mode="wait" initial={false}>
@@ -312,7 +295,6 @@ export function Dashboard() {
   const router = useRouter();
   const prefersReducedMotion = useReducedMotion() ?? false;
   const [loadState, setLoadState] = useState<LoadState>("idle");
-  const [position, setPosition] = useState<GeoPosition | null>(null);
   const [weather, setWeather] = useState<WeatherNow | null>(null);
   const [quests, setQuests] = useState<SkyQuest[]>([]);
   const [futureSuggestions, setFutureSuggestions] = useState<FutureQuestSuggestion[]>([]);
@@ -320,7 +302,6 @@ export function Dashboard() {
   const [profile, setProfile] = useState<ProgressProfile | null>(null);
   const [observations, setObservations] = useState<Observation[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
-  const [now, setNow] = useState<Date | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isOnboardingReady, setIsOnboardingReady] = useState(false);
   const [isLocationLoading, setIsLocationLoading] = useState(false);
@@ -345,7 +326,6 @@ export function Dashboard() {
   const loadDashboard = useCallback(async (coords: GeoPosition) => {
     setLoadState("loading");
     setNotice(null);
-    setPosition(coords);
 
     let weatherNotice: string | null = null;
     const currentWeather = await fetchWeatherNow(coords.latitude, coords.longitude).catch(() => {
@@ -409,7 +389,6 @@ export function Dashboard() {
   useEffect(() => {
     let isActive = true;
     const currentDate = new Date();
-    setNow(currentDate);
     setEventTimeline(createEventTimeline(currentDate));
     setProfile(getProgressProfile());
     void getObservations().then((storedObservations) => {
@@ -420,7 +399,6 @@ export function Dashboard() {
 
     const cachedAnalysis = readCachedAnalysis();
     if (cachedAnalysis) {
-      setPosition(cachedAnalysis.position);
       setWeather(cachedAnalysis.weather);
       setQuests(cachedAnalysis.quests);
       setFutureSuggestions(cachedAnalysis.futureSuggestions);
@@ -429,10 +407,8 @@ export function Dashboard() {
       setLoadState("ready");
     }
 
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => {
       isActive = false;
-      window.clearInterval(timer);
     };
   }, [loadDashboard]);
 
@@ -447,7 +423,6 @@ export function Dashboard() {
     try {
       const coords = await getCurrentPosition();
       saveLastLocation(coords);
-      setPosition(coords);
       await loadDashboard(coords);
     } catch (error) {
       const fallbackQuests = generateQuests({
@@ -496,9 +471,6 @@ export function Dashboard() {
     (suggestion) => !currentTargets.has(suggestion.quest.target),
   );
   const recentObservations = observations.slice(0, 2);
-  const locationLabel = position
-    ? `${position.latitude.toFixed(2)}°, ${position.longitude.toFixed(2)}°`
-    : "Position non chargée";
   const conditionsLabel =
     analysisSavedAt && !isGuidanceUnlocked
       ? "Analyse passée"
@@ -527,36 +499,7 @@ export function Dashboard() {
         />
       ) : null}
 
-      <motion.header
-        id="dashboard-top"
-        className="app-header"
-        initial={prefersReducedMotion ? false : { opacity: 0, y: -16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: prefersReducedMotion ? 0 : 0.45 }}
-      >
-        <div className="header-inner">
-          <div className="header-logo">
-            <LogoMark />
-            SkyQuest
-          </div>
-          <div className="header-meta">
-            <div className="header-time">
-              {now
-                ? new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(
-                    now,
-                  )
-                : "--:--"}
-            </div>
-            <div className="header-location">
-              <svg viewBox="0 0 24 24">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
-              {locationLabel}
-            </div>
-          </div>
-        </div>
-      </motion.header>
+      <AppHeader eyebrow="SkyQuest" title="Maintenant" />
 
       <motion.main
         className="dashboard-main"

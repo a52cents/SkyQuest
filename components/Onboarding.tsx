@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 import { AppButton } from "@/components/AppButton";
@@ -191,9 +192,14 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
             <p className="premium-kicker">Première visite</p>
             <p className="mt-1 text-sm text-muted">3 étapes pour démarrer sans surprise.</p>
           </div>
-          <div className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-xs font-semibold text-faint">
-            SkyQuest
-          </div>
+          <Image
+            src="/newlogo.png"
+            alt="SkyQuest"
+            width={72}
+            height={72}
+            className="h-[72px] w-[72px] shrink-0 rounded-[16px] object-cover"
+            priority
+          />
         </div>
 
         <div className="relative flex-1 overflow-hidden">

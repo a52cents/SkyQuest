@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   description: "Découvre quoi observer dans le ciel maintenant.",
   applicationName: "SkyQuest",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/newicon.png", type: "image/png", sizes: "1254x1254" }],
+    apple: [{ url: "/newicon.png", type: "image/png", sizes: "1254x1254" }],
+  },
   appleWebApp: {
     capable: true,
     title: "SkyQuest",

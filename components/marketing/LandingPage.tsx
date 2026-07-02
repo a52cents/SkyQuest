@@ -27,19 +27,7 @@ type Star = {
 function Logo() {
   return (
     <a href="#" className="logo" aria-label="SkyQuest, retour en haut">
-      <span className="logo-mark" aria-hidden="true">
-        <svg viewBox="0 0 28 28">
-          <circle className="star" cx="14" cy="6" r="1.5" />
-          <circle className="star" cx="8" cy="18" r="1" />
-          <circle className="star" cx="22" cy="16" r="1.2" />
-          <path
-            d="M14 6 L8 18 L22 16 Z"
-            fill="none"
-            stroke="rgba(255,255,255,0.2)"
-            strokeWidth="0.5"
-          />
-        </svg>
-      </span>
+      <img className="logo-mark" src="/newicon.png" alt="" aria-hidden="true" />
       SkyQuest
     </a>
   );
