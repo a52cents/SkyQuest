@@ -1,5 +1,6 @@
 import { AppButton } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
+import { InlineTerm } from "@/components/InlineTerm";
 import type { OrientationConfidence, OrientationStatus } from "./types";
 import type { SkyQuest } from "@/lib/types";
 
@@ -97,6 +98,13 @@ export function CameraDetailsPanel({
           {rows.map(([label, value]) => (
             <DetailsRow key={label} label={label} value={value} />
           ))}
+        </div>
+        <div className="mt-4 rounded-brand-lg border border-brand-border bg-white/[0.05] p-4">
+          <p className="text-sm font-bold text-white">Mots utiles</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <InlineTerm termId="azimut" />
+            <InlineTerm termId="altitude" />
+          </div>
         </div>
         <div className="mt-4 rounded-brand-lg border border-brand-border bg-white/[0.05] p-4">
           <p className="text-sm font-bold text-white">Conseil</p>

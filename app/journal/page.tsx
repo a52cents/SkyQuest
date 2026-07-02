@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AppButton } from "@/components/AppButton";
@@ -98,6 +99,28 @@ export default function JournalPage() {
             message="Marque une quête comme vue ou pas trouvée pour garder une trace locale."
           />
         )}
+        <Link href="/glossary" className="block rounded-[20px]">
+          <AppCard
+            variant="subtle"
+            padding="sm"
+            className="transition-colors hover:border-accent/30"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-[Georgia,'Times_New_Roman',serif] text-lg text-text">
+                  Glossaire
+                </p>
+                <p className="mt-1 text-sm leading-5 text-muted">Comprendre les termes du ciel</p>
+              </div>
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-accent/20 bg-accent/[0.08] font-bold text-accent-cyan"
+                aria-hidden="true"
+              >
+                ?
+              </span>
+            </div>
+          </AppCard>
+        </Link>
         <AppCard variant="subtle" padding="sm">
           <p className="font-[Georgia,'Times_New_Roman',serif] text-lg text-text">
             Données locales

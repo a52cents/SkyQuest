@@ -499,7 +499,20 @@ export function Dashboard() {
         />
       ) : null}
 
-      <AppHeader eyebrow="SkyQuest" title="Maintenant" />
+      <AppHeader
+        eyebrow="SkyQuest"
+        title="Maintenant"
+        action={
+          <Link
+            href="/glossary"
+            aria-label="Ouvrir le glossaire"
+            title="Glossaire"
+            className="flex h-10 w-10 items-center justify-center rounded-[13px] border border-white/10 bg-white/[0.045] text-base font-bold text-muted transition-colors hover:border-accent/40 hover:text-text"
+          >
+            ?
+          </Link>
+        }
+      />
 
       <motion.main
         className="dashboard-main"

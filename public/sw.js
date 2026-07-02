@@ -1,5 +1,12 @@
-const CACHE_NAME = "skyquest-v1";
-const APP_SHELL = ["/", "/journal", "/manifest.webmanifest", "/newicon.png", "/newlogo.png"];
+const CACHE_NAME = "skyquest-v2";
+const APP_SHELL = [
+  "/",
+  "/journal",
+  "/glossary",
+  "/manifest.webmanifest",
+  "/newicon.png",
+  "/newlogo.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -26,8 +33,19 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    fetch(event.request).catch(() =>
-      caches.match(event.request).then((cached) => cached || caches.match("/")),
-    ),
+    fetch(event.request)
+      .then(async (response) => {
+        const requestUrl = new URL(event.request.url);
+        if (
+          response.ok &&
+          requestUrl.origin === self.location.origin &&
+          !requestUrl.pathname.startsWith("/api/")
+        ) {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(event.request, response.clone());
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/"))),
   );
 });
