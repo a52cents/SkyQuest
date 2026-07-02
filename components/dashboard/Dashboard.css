@@ -1,21 +1,21 @@
 .sky-dashboard {
-  --dash-bg: #0a0a0b;
-  --dash-bg-elev: #131316;
-  --dash-bg-card: #161619;
-  --dash-fg: #f4f4f5;
-  --dash-fg-dim: #a1a1aa;
-  --dash-fg-muted: #52525b;
-  --dash-accent: #7c5cff;
-  --dash-accent-glow: rgba(124, 92, 255, 0.12);
-  --dash-accent-warm: #f59e0b;
-  --dash-accent-cyan: #38bdf8;
-  --dash-border: rgba(255, 255, 255, 0.06);
-  --dash-border-hover: rgba(255, 255, 255, 0.14);
-  --dash-radius: 20px;
-  --dash-radius-sm: 12px;
-  --dash-font-display: Georgia, "Times New Roman", serif;
-  --dash-font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --dash-font-mono: "SF Mono", "Fira Code", monospace;
+  --dash-bg: var(--background);
+  --dash-bg-elev: var(--surface);
+  --dash-bg-card: var(--surface-strong);
+  --dash-fg: var(--text);
+  --dash-fg-dim: var(--muted);
+  --dash-fg-muted: var(--faint);
+  --dash-accent: var(--accent);
+  --dash-accent-glow: color-mix(in srgb, var(--accent) 12%, transparent);
+  --dash-accent-warm: var(--warning);
+  --dash-accent-cyan: var(--accent-cyan);
+  --dash-border: var(--brand-color-border-secondary);
+  --dash-border-hover: var(--brand-color-border);
+  --dash-radius: var(--brand-border-radius-lg);
+  --dash-radius-sm: var(--brand-border-radius);
+  --dash-font-display: var(--brand-display-font-family);
+  --dash-font-body: var(--brand-font-family);
+  --dash-font-mono: var(--brand-font-family-code);
   min-height: 100vh;
   padding-bottom: 0;
   overflow-x: hidden;
@@ -26,32 +26,21 @@
   -webkit-font-smoothing: antialiased;
 }
 
-html.night-mode .sky-dashboard {
-  --dash-bg: #0a0000;
-  --dash-bg-elev: #120000;
-  --dash-bg-card: #170000;
-  --dash-fg: #d97070;
-  --dash-fg-dim: #8a3838;
-  --dash-fg-muted: #6a2a2a;
-  --dash-accent: #c0392b;
-  --dash-accent-glow: rgba(192, 57, 43, 0.18);
-  --dash-accent-warm: #d04a3c;
-  --dash-accent-cyan: #c0392b;
-  --dash-border: rgba(192, 57, 43, 0.25);
-  --dash-border-hover: rgba(192, 57, 43, 0.35);
-}
-
 html.night-mode .sky-dashboard .app-header {
-  background: rgba(10, 0, 0, 0.85);
+  background: color-mix(in srgb, var(--background) 85%, transparent);
   border-bottom-color: var(--dash-border);
 }
 
 html.night-mode .sky-dashboard .status-pill {
-  background: rgba(192, 57, 43, 0.08);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 html.night-mode .sky-dashboard .camera-guide::after {
-  background: radial-gradient(circle at 50% 30%, rgba(192, 57, 43, 0.18) 0%, transparent 60%);
+  background: radial-gradient(
+    circle at 50% 30%,
+    color-mix(in srgb, var(--accent) 18%, transparent) 0%,
+    transparent 60%
+  );
 }
 
 html.night-mode .sky-dashboard .dashboard-notice {

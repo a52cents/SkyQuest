@@ -474,8 +474,12 @@ export function Dashboard() {
   }
 
   function dismissAdConsent() {
+    const coords = pendingAdPosition;
     setShowAdConsent(false);
     setPendingAdPosition(null);
+    if (coords) {
+      void loadDashboard(coords);
+    }
   }
 
   async function handleAdConfirm() {
@@ -568,7 +572,7 @@ export function Dashboard() {
               <h2 id="dashboard-ad-title">Avant de lire le ciel</h2>
               <p>
                 {
-                  "Ta position est prête. Une publicité s'ouvre seulement après ton accord, puis SkyQuest charge les conditions et les quêtes autour de toi."
+                  "Ta position est prête. Tu peux soutenir SkyQuest en ouvrant une publicité, ou continuer directement vers l'analyse du ciel."
                 }
               </p>
               <div className="modal-actions">
@@ -578,7 +582,7 @@ export function Dashboard() {
                   onClick={() => void handleAdConfirm()}
                   disabled={isAdLoading}
                 >
-                  {isAdLoading ? "Ouverture…" : "Continuer"}
+                  {isAdLoading ? "Ouverture…" : "Soutenir et continuer"}
                 </button>
                 <button
                   type="button"
@@ -586,7 +590,7 @@ export function Dashboard() {
                   onClick={dismissAdConsent}
                   disabled={isAdLoading}
                 >
-                  Pas maintenant
+                  Continuer sans publicité
                 </button>
               </div>
             </motion.div>

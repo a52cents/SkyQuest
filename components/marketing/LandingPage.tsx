@@ -102,7 +102,9 @@ export function LandingPage() {
       if (!nav) return;
       nav.style.padding = window.scrollY > 40 ? "12px 0" : "18px 0";
       nav.style.background =
-        window.scrollY > 40 ? "rgba(10, 10, 11, 0.92)" : "rgba(10, 10, 11, 0.7)";
+        window.scrollY > 40
+          ? "color-mix(in srgb, var(--background) 92%, transparent)"
+          : "color-mix(in srgb, var(--background) 70%, transparent)";
     };
 
     window.addEventListener("scroll", updateNav, { passive: true });
