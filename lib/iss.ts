@@ -70,14 +70,27 @@ export function parseIssVisiblePass(payload: IssVisiblePassPayload): IssVisibleP
   };
 }
 
-export function findNextIssVisiblePass(data: N2yoVisualPassResponse, now: Date, horizonMinutes = MAX_MINUTES_UNTIL_PASS): IssVisiblePassPayload | null {
+export function findNextIssVisiblePass(
+  data: N2yoVisualPassResponse,
+  now: Date,
+  horizonMinutes = MAX_MINUTES_UNTIL_PASS,
+): IssVisiblePassPayload | null {
   const nowSeconds = Math.floor(now.getTime() / 1000);
   const maxStartSeconds = nowSeconds + horizonMinutes * 60;
   const pass = data.passes
-    ?.filter((candidate) => typeof candidate.startUTC === "number" && candidate.startUTC <= maxStartSeconds)
+    ?.filter(
+      (candidate) =>
+        typeof candidate.startUTC === "number" && candidate.startUTC <= maxStartSeconds,
+    )
     .find((candidate) => typeof candidate.maxEl === "number" && candidate.maxEl >= 15);
 
-  if (!pass || typeof pass.startAz !== "number" || typeof pass.maxAz !== "number" || typeof pass.maxEl !== "number" || typeof pass.startUTC !== "number") {
+  if (
+    !pass ||
+    typeof pass.startAz !== "number" ||
+    typeof pass.maxAz !== "number" ||
+    typeof pass.maxEl !== "number" ||
+    typeof pass.startUTC !== "number"
+  ) {
     return null;
   }
 

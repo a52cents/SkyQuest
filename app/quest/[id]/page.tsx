@@ -16,7 +16,10 @@ import type { Observation, ProgressReward, SkyQuest } from "@/lib/types";
 export default function QuestGuidePage() {
   const params = useParams<{ id: string }>();
   const [quest, setQuest] = useState<SkyQuest | null>(null);
-  const [reward, setReward] = useState<{ reward: ProgressReward; previousRankName: string | null } | null>(null);
+  const [reward, setReward] = useState<{
+    reward: ProgressReward;
+    previousRankName: string | null;
+  } | null>(null);
   const isLoggingRef = useRef(false);
 
   useEffect(() => {
@@ -26,7 +29,10 @@ export default function QuestGuidePage() {
     }
   }, [params.id]);
 
-  function logAndReturn(status: "seen" | "missed", photo?: Pick<Observation, "photoDataUrl" | "photoThumbnailDataUrl">) {
+  function logAndReturn(
+    status: "seen" | "missed",
+    photo?: Pick<Observation, "photoDataUrl" | "photoThumbnailDataUrl">,
+  ) {
     if (!quest || isLoggingRef.current) {
       return;
     }
@@ -39,29 +45,46 @@ export default function QuestGuidePage() {
 
   if (reward) {
     return (
-      <PageShell eyebrow="Observation notée" title="Une trace dans ton ciel" className="max-w-2xl justify-center" contentClassName="flex flex-col justify-center gap-3">
-        <ProgressFeedback reward={reward.reward} previousRankName={reward.previousRankName} showJournalLink />
-        <Link href="/" className={getAppButtonClassName({ variant: "ghost", className: "w-full" })}>Retour à l’accueil</Link>
+      <PageShell
+        eyebrow="Observation notée"
+        title="Une trace dans ton ciel"
+        className="max-w-2xl justify-center"
+        contentClassName="flex flex-col justify-center gap-3"
+      >
+        <ProgressFeedback
+          reward={reward.reward}
+          previousRankName={reward.previousRankName}
+          showJournalLink
+        />
+        <Link href="/" className={getAppButtonClassName({ variant: "ghost", className: "w-full" })}>
+          Retour à l’accueil
+        </Link>
       </PageShell>
     );
   }
 
   if (!quest) {
     return (
-      <PageShell className="max-w-2xl justify-center" contentClassName="flex flex-col justify-center">
+      <PageShell
+        className="max-w-2xl justify-center"
+        contentClassName="flex flex-col justify-center"
+      >
         <ErrorState
           tone="warning"
           message="Quête introuvable. Relance Maintenant pour générer une nouvelle observation."
         />
-        <Link
-          href="/"
-          className={getAppButtonClassName({ className: "mt-4" })}
-        >
+        <Link href="/" className={getAppButtonClassName({ className: "mt-4" })}>
           Retour à {"l'accueil"}
         </Link>
       </PageShell>
     );
   }
 
-  return <CameraGuide quest={quest} onSeen={(photo) => logAndReturn("seen", photo)} onMissed={() => logAndReturn("missed")} />;
+  return (
+    <CameraGuide
+      quest={quest}
+      onSeen={(photo) => logAndReturn("seen", photo)}
+      onMissed={() => logAndReturn("missed")}
+    />
+  );
 }

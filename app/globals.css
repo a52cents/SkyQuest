@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "../system/variables.dark.css";
 @import "../components/marketing/LandingPage.css";
 @import "../components/dashboard/Dashboard.css";
 
@@ -9,6 +8,28 @@
   color-scheme: dark;
   --brand-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --brand-display-font-family: Georgia, "Times New Roman", serif;
+  --brand-font-family-code: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --brand-font-size: 14px;
+  --brand-font-size-sm: 12px;
+  --brand-font-size-lg: 18px;
+  --brand-font-size-xl: 22px;
+  --brand-font-size-heading-1: 38px;
+  --brand-font-size-heading-2: 32px;
+  --brand-font-size-heading-3: 26px;
+  --brand-font-size-heading-4: 22px;
+  --brand-font-size-heading-5: 18px;
+  --brand-size-xxs: 4px;
+  --brand-size-xs: 8px;
+  --brand-size-sm: 12px;
+  --brand-size: 16px;
+  --brand-size-md: 20px;
+  --brand-size-lg: 24px;
+  --brand-size-xl: 32px;
+  --brand-size-xxl: 48px;
+  --brand-border-radius-xs: 3px;
+  --brand-border-radius-sm: 5px;
+  --brand-motion-ease-in-out: cubic-bezier(0.645, 0.045, 0.355, 1);
+  --brand-motion-ease-out: cubic-bezier(0.215, 0.61, 0.355, 1);
   --background: #0a0a0b;
   --surface: #131316;
   --surface-strong: #161619;
@@ -114,7 +135,9 @@
 *,
 *::before,
 *::after {
-  transition-property: color, background-color, border-color, box-shadow, outline-color, fill, stroke, text-decoration-color;
+  transition-property:
+    color, background-color, border-color, box-shadow, outline-color, fill, stroke,
+    text-decoration-color;
   transition-duration: 200ms;
   transition-timing-function: ease;
 }
@@ -202,8 +225,12 @@ a:focus-visible {
   background-image:
     radial-gradient(circle, rgba(236, 240, 255, 0.46) 0.7px, transparent 0.9px),
     radial-gradient(circle, rgba(115, 201, 235, 0.25) 0.6px, transparent 0.8px);
-  background-position: 0 0, 37px 51px;
-  background-size: 121px 121px, 187px 187px;
+  background-position:
+    0 0,
+    37px 51px;
+  background-size:
+    121px 121px,
+    187px 187px;
   mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), transparent 72%);
   opacity: 0.72;
 }
@@ -312,7 +339,8 @@ a:focus-visible {
   }
 
   @keyframes soft-pulse {
-    0%, 100% {
+    0%,
+    100% {
       transform: scale(1);
       opacity: 0.82;
     }

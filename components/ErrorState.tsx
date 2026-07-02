@@ -4,9 +4,14 @@ type ErrorStateProps = {
 };
 
 export function ErrorState({ message, tone = "error" }: ErrorStateProps) {
-  const color = tone === "info" ? "border-accent-cyan/25 bg-accent-cyan/10 text-accent-cyan" :
-    tone === "warning" ? "border-warning/25 bg-warning/10 text-warning" :
-    "border-danger/25 bg-danger/10 text-danger";
+  const color =
+    tone === "info"
+      ? "border-accent-cyan/25 bg-accent-cyan/10 text-accent-cyan"
+      : tone === "warning"
+        ? "border-warning/25 bg-warning/10 text-warning"
+        : "border-danger/25 bg-danger/10 text-danger";
 
-  return <div className={`mb-4 rounded-[16px] border p-4 text-sm leading-6 ${color}`}>{message}</div>;
+  return (
+    <div className={`mb-4 rounded-[16px] border p-4 text-sm leading-6 ${color}`}>{message}</div>
+  );
 }

@@ -37,22 +37,46 @@ export default function JournalPage() {
   }
 
   return (
-    <PageShell
-      eyebrow="Mémoire locale"
-      title="Journal"
-      contentClassName="pb-4"
-    >
+    <PageShell eyebrow="Mémoire locale" title="Journal" contentClassName="pb-4">
       <AnimatePresence>
         {confirmation ? (
-          <motion.div className="fixed inset-0 z-[70] flex items-end justify-center bg-[#0a0a0b]/85 p-3 backdrop-blur-xl sm:items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="dialog" aria-modal="true" aria-labelledby="confirmation-title">
-            <motion.div className="w-full max-w-md" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}>
+          <motion.div
+            className="fixed inset-0 z-[70] flex items-end justify-center bg-[#0a0a0b]/85 p-3 backdrop-blur-xl sm:items-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirmation-title"
+          >
+            <motion.div
+              className="w-full max-w-md"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 24 }}
+            >
               <AppCard padding="lg">
                 <p className="premium-kicker">Action locale</p>
-                <h2 id="confirmation-title" className="mt-2 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal text-text">{confirmation === "journal" ? "Vider le journal ?" : "Réinitialiser la progression ?"}</h2>
-                <p className="mt-3 text-sm leading-6 text-muted">{confirmation === "journal" ? "Les observations seront supprimées de cet appareil. La progression sera conservée." : "Les rangs, découvertes et accomplissements seront remis à zéro. Le journal sera conservé."}</p>
+                <h2
+                  id="confirmation-title"
+                  className="mt-2 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal text-text"
+                >
+                  {confirmation === "journal"
+                    ? "Vider le journal ?"
+                    : "Réinitialiser la progression ?"}
+                </h2>
+                <p className="mt-3 text-sm leading-6 text-muted">
+                  {confirmation === "journal"
+                    ? "Les observations seront supprimées de cet appareil. La progression sera conservée."
+                    : "Les rangs, découvertes et accomplissements seront remis à zéro. Le journal sera conservé."}
+                </p>
                 <div className="mt-6 grid gap-2">
-                  <AppButton variant="danger" onClick={confirmDestructiveAction} fullWidth>Confirmer</AppButton>
-                  <AppButton variant="ghost" onClick={() => setConfirmation(null)} fullWidth>Annuler</AppButton>
+                  <AppButton variant="danger" onClick={confirmDestructiveAction} fullWidth>
+                    Confirmer
+                  </AppButton>
+                  <AppButton variant="ghost" onClick={() => setConfirmation(null)} fullWidth>
+                    Annuler
+                  </AppButton>
                 </div>
               </AppCard>
             </motion.div>
@@ -63,12 +87,27 @@ export default function JournalPage() {
         {observations.length > 0 ? (
           <JournalList observations={observations} onClear={handleClear} />
         ) : (
-          <EmptyState title="Journal vide" message="Marque une quête comme vue ou pas trouvée pour garder une trace locale." />
+          <EmptyState
+            title="Journal vide"
+            message="Marque une quête comme vue ou pas trouvée pour garder une trace locale."
+          />
         )}
         <AppCard variant="subtle" padding="sm">
-          <p className="font-[Georgia,'Times_New_Roman',serif] text-lg text-text">Données locales</p>
-          <p className="mt-1 text-xs leading-5 text-faint">{"Cette action ne supprime pas les observations du journal."}</p>
-          <AppButton type="button" variant="danger" size="sm" onClick={handleResetProgress} className="mt-4">Réinitialiser la progression</AppButton>
+          <p className="font-[Georgia,'Times_New_Roman',serif] text-lg text-text">
+            Données locales
+          </p>
+          <p className="mt-1 text-xs leading-5 text-faint">
+            {"Cette action ne supprime pas les observations du journal."}
+          </p>
+          <AppButton
+            type="button"
+            variant="danger"
+            size="sm"
+            onClick={handleResetProgress}
+            className="mt-4"
+          >
+            Réinitialiser la progression
+          </AppButton>
         </AppCard>
       </div>
     </PageShell>

@@ -1,4 +1,5 @@
-export type HapticPattern = "tap" | "select" | "align" | "success" | "missed" | "achievement" | "rank-up" | "error";
+export type HapticPattern =
+  "tap" | "select" | "align" | "success" | "missed" | "achievement" | "rank-up" | "error";
 
 const HAPTICS_STORAGE_KEY = "skyquest.haptics.v1";
 

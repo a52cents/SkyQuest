@@ -1,3 +1,14 @@
+/**
+ * Scoring de visibilité
+ *
+ * Transforme des données astronomiques et météo en un score éditorial de 0 à 100 pour les
+ * planètes, objets du catalogue et pluies de météores. Ce score sert à classer les quêtes ;
+ * ce n'est ni une probabilité scientifique ni une garantie d'observation.
+ *
+ * Garder les seuils de `getVisibilityLabel` cohérents avec `quest-generator.ts` et les textes
+ * de l'interface. Toute nouvelle pénalité doit se dégrader proprement avec des données
+ * partielles et ne jamais produire une valeur hors de l'intervalle 0–100.
+ */
 import type { SkyObject, VisibilityLabel, WeatherNow } from "@/lib/types";
 import type { CatalogSkyObject } from "@/lib/sky-catalog";
 
@@ -7,7 +18,11 @@ type VisibilityInput = {
   sunAltitude: number;
 };
 
-export function calculateVisibilityScore({ object, weather, sunAltitude }: VisibilityInput): number {
+export function calculateVisibilityScore({
+  object,
+  weather,
+  sunAltitude,
+}: VisibilityInput): number {
   if (object.altitude < 5) {
     return 5;
   }
@@ -145,7 +160,10 @@ export function calculateCatalogVisibilityScore({
     return 0;
   }
 
-  if (object.id === "andromeda" && (altitude < 25 || weather.cloudCover >= 35 || sunAltitude > -8)) {
+  if (
+    object.id === "andromeda" &&
+    (altitude < 25 || weather.cloudCover >= 35 || sunAltitude > -8)
+  ) {
     return 0;
   }
 

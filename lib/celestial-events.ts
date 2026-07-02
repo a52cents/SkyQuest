@@ -82,16 +82,45 @@ function solarEclipseTitle(kind: Astronomy.EclipseKind): string {
 function addSeasonEvents(events: CelestialEvent[], startDate: Date, endDate: Date) {
   for (let year = startDate.getUTCFullYear(); year <= endDate.getUTCFullYear(); year += 1) {
     const seasons = Astronomy.Seasons(year);
-    const entries: Array<{ type: "equinox" | "solstice"; title: string; date: Date; description: string }> = [
-      { type: "equinox", title: "Équinoxe de mars", date: seasons.mar_equinox.date, description: "Début astronomique du printemps dans l’hémisphère Nord." },
-      { type: "solstice", title: "Solstice de juin", date: seasons.jun_solstice.date, description: "Début astronomique de l’été dans l’hémisphère Nord." },
-      { type: "equinox", title: "Équinoxe de septembre", date: seasons.sep_equinox.date, description: "Début astronomique de l’automne dans l’hémisphère Nord." },
-      { type: "solstice", title: "Solstice de décembre", date: seasons.dec_solstice.date, description: "Début astronomique de l’hiver dans l’hémisphère Nord." },
+    const entries: Array<{
+      type: "equinox" | "solstice";
+      title: string;
+      date: Date;
+      description: string;
+    }> = [
+      {
+        type: "equinox",
+        title: "Équinoxe de mars",
+        date: seasons.mar_equinox.date,
+        description: "Début astronomique du printemps dans l’hémisphère Nord.",
+      },
+      {
+        type: "solstice",
+        title: "Solstice de juin",
+        date: seasons.jun_solstice.date,
+        description: "Début astronomique de l’été dans l’hémisphère Nord.",
+      },
+      {
+        type: "equinox",
+        title: "Équinoxe de septembre",
+        date: seasons.sep_equinox.date,
+        description: "Début astronomique de l’automne dans l’hémisphère Nord.",
+      },
+      {
+        type: "solstice",
+        title: "Solstice de décembre",
+        date: seasons.dec_solstice.date,
+        description: "Début astronomique de l’hiver dans l’hémisphère Nord.",
+      },
     ];
 
     entries.forEach((entry) => {
       if (!isWithinRange(entry.date, startDate, endDate)) return;
-      events.push({ ...entry, date: new Date(entry.date), id: createEventId(entry.type, entry.date) });
+      events.push({
+        ...entry,
+        date: new Date(entry.date),
+        id: createEventId(entry.type, entry.date),
+      });
     });
   }
 }
@@ -108,8 +137,14 @@ export function getUpcomingCelestialEvents(startDate: Date, limitDays: number): 
   searchMoonPhases(180, rangeStart, rangeEnd).forEach((date) => {
     const matchingPerigee = perigees
       .filter((apsis) => apsis.dist_km < SUPERMOON_MAX_DISTANCE_KM)
-      .sort((left, right) => Math.abs(left.time.date.getTime() - date.getTime()) - Math.abs(right.time.date.getTime() - date.getTime()))
-      .find((apsis) => Math.abs(apsis.time.date.getTime() - date.getTime()) <= SUPERMOON_MAX_OFFSET_MS);
+      .sort(
+        (left, right) =>
+          Math.abs(left.time.date.getTime() - date.getTime()) -
+          Math.abs(right.time.date.getTime() - date.getTime()),
+      )
+      .find(
+        (apsis) => Math.abs(apsis.time.date.getTime() - date.getTime()) <= SUPERMOON_MAX_OFFSET_MS,
+      );
 
     if (matchingPerigee) {
       const distanceKm = Math.round(matchingPerigee.dist_km);
@@ -150,18 +185,20 @@ export function getUpcomingCelestialEvents(startDate: Date, limitDays: number): 
       type: "lunar_eclipse",
       title: lunarEclipseTitle(lunarEclipse.kind),
       date: new Date(lunarEclipse.peak.date),
-      description: lunarEclipse.kind === Astronomy.EclipseKind.Penumbral
-        ? "Maximum d’une éclipse pénombrale de Lune calculée à l’échelle mondiale."
-        : `Maximum mondial calculé · ${Math.round(lunarEclipse.obscuration * 100)} % du disque lunaire obscurci.`,
+      description:
+        lunarEclipse.kind === Astronomy.EclipseKind.Penumbral
+          ? "Maximum d’une éclipse pénombrale de Lune calculée à l’échelle mondiale."
+          : `Maximum mondial calculé · ${Math.round(lunarEclipse.obscuration * 100)} % du disque lunaire obscurci.`,
       details: { eclipseKind: lunarEclipse.kind, obscuration: lunarEclipse.obscuration },
     });
   }
 
   const solarEclipse = Astronomy.SearchGlobalSolarEclipse(rangeStart);
   if (isWithinRange(solarEclipse.peak.date, rangeStart, rangeEnd)) {
-    const obscurationText = typeof solarEclipse.obscuration === "number"
-      ? ` · ${Math.round(solarEclipse.obscuration * 100)} % au maximum global`
-      : "";
+    const obscurationText =
+      typeof solarEclipse.obscuration === "number"
+        ? ` · ${Math.round(solarEclipse.obscuration * 100)} % au maximum global`
+        : "";
     events.push({
       id: createEventId("solar_eclipse", solarEclipse.peak.date),
       type: "solar_eclipse",
@@ -173,12 +210,16 @@ export function getUpcomingCelestialEvents(startDate: Date, limitDays: number): 
   }
 
   addSeasonEvents(events, rangeStart, rangeEnd);
-  const eclipseEvents = events.filter((event) => event.type === "lunar_eclipse" || event.type === "solar_eclipse");
+  const eclipseEvents = events.filter(
+    (event) => event.type === "lunar_eclipse" || event.type === "solar_eclipse",
+  );
   const withoutDuplicatedPhases = events.filter((event) => {
     if (event.type !== "full_moon" && event.type !== "new_moon") return true;
     const matchingEclipseType = event.type === "full_moon" ? "lunar_eclipse" : "solar_eclipse";
-    return !eclipseEvents.some((eclipse) =>
-      eclipse.type === matchingEclipseType && Math.abs(eclipse.date.getTime() - event.date.getTime()) <= 12 * 60 * 60 * 1000,
+    return !eclipseEvents.some(
+      (eclipse) =>
+        eclipse.type === matchingEclipseType &&
+        Math.abs(eclipse.date.getTime() - event.date.getTime()) <= 12 * 60 * 60 * 1000,
     );
   });
 

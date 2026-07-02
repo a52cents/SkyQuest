@@ -20,9 +20,11 @@ const baseClasses = [
 ].join(" ");
 
 const variantClasses: Record<AppButtonVariant, string> = {
-  primary: "border-white/10 bg-accent px-5 text-white shadow-[0_4px_20px_rgba(124,92,255,0.30)] hover:-translate-y-px hover:bg-brand-primary-hover",
+  primary:
+    "border-white/10 bg-accent px-5 text-white shadow-[0_4px_20px_rgba(124,92,255,0.30)] hover:-translate-y-px hover:bg-brand-primary-hover",
   secondary: "border-white/[0.14] bg-transparent text-text hover:bg-surface",
-  ghost: "border-white/[0.10] bg-white/[0.035] text-text hover:border-white/[0.18] hover:bg-white/[0.06]",
+  ghost:
+    "border-white/[0.10] bg-white/[0.035] text-text hover:border-white/[0.18] hover:bg-white/[0.06]",
   success: "border-success/20 bg-success/[0.08] text-success hover:bg-success/[0.13]",
   danger: "border-danger/20 bg-danger/[0.08] text-danger hover:bg-danger/[0.13]",
 };
@@ -48,7 +50,13 @@ export function getAppButtonClassName({
   fullWidth?: boolean;
   className?: string;
 } = {}) {
-  return joinClasses(baseClasses, variantClasses[variant], sizeClasses[size], fullWidth && "w-full", className);
+  return joinClasses(
+    baseClasses,
+    variantClasses[variant],
+    sizeClasses[size],
+    fullWidth && "w-full",
+    className,
+  );
 }
 
 export function AppButton({

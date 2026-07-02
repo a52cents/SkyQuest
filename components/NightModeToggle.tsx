@@ -39,8 +39,20 @@ function ClosedEyeIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <path d="M8.2 8.8 15.8 16.4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-      <path d="M15.8 8.8 8.2 16.4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+      <path
+        d="M8.2 8.8 15.8 16.4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+      />
+      <path
+        d="M15.8 8.8 8.2 16.4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -80,7 +92,9 @@ export function NightModeToggle() {
           : "inline-flex h-10 items-center gap-2 rounded-[13px] border border-white/10 bg-white/[0.045] px-3 text-sm font-semibold text-muted transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-white/20 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       }
     >
-      <span className={enabled ? "text-danger" : "text-muted"}>{enabled ? <ClosedEyeIcon /> : <MoonIcon />}</span>
+      <span className={enabled ? "text-danger" : "text-muted"}>
+        {enabled ? <ClosedEyeIcon /> : <MoonIcon />}
+      </span>
       <span className="hidden sm:inline">{enabled ? "Observation" : "Nuit"}</span>
     </button>
   );

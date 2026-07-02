@@ -1,4 +1,5 @@
-const POPUNDER_LANDING_URL = "https://www.effectivecpmnetwork.com/fu31afbd?key=d3c79b3e31b72dcc194c75aa618621ae";
+const POPUNDER_LANDING_URL =
+  "https://www.effectivecpmnetwork.com/fu31afbd?key=d3c79b3e31b72dcc194c75aa618621ae";
 const POPUNDER_STORAGE_KEY = "skyquest:last-popunder-ad-at";
 const POPUNDER_INTERVAL_MS = 10 * 60 * 1000;
 

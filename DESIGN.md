@@ -1,98 +1,93 @@
----
-name: "SkyQuest Design System"
-category: Brands
-surface: web
-colors:
-  primary: "#f8fafc"
-  primary-2: "#7c5cff"
-  surface: "#11172a"
-  surface-2: "#f3f4fc"
-  secondary: "#b8c3d9"
-  border: "#e7e4fc"
-  secondary-2: "#38bdf8"
----
+# SkyQuest — Intention visuelle
 
-# SkyQuest Design System
+SkyQuest est un compagnon nocturne mobile pour les débutants et les observateurs occasionnels. L'interface doit rendre l'astronomie accessible, calme et un peu magique, sans ressembler à un outil scientifique professionnel.
 
-> Category: Brands
+Ce document décrit l'intention. Pour savoir quel fichier fait autorité lors de l'implémentation, consulter [`UI_SOURCE_OF_TRUTH.md`](./UI_SOURCE_OF_TRUTH.md).
 
-> Surface: web
+## Sensation recherchée
 
-*SkyQuest is a mobile-first astronomy app for beginners and casual sky lovers.*
+> Lève les yeux. Le ciel a une quête pour toi.
 
-SkyQuest is a mobile-first astronomy app for beginners and casual sky lovers.
+L'expérience doit être :
 
-The app gives users 1 to 3 real-time “sky quests” based on their GPS position, current time, weather, and visible sky objects. Instead of showing a complex star map, SkyQuest tells users what they can observe right now and guides them with a simple camera overlay.
+- sombre et immersive ;
+- calme plutôt que spectaculaire ;
+- premium sans devenir froide ;
+- lisible dehors, la nuit ;
+- rassurante pour une personne qui débute ;
+- simple à parcourir avec une seule main.
 
-The brand should feel calm, magical, premium, immersive, and beginner-friendly. It should make astronomy feel accessible and emotional, not technical or overwhelming.
+## Palette actuelle
 
-Core feeling:
-“Look up. The sky has a quest for you.”
+Ces couleurs reflètent les variables principales de `app/globals.css`. Le CSS reste la référence exécutable.
 
-Visual direction:
-Dark premium night-sky aesthetic, deep navy/black backgrounds, subtle violet-blue/cyan glow, soft glassmorphism cards, rounded corners, large readable text, simple celestial icons, and a mobile-first interface readable outdoors at night.
+| Rôle              | Valeur    | Usage                          |
+| ----------------- | --------- | ------------------------------ |
+| Arrière-plan      | `#0a0a0b` | canevas principal presque noir |
+| Surface           | `#131316` | cartes et panneaux             |
+| Surface forte     | `#161619` | éléments élevés et contrastés  |
+| Texte             | `#f4f4f5` | titres et contenu principal    |
+| Texte secondaire  | `#a1a1aa` | descriptions et métadonnées    |
+| Texte discret     | `#52525b` | informations tertiaires        |
+| Accent principal  | `#7c5cff` | actions et éléments actifs     |
+| Accent secondaire | `#38bdf8` | liens, repères et focus        |
 
-Avoid:
-Technical astronomy dashboards, cluttered star maps, childish cartoon space visuals, aggressive neon sci-fi UI, tiny labels, and low-contrast text.
+Le mode nuit rouge constitue une variante fonctionnelle destinée à préserver l'adaptation visuelle dans l'obscurité. Il ne remplace pas la palette principale.
 
-The design should feel like a calm magical night companion, not a professional science tool.
+Ne pas introduire de fonds beige, crème, rose, pêche ou orange. Les couleurs chaudes sont réservées aux états sémantiques nécessaires et au mode nuit rouge.
 
-## Color Palette
+## Typographie
 
-| Role | Name | Hex | Usage |
-| --- | --- | --- | --- |
-| background | Primary: " | `#f8fafc` | page canvas |
-| foreground | Primary: " | `#7c5cff` | body text and headings |
-| accent | Surface: " | `#11172a` | primary actions and emphasis |
-| surface | Surface | `#f3f4fc` | cards and panels |
-| muted | Secondary: " | `#b8c3d9` | secondary text and metadata |
-| border | Border | `#e7e4fc` | rules and dividers |
-| accent-secondary | Secondary: " | `#38bdf8` | secondary actions and links |
+- corps et interface : Inter ou police système sans serif ;
+- titres éditoriaux : Georgia ou serif équivalente lorsque l'interface actuelle l'utilise ;
+- tailles suffisamment grandes pour une lecture mobile en extérieur ;
+- hiérarchie courte, sans accumulation de petits libellés techniques.
 
-## Typography
-- **Display:** Inter — weights 400, 700 — fallbacks: system-ui, -apple-system, Segoe UI, Helvetica Neue, Arial, sans-serif
-- **Body:** Inter — weights 400, 700 — fallbacks: system-ui, -apple-system, Segoe UI, Helvetica Neue, Arial, sans-serif
+## Formes et profondeur
 
-## Voice & Tone
+- cartes arrondies ;
+- bordures fines et peu contrastées ;
+- glassmorphism léger, jamais au détriment de la lisibilité ;
+- ombres et halos subtils bleu-violet ;
+- contrôles tactiles généreux ;
+- rythme spatial aéré sur une base proche de 8 px.
 
-- **Adjectives:** (none yet)
-- **Tone:** SkyQuest is a mobile-first astronomy app for beginners and casual sky lovers.
+## Mouvement
 
-### Messaging pillars
-- SkyQuest is a mobile-first astronomy app for beginners and casual sky lovers.
+Les animations servent à orienter l'attention et à rendre les transitions douces. Elles ne doivent pas ralentir le parcours.
 
-The app gives users 1 to 3 real-time “sky quests” based on their GPS position, current time, weather, and visible sky objects. Instead of showing a complex star map, SkyQuest tells users what they can observe right now and guides them with a simple camera overlay.
+- mouvements courts et calmes ;
+- pas d'effets sci-fi agressifs ;
+- respect obligatoire de `prefers-reduced-motion` ;
+- éviter les animations continues inutiles lors d'une observation.
 
-The brand should feel calm, magical, premium, immersive, and beginner-friendly. It should make astronomy feel accessible and emotional, not technical or overwhelming.
+## Ton des écrans
 
-Core feeling:
-“Look up. The sky has a quest for you.”
+L'interface traduit les données en conseils concrets. Elle montre seulement la quantité de science nécessaire pour inspirer confiance.
 
-Visual direction:
-Dark premium night-sky aesthetic, deep navy/black backgrounds, subtle violet-blue/cyan glow, soft glassmorphism cards, rounded corners, large readable text, simple celestial icons, and a mobile-first interface readable outdoors at night.
+Préférer :
 
-Avoid:
-Technical astronomy dashboards, cluttered star maps, childish cartoon space visuals, aggressive neon sci-fi UI, tiny labels, and low-contrast text.
+- « Regarde vers le nord-est » ;
+- « Cherche environ deux poings au-dessus de l'horizon » ;
+- « Bonne chance si l'horizon est dégagé ».
 
-The design should feel like a calm magical night companion, not a professional science tool.
-- SkyQuest is a mobile-first astronomy app for beginners and casual sky lovers.
+Éviter :
 
-### Vocabulary
-- **Use:** (none yet)
-- **Avoid:** (none yet)
+- les tableaux de coordonnées complexes ;
+- les cartes du ciel surchargées ;
+- les certitudes sur une observation ;
+- les longs paragraphes dans le parcours principal.
 
-## Imagery
+## À éviter visuellement
 
-- **Style:** (none yet)
-- **Subjects:** (none yet)
-- **Treatment:** (none yet)
-- **Avoid:** (none yet)
+- esthétique de cockpit scientifique ;
+- néons agressifs et surcharge cyberpunk ;
+- illustrations spatiales enfantines ;
+- textes minuscules ou peu contrastés ;
+- multiplication des cartes génériques sans hiérarchie ;
+- couleurs claires chaudes qui cassent l'ambiance nocturne ;
+- reprise automatique d'un ancien export design lorsqu'il contredit l'application actuelle.
 
-## Layout
+## Validation
 
-- **Radius:** 8px
-- **Border weight:** 1px
-- **Spacing:** 8px baseline grid
-
-### Posture rules
-- Component kit should cover: large, rounded, gradient, subtle, high, minimum, dark, off-white, object, quest, visibility, difficulty.
+Toute évolution importante doit être vérifiée sur mobile compact, mobile standard, tablette et bureau. La priorité reste le mobile utilisé dehors : contraste, zones tactiles, absence de débordement et compréhension immédiate.

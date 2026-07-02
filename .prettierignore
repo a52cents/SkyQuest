@@ -1,0 +1,21 @@
+# Dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Local and binary files
+.env*
+public/*.webp
+public/*.png
+
+# Generated design handoff artifacts
+app/*.example.html
+
+# Repository instructions
+AGENTS.md
+
+# Package manager output
+package-lock.json

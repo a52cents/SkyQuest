@@ -9,13 +9,23 @@ function joinClasses(...classes: Array<string | false | null | undefined>) {
 }
 
 export function VisibilityBadge({ label, score, className }: VisibilityBadgeProps) {
-  const tone = score >= 80 ? "border-success/25 bg-success/12 text-success" :
-    score >= 60 ? "border-accent/25 bg-accent/12 text-accent" :
-    score >= 40 ? "border-warning/25 bg-warning/12 text-warning" :
-    "border-danger/25 bg-danger/12 text-danger";
+  const tone =
+    score >= 80
+      ? "border-success/25 bg-success/12 text-success"
+      : score >= 60
+        ? "border-accent/25 bg-accent/12 text-accent"
+        : score >= 40
+          ? "border-warning/25 bg-warning/12 text-warning"
+          : "border-danger/25 bg-danger/12 text-danger";
 
   return (
-    <span className={joinClasses("inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-bold", tone, className)}>
+    <span
+      className={joinClasses(
+        "inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-bold",
+        tone,
+        className,
+      )}
+    >
       {label} {"\u00b7"} Conditions {score}/100
     </span>
   );

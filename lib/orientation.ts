@@ -1,3 +1,15 @@
+/**
+ * Orientation du téléphone
+ *
+ * Normalise les conventions hétérogènes des capteurs navigateur en une direction caméra
+ * exploitable par le guidage, puis produit des indications simples de rotation et d'altitude.
+ *
+ * Points sensibles :
+ * - iOS et Android n'exposent pas toujours les mêmes axes ni le même nord de référence ;
+ * - les angles doivent rester continus au passage de 359° à 0° ;
+ * - une lecture absente ou peu fiable doit réduire la confiance, pas provoquer une erreur ;
+ * - ce module ne demande jamais lui-même une permission navigateur.
+ */
 export function normalizeAngle(angle: number): number {
   return ((angle % 360) + 360) % 360;
 }
@@ -7,7 +19,16 @@ export function angleDifference(current: number, target: number): number {
 }
 
 export function azimuthToCardinal(azimuth: number): string {
-  const directions = ["Nord", "Nord-Est", "Est", "Sud-Est", "Sud", "Sud-Ouest", "Ouest", "Nord-Ouest"];
+  const directions = [
+    "Nord",
+    "Nord-Est",
+    "Est",
+    "Sud-Est",
+    "Sud",
+    "Sud-Ouest",
+    "Ouest",
+    "Nord-Ouest",
+  ];
   const index = Math.round(normalizeAngle(azimuth) / 45) % directions.length;
   return directions[index];
 }
@@ -124,7 +145,7 @@ export function getCameraPointing(reading: DeviceOrientationReading): CameraPoin
     // Le vecteur "caméra arrière" dans le repère device est [0, 0, -1]
     const cameraWorldVector = quaternionToVector(q, [0, 0, -1]);
     const horizontal = vectorToHorizontal(cameraWorldVector);
-    
+
     if (horizontal) {
       return {
         azimuth: horizontal.azimuth,
@@ -135,11 +156,16 @@ export function getCameraPointing(reading: DeviceOrientationReading): CameraPoin
   }
 
   // FALLBACK — deviceorientation + webkitCompassHeading direct
-  const compassHeading = typeof reading.webkitCompassHeading === "number"
-    ? normalizeAngle(reading.webkitCompassHeading)
-    : null;
+  const compassHeading =
+    typeof reading.webkitCompassHeading === "number"
+      ? normalizeAngle(reading.webkitCompassHeading)
+      : null;
 
-  if (typeof reading.alpha === "number" && typeof reading.beta === "number" && typeof reading.gamma === "number") {
+  if (
+    typeof reading.alpha === "number" &&
+    typeof reading.beta === "number" &&
+    typeof reading.gamma === "number"
+  ) {
     const horizontal = getBackCameraHorizontal({
       alpha: reading.alpha,
       beta: reading.beta,
@@ -150,7 +176,7 @@ export function getCameraPointing(reading: DeviceOrientationReading): CameraPoin
       // On utilise la boussole directe uniquement quand le téléphone est quasi-vertical
       // (beta entre 45° et 135°) pour éviter les sauts angulaires
       const isQuasiVertical = reading.beta > 45 && reading.beta < 135;
-      
+
       if (compassHeading !== null && isQuasiVertical) {
         // La caméra arrière pointe à l'opposé du haut du téléphone
         return {
@@ -159,7 +185,7 @@ export function getCameraPointing(reading: DeviceOrientationReading): CameraPoin
           source: "webkit-compass",
         };
       }
-      
+
       // Sinon, fallback "tilt-only" (azimuth null pour éviter les sauts)
       return {
         azimuth: null,

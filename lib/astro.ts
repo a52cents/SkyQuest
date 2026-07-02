@@ -1,3 +1,13 @@
+/**
+ * Calculs astronomiques de base
+ *
+ * Adapte `astronomy-engine` au domaine SkyQuest : positions horizontales de la Lune, des
+ * planètes et du Soleil, ainsi que conversion de coordonnées équatoriales J2000 pour le
+ * catalogue. Toutes les fonctions sont pures et reçoivent explicitement lieu et date.
+ *
+ * Les azimuts sont exprimés en degrés depuis le nord et les altitudes en degrés au-dessus de
+ * l'horizon. Ne pas confondre coordonnées J2000 fixes et coordonnées équatoriales de la date.
+ */
 import * as Astronomy from "astronomy-engine";
 import type { SkyObject, SkyObjectName } from "@/lib/types";
 
@@ -127,7 +137,11 @@ export function getSunAltitude(latitude: number, longitude: number, date: Date):
   return getSunPosition(latitude, longitude, date).altitude;
 }
 
-export function getSunPosition(latitude: number, longitude: number, date: Date): { azimuth: number; altitude: number } {
+export function getSunPosition(
+  latitude: number,
+  longitude: number,
+  date: Date,
+): { azimuth: number; altitude: number } {
   const observer = createObserver(latitude, longitude);
   return calculateHorizontalPosition(bodyByName.Sun, observer, date);
 }

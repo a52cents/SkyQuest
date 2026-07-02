@@ -14,8 +14,14 @@ test("J2000 coordinates are rotated into the local horizon frame", () => {
   };
   const actual = equatorialJ2000ToHorizontal(input);
   const observer = new Astronomy.Observer(input.latitude, input.longitude, 0);
-  const vector = Astronomy.VectorFromSphere(new Astronomy.Spherical(input.declinationDegrees, input.rightAscensionHours * 15, 1), date);
-  const expected = Astronomy.HorizonFromVector(Astronomy.RotateVector(Astronomy.Rotation_EQJ_HOR(date, observer), vector), "normal");
+  const vector = Astronomy.VectorFromSphere(
+    new Astronomy.Spherical(input.declinationDegrees, input.rightAscensionHours * 15, 1),
+    date,
+  );
+  const expected = Astronomy.HorizonFromVector(
+    Astronomy.RotateVector(Astronomy.Rotation_EQJ_HOR(date, observer), vector),
+    "normal",
+  );
   assert.ok(Math.abs(actual.azimuth - expected.lon) < 1e-10);
   assert.ok(Math.abs(actual.altitude - expected.lat) < 1e-10);
 });

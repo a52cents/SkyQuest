@@ -46,7 +46,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ pass: null }, { status: 400 });
   }
 
-  const url = new URL(`https://api.n2yo.com/rest/v1/satellite/visualpasses/${ISS_NORAD_ID}/${latitude}/${longitude}/0/1/120`);
+  const url = new URL(
+    `https://api.n2yo.com/rest/v1/satellite/visualpasses/${ISS_NORAD_ID}/${latitude}/${longitude}/0/1/120`,
+  );
   url.searchParams.set("apiKey", apiKey);
 
   try {

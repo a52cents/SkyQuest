@@ -19,7 +19,13 @@ export function middleware(request: NextRequest) {
     "form-action 'self'",
     "frame-src 'none'",
     "frame-ancestors 'none'",
-    ...(isDevelopment ? [] : ["upgrade-insecure-requests", "require-trusted-types-for 'script'", "trusted-types skyquest default"]),
+    ...(isDevelopment
+      ? []
+      : [
+          "upgrade-insecure-requests",
+          "require-trusted-types-for 'script'",
+          "trusted-types skyquest default",
+        ]),
   ].join("; ");
 
   const requestHeaders = new Headers(request.headers);
@@ -33,8 +39,12 @@ export function middleware(request: NextRequest) {
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  response.headers.set("Permissions-Policy", "camera=(self), geolocation=(self), accelerometer=(self), gyroscope=(self), magnetometer=(self)");
-  if (!isDevelopment) response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  response.headers.set(
+    "Permissions-Policy",
+    "camera=(self), geolocation=(self), accelerometer=(self), gyroscope=(self), magnetometer=(self)",
+  );
+  if (!isDevelopment)
+    response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   return response;
 }
 

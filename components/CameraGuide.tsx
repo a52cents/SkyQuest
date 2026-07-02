@@ -1,5 +1,22 @@
 "use client";
 
+/**
+ * CameraGuide
+ *
+ * Rôle :
+ * - affiche le guidage caméra d'une quête et recalcule sa position pendant la session ;
+ * - démarre et arrête la caméra, puis demande l'orientation du téléphone si nécessaire ;
+ * - projette la cible en 2D et fournit des indications de direction et d'altitude ;
+ * - permet de terminer la quête comme trouvée ou non trouvée ;
+ * - peut capturer ou choisir une photo locale pour le journal.
+ *
+ * Invariants produit et confidentialité :
+ * - ne jamais envoyer une photo vers un serveur ;
+ * - demander caméra et orientation uniquement après une action utilisateur ;
+ * - arrêter toutes les pistes caméra au démontage ;
+ * - conserver un guidage textuel si la caméra, l'orientation ou le stockage échoue ;
+ * - présenter la projection comme une aide approximative, jamais comme une position certaine.
+ */
 import Link from "next/link";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
@@ -93,7 +110,12 @@ function getGearLabel(quest: SkyQuest): string {
   return quest.requiredGear === "binoculars_recommended" ? "Jumelles" : "Oeil nu";
 }
 
-async function createResizedDataUrl(source: CanvasImageSource, sourceWidth: number, sourceHeight: number, maxWidth: number): Promise<string> {
+async function createResizedDataUrl(
+  source: CanvasImageSource,
+  sourceWidth: number,
+  sourceHeight: number,
+  maxWidth: number,
+): Promise<string> {
   const scale = Math.min(1, maxWidth / sourceWidth);
   const width = Math.max(1, Math.round(sourceWidth * scale));
   const height = Math.max(1, Math.round(sourceHeight * scale));
@@ -110,9 +132,18 @@ async function createResizedDataUrl(source: CanvasImageSource, sourceWidth: numb
   return canvas.toDataURL("image/jpeg", PHOTO_QUALITY);
 }
 
-async function createPhotoDraftFromImage(source: CanvasImageSource, width: number, height: number): Promise<PhotoDraft> {
+async function createPhotoDraftFromImage(
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+): Promise<PhotoDraft> {
   const photoDataUrl = await createResizedDataUrl(source, width, height, PHOTO_MAX_WIDTH);
-  const photoThumbnailDataUrl = await createResizedDataUrl(source, width, height, THUMBNAIL_MAX_WIDTH);
+  const photoThumbnailDataUrl = await createResizedDataUrl(
+    source,
+    width,
+    height,
+    THUMBNAIL_MAX_WIDTH,
+  );
 
   return { photoDataUrl, photoThumbnailDataUrl };
 }
@@ -148,12 +179,18 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cameraPointingRef = useRef<CameraPointing | null>(null);
-  const [cameraStatus, setCameraStatus] = useState<"idle" | "starting" | "active" | "error">("idle");
+  const [cameraStatus, setCameraStatus] = useState<"idle" | "starting" | "active" | "error">(
+    "idle",
+  );
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [orientationStatus, setOrientationStatus] = useState<"idle" | "active" | "denied" | "unsupported">("idle");
+  const [orientationStatus, setOrientationStatus] = useState<
+    "idle" | "active" | "denied" | "unsupported"
+  >("idle");
   const [orientationError, setOrientationError] = useState<string | null>(null);
   const [orientationEnabled, setOrientationEnabled] = useState(false);
-  const [orientationConfidence, setOrientationConfidence] = useState<"high" | "medium" | "low">("low");
+  const [orientationConfidence, setOrientationConfidence] = useState<"high" | "medium" | "low">(
+    "low",
+  );
   const [currentAzimuth, setCurrentAzimuth] = useState<number | null>(null);
   const [currentAltitude, setCurrentAltitude] = useState<number | null>(null);
   const [liveQuest, setLiveQuest] = useState<SkyQuest>(quest);
@@ -165,9 +202,14 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [setupStarting, setSetupStarting] = useState(false);
   const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
   const [photoDraft, setPhotoDraft] = useState<PhotoDraft | null>(null);
-  const [photoCaptureStatus, setPhotoCaptureStatus] = useState<"idle" | "capturing" | "ready" | "error">("idle");
+  const [photoCaptureStatus, setPhotoCaptureStatus] = useState<
+    "idle" | "capturing" | "ready" | "error"
+  >("idle");
   const [photoError, setPhotoError] = useState<string | null>(null);
-  const [observerLocation, setObserverLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [observerLocation, setObserverLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [skyOverlayEnabled, setSkyOverlayEnabled] = useState(true);
   const wasAlignedRef = useRef(false);
   const prefersReducedMotion = useReducedMotion() ?? false;
@@ -214,12 +256,14 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
     function refreshPosition() {
       const now = new Date();
-      setLiveQuest((currentQuest) => recalculateQuestPosition({
-        quest: currentQuest,
-        latitude: lastLocation.latitude,
-        longitude: lastLocation.longitude,
-        now,
-      }));
+      setLiveQuest((currentQuest) =>
+        recalculateQuestPosition({
+          quest: currentQuest,
+          latitude: lastLocation.latitude,
+          longitude: lastLocation.longitude,
+          now,
+        }),
+      );
     }
 
     refreshPosition();
@@ -290,7 +334,12 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
   function readCameraZoomRange(capabilities: CameraCapabilities): CameraZoomRange | null {
     const zoom = capabilities.zoom;
-    if (!zoom || typeof zoom.min !== "number" || typeof zoom.max !== "number" || zoom.max <= zoom.min) {
+    if (
+      !zoom ||
+      typeof zoom.min !== "number" ||
+      typeof zoom.max !== "number" ||
+      zoom.max <= zoom.min
+    ) {
       return null;
     }
 
@@ -320,7 +369,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     const settings = track ? getSettings(track) : null;
 
     setZoomRange(range);
-    setCurrentZoom(range ? settings?.zoom ?? range.min : null);
+    setCurrentZoom(range ? (settings?.zoom ?? range.min) : null);
     setZoomError(null);
   }
 
@@ -382,14 +431,16 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
     try {
       const orientationEvent = hasDeviceOrientation
-        ? DeviceOrientationEvent as OrientationPermissionEvent
+        ? (DeviceOrientationEvent as OrientationPermissionEvent)
         : null;
       if (typeof orientationEvent?.requestPermission === "function") {
         const permission = await orientationEvent.requestPermission(true);
         if (permission !== "granted") {
           haptic("error");
           setOrientationStatus("denied");
-          setOrientationError("Orientation refusee. Verifie les permissions mouvement et orientation.");
+          setOrientationError(
+            "Orientation refusee. Verifie les permissions mouvement et orientation.",
+          );
           return false;
         }
       }
@@ -400,7 +451,9 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     } catch {
       haptic("error");
       setOrientationStatus("denied");
-      setOrientationError("Orientation refusee ou indisponible. Utilise la direction texte comme repere.");
+      setOrientationError(
+        "Orientation refusee ou indisponible. Utilise la direction texte comme repere.",
+      );
       return false;
     }
   }
@@ -412,8 +465,8 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
     setSetupStarting(true);
     // iOS requires the orientation request to begin directly from this click.
-    const orientationReady = orientationStatus === "active" || await requestOrientation();
-    const cameraReady = cameraStatus === "active" || await startCamera();
+    const orientationReady = orientationStatus === "active" || (await requestOrientation());
+    const cameraReady = cameraStatus === "active" || (await startCamera());
     setSetupStarting(false);
 
     if (orientationReady || cameraReady) {
@@ -426,14 +479,18 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     const video = videoRef.current;
 
     if (!video || cameraStatus !== "active" || video.videoWidth <= 0 || video.videoHeight <= 0) {
-      setPhotoError("La caméra n'est pas prête. Tu peux choisir une photo ou continuer sans photo.");
+      setPhotoError(
+        "La caméra n'est pas prête. Tu peux choisir une photo ou continuer sans photo.",
+      );
       return null;
     }
 
     try {
       return await createPhotoDraftFromImage(video, video.videoWidth, video.videoHeight);
     } catch {
-      setPhotoError("Photo impossible depuis la caméra. Tu peux choisir une image ou continuer sans photo.");
+      setPhotoError(
+        "Photo impossible depuis la caméra. Tu peux choisir une image ou continuer sans photo.",
+      );
       return null;
     }
   }
@@ -488,26 +545,35 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     setPhotoCaptureStatus("idle");
   }
 
-  const directionHint = liveQuest.azimuth !== null && currentAzimuth !== null
-    ? getDirectionHint(currentAzimuth, liveQuest.azimuth)
-    : null;
-  const altitudeHint = liveQuest.altitude !== null && currentAltitude !== null
-    ? getAltitudeHint(currentAltitude, liveQuest.altitude)
-    : null;
-  const directionDelta = liveQuest.azimuth !== null && currentAzimuth !== null
-    ? angleDifference(currentAzimuth, liveQuest.azimuth)
-    : null;
-  const altitudeDelta = liveQuest.altitude !== null && currentAltitude !== null
-    ? liveQuest.altitude - currentAltitude
-    : null;
-  const directionAligned = directionDelta !== null && Math.abs(directionDelta) <= DIRECTION_ALIGNMENT_THRESHOLD_DEGREES;
-  const altitudeAligned = altitudeDelta !== null && Math.abs(altitudeDelta) <= ALTITUDE_ALIGNMENT_THRESHOLD_DEGREES;
+  const directionHint =
+    liveQuest.azimuth !== null && currentAzimuth !== null
+      ? getDirectionHint(currentAzimuth, liveQuest.azimuth)
+      : null;
+  const altitudeHint =
+    liveQuest.altitude !== null && currentAltitude !== null
+      ? getAltitudeHint(currentAltitude, liveQuest.altitude)
+      : null;
+  const directionDelta =
+    liveQuest.azimuth !== null && currentAzimuth !== null
+      ? angleDifference(currentAzimuth, liveQuest.azimuth)
+      : null;
+  const altitudeDelta =
+    liveQuest.altitude !== null && currentAltitude !== null
+      ? liveQuest.altitude - currentAltitude
+      : null;
+  const directionAligned =
+    directionDelta !== null && Math.abs(directionDelta) <= DIRECTION_ALIGNMENT_THRESHOLD_DEGREES;
+  const altitudeAligned =
+    altitudeDelta !== null && Math.abs(altitudeDelta) <= ALTITUDE_ALIGNMENT_THRESHOLD_DEGREES;
   const isAligned = directionAligned && altitudeAligned;
   const directionArrow = getDirectionArrow(directionDelta);
   const altitudeArrow = getAltitudeArrow(altitudeDelta);
-  const directionArrowLabel = directionDelta !== null ? `${directionArrow} ${Math.abs(Math.round(directionDelta))}°` : "-";
-  const altitudeArrowLabel = altitudeDelta !== null ? `${altitudeArrow} ${Math.abs(Math.round(altitudeDelta))}°` : "-";
-  const currentPhoneDirection = currentAzimuth !== null ? azimuthToCardinal(currentAzimuth) : "Inconnu";
+  const directionArrowLabel =
+    directionDelta !== null ? `${directionArrow} ${Math.abs(Math.round(directionDelta))}°` : "-";
+  const altitudeArrowLabel =
+    altitudeDelta !== null ? `${altitudeArrow} ${Math.abs(Math.round(altitudeDelta))}°` : "-";
+  const currentPhoneDirection =
+    currentAzimuth !== null ? azimuthToCardinal(currentAzimuth) : "Inconnu";
   const hasPrecisePoint = liveQuest.azimuth !== null && liveQuest.altitude !== null;
   const close = isAligned;
   const mainHint = close
@@ -517,16 +583,17 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       : altitudeHint && altitudeHint !== "Hauteur proche"
         ? altitudeHint
         : `Cherche ${liveQuest.target} dans le ciel`;
-  const targetAltitudeLabel = liveQuest.altitude !== null ? `${Math.round(liveQuest.altitude)}°` : "Libre";
+  const targetAltitudeLabel =
+    liveQuest.altitude !== null ? `${Math.round(liveQuest.altitude)}°` : "Libre";
   const zoomLabel = zoomRange && currentZoom !== null ? `${formatZoom(currentZoom)}x` : "Auto";
   const overlaySupported = questSupportsSkyOverlay(liveQuest);
   const overlayReady = Boolean(
     skyOverlayEnabled &&
-      overlaySupported &&
-      observerLocation &&
-      cameraStatus === "active" &&
-      orientationStatus === "active" &&
-      orientationConfidence !== "low",
+    overlaySupported &&
+    observerLocation &&
+    cameraStatus === "active" &&
+    orientationStatus === "active" &&
+    orientationConfidence !== "low",
   );
 
   useEffect(() => {
@@ -557,14 +624,28 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       }
     : {
         hidden: { opacity: 0, scale: 0.85, y: 4 },
-        show: { opacity: 1, scale: 1, y: 0, transition: { type: "spring", stiffness: 700, damping: 40 } },
+        show: {
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          transition: { type: "spring", stiffness: 700, damping: 40 },
+        },
         exit: { opacity: 0, scale: 0.9, y: -2, transition: { duration: 0.15 } },
       };
 
   return (
     <main className="camera-guide-screen relative h-[100dvh] select-none overflow-hidden bg-[#0a0a0b] text-white">
-      <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.30),rgba(0,0,0,0.08)_42%,rgba(0,0,0,0.62))]" aria-hidden="true" />
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      <div
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.30),rgba(0,0,0,0.08)_42%,rgba(0,0,0,0.62))]"
+        aria-hidden="true"
+      />
       <SkyOverlay
         quest={liveQuest}
         location={observerLocation}
@@ -575,40 +656,75 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       />
 
       {cameraStatus !== "active" ? (
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,color-mix(in_srgb,var(--accent-cyan)_16%,transparent),transparent_20rem),var(--background)]" aria-hidden="true" />
+        <div
+          className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,color-mix(in_srgb,var(--accent-cyan)_16%,transparent),transparent_20rem),var(--background)]"
+          aria-hidden="true"
+        />
       ) : null}
 
       <div className="pointer-events-none absolute left-1/2 top-1/2 z-[11] -translate-x-1/2 -translate-y-1/2">
         {hasPrecisePoint ? (
           <div className="relative flex h-32 w-32 items-center justify-center">
-            <div className={`absolute h-28 w-28 rounded-full border ${directionAligned && altitudeAligned ? "border-success/80 bg-success/10" : "border-accent-cyan/70 bg-accent-cyan/10"} shadow-[0_0_55px_color-mix(in_srgb,var(--accent-cyan)_22%,transparent)]`} />
+            <div
+              className={`absolute h-28 w-28 rounded-full border ${directionAligned && altitudeAligned ? "border-success/80 bg-success/10" : "border-accent-cyan/70 bg-accent-cyan/10"} shadow-[0_0_55px_color-mix(in_srgb,var(--accent-cyan)_22%,transparent)]`}
+            />
             <div className="absolute h-px w-24 bg-white/28" />
             <div className="absolute h-24 w-px bg-white/28" />
-            <div className={`h-3 w-3 rounded-full ${directionAligned && altitudeAligned ? "bg-success" : "bg-accent-cyan"}`} />
+            <div
+              className={`h-3 w-3 rounded-full ${directionAligned && altitudeAligned ? "bg-success" : "bg-accent-cyan"}`}
+            />
             <AnimatePresence mode="wait" initial={false}>
               {directionArrow === "→" ? (
-                <motion.span key={directionArrow} variants={arrowVariants} initial="hidden" animate="show" exit="exit" className="absolute -right-9 text-5xl font-black text-white drop-shadow-xl">
+                <motion.span
+                  key={directionArrow}
+                  variants={arrowVariants}
+                  initial="hidden"
+                  animate="show"
+                  exit="exit"
+                  className="absolute -right-9 text-5xl font-black text-white drop-shadow-xl"
+                >
                   →
                 </motion.span>
               ) : null}
             </AnimatePresence>
             <AnimatePresence mode="wait" initial={false}>
               {directionArrow === "←" ? (
-                <motion.span key={directionArrow} variants={arrowVariants} initial="hidden" animate="show" exit="exit" className="absolute -left-9 text-5xl font-black text-white drop-shadow-xl">
+                <motion.span
+                  key={directionArrow}
+                  variants={arrowVariants}
+                  initial="hidden"
+                  animate="show"
+                  exit="exit"
+                  className="absolute -left-9 text-5xl font-black text-white drop-shadow-xl"
+                >
                   ←
                 </motion.span>
               ) : null}
             </AnimatePresence>
             <AnimatePresence mode="wait" initial={false}>
               {altitudeArrow === "↑" ? (
-                <motion.span key={altitudeArrow} variants={arrowVariants} initial="hidden" animate="show" exit="exit" className="absolute -top-11 text-4xl font-black text-accent-cyan drop-shadow-xl">
+                <motion.span
+                  key={altitudeArrow}
+                  variants={arrowVariants}
+                  initial="hidden"
+                  animate="show"
+                  exit="exit"
+                  className="absolute -top-11 text-4xl font-black text-accent-cyan drop-shadow-xl"
+                >
                   ↑
                 </motion.span>
               ) : null}
             </AnimatePresence>
             <AnimatePresence mode="wait" initial={false}>
               {altitudeArrow === "↓" ? (
-                <motion.span key={altitudeArrow} variants={arrowVariants} initial="hidden" animate="show" exit="exit" className="absolute -bottom-11 text-4xl font-black text-accent-cyan drop-shadow-xl">
+                <motion.span
+                  key={altitudeArrow}
+                  variants={arrowVariants}
+                  initial="hidden"
+                  animate="show"
+                  exit="exit"
+                  className="absolute -bottom-11 text-4xl font-black text-accent-cyan drop-shadow-xl"
+                >
                   ↓
                 </motion.span>
               ) : null}
@@ -621,10 +737,20 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
       <section className="relative z-10 flex h-[100dvh] flex-col justify-between px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)]">
         <header className="flex min-h-14 items-center gap-2 rounded-[20px] border border-white/[0.08] bg-[#0a0a0b]/75 px-2 py-2 shadow-[0_12px_40px_rgba(0,0,0,0.22)] backdrop-blur-[24px]">
-          <Link href="/" aria-label="Quitter" className={getAppButtonClassName({ variant: "ghost", size: "sm", className: "min-h-0 h-10 w-10 px-0 text-lg" })}>
+          <Link
+            href="/"
+            aria-label="Quitter"
+            className={getAppButtonClassName({
+              variant: "ghost",
+              size: "sm",
+              className: "min-h-0 h-10 w-10 px-0 text-lg",
+            })}
+          >
             ←
           </Link>
-          <h1 className="min-w-0 flex-1 truncate font-[Georgia,'Times_New_Roman',serif] text-base font-normal tracking-[-0.02em] text-white">{liveQuest.title}</h1>
+          <h1 className="min-w-0 flex-1 truncate font-[Georgia,'Times_New_Roman',serif] text-base font-normal tracking-[-0.02em] text-white">
+            {liveQuest.title}
+          </h1>
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
@@ -667,8 +793,16 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         </div>
 
         <div className="rounded-[20px] border border-white/[0.08] bg-[#0a0a0b]/80 p-3 shadow-[0_-12px_44px_rgba(0,0,0,0.28)] backdrop-blur-[24px]">
-          {cameraError ? <p className="mb-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">{cameraError}</p> : null}
-          {zoomError ? <p className="mb-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">{zoomError}</p> : null}
+          {cameraError ? (
+            <p className="mb-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">
+              {cameraError}
+            </p>
+          ) : null}
+          {zoomError ? (
+            <p className="mb-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">
+              {zoomError}
+            </p>
+          ) : null}
 
           {cameraStatus === "active" && zoomRange && currentZoom !== null ? (
             <label className="block rounded-[13px] border border-white/[0.08] bg-white/[0.05] p-3">
@@ -692,7 +826,13 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
           ) : null}
 
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <AppButton variant="success" size="sm" onClick={handleTargetFound} className="min-h-12" disabled={photoCaptureStatus === "capturing"}>
+            <AppButton
+              variant="success"
+              size="sm"
+              onClick={handleTargetFound}
+              className="min-h-12"
+              disabled={photoCaptureStatus === "capturing"}
+            >
               {photoCaptureStatus === "capturing" ? "Photo..." : "Je l'ai trouvée"}
             </AppButton>
             <AppButton variant="ghost" size="sm" onClick={handleMissed} className="min-h-12">
@@ -702,7 +842,13 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
           <div className="mt-2">
             {cameraStatus !== "active" ? (
-              <AppButton variant="secondary" onClick={startCamera} disabled={cameraStatus === "starting"} fullWidth className="min-h-12">
+              <AppButton
+                variant="secondary"
+                onClick={startCamera}
+                disabled={cameraStatus === "starting"}
+                fullWidth
+                className="min-h-12"
+              >
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.span
                     key={cameraStatus === "starting" ? "camera-starting" : "camera-idle"}
@@ -731,17 +877,34 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         </div>
       </section>
 
-      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFilePhoto} />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleFilePhoto}
+      />
 
       {setupModalOpen ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0a0a0b]/90 p-4 backdrop-blur-xl" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0a0a0b]/90 p-4 backdrop-blur-xl"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="setup-title"
+        >
           <AppCard className="w-full max-w-md select-text" padding="lg">
             <p className="premium-kicker">Avant de commencer</p>
-            <h2 id="setup-title" className="mt-2 font-[Georgia,'Times_New_Roman',serif] text-3xl font-normal tracking-[-0.03em] text-white">
+            <h2
+              id="setup-title"
+              className="mt-2 font-[Georgia,'Times_New_Roman',serif] text-3xl font-normal tracking-[-0.03em] text-white"
+            >
               Prépare ton guidage
             </h2>
             <p className="mt-3 text-sm leading-6 text-muted">
-              {"La caméra montre le ciel devant toi. L'orientation aide SkyQuest à placer la cible. Aucune photo n'est envoyée."}
+              {
+                "La caméra montre le ciel devant toi. L'orientation aide SkyQuest à placer la cible. Aucune photo n'est envoyée."
+              }
             </p>
 
             <div className="mt-5 grid gap-3">
@@ -751,7 +914,9 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               </div>
               <div className="rounded-[16px] border border-white/10 bg-white/[0.04] p-3">
                 <p className="font-bold text-white">Mouvement et orientation</p>
-                <p className="mt-1 text-sm text-muted">Utilisés pour les indications et le repère céleste.</p>
+                <p className="mt-1 text-sm text-muted">
+                  Utilisés pour les indications et le repère céleste.
+                </p>
               </div>
             </div>
 
@@ -766,7 +931,12 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               <AppButton onClick={activateGuidance} disabled={setupStarting} fullWidth>
                 {setupStarting ? "Activation..." : "Activer le guidage"}
               </AppButton>
-              <AppButton variant="ghost" onClick={() => setSetupModalOpen(false)} disabled={setupStarting} fullWidth>
+              <AppButton
+                variant="ghost"
+                onClick={() => setSetupModalOpen(false)}
+                disabled={setupStarting}
+                fullWidth
+              >
                 Continuer avec les indications simples
               </AppButton>
             </div>
@@ -775,26 +945,68 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       ) : null}
 
       {detailsOpen ? (
-        <div className="fixed inset-0 z-40 flex items-end bg-black/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="details-title">
-          <AppCard className="mx-auto max-h-[82dvh] w-full max-w-[600px] select-text overflow-y-auto rounded-t-[20px] rounded-b-none pb-[calc(env(safe-area-inset-bottom)+1rem)]" padding="lg">
+        <div
+          className="fixed inset-0 z-40 flex items-end bg-black/55 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="details-title"
+        >
+          <AppCard
+            className="mx-auto max-h-[82dvh] w-full max-w-[600px] select-text overflow-y-auto rounded-t-[20px] rounded-b-none pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+            padding="lg"
+          >
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-bold uppercase tracking-[0.18em] text-accent-cyan">Details</p>
-                <h2 id="details-title" className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal tracking-[-0.02em] text-white">{liveQuest.title}</h2>
+                <p className="text-sm font-bold uppercase tracking-[0.18em] text-accent-cyan">
+                  Details
+                </p>
+                <h2
+                  id="details-title"
+                  className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal tracking-[-0.02em] text-white"
+                >
+                  {liveQuest.title}
+                </h2>
               </div>
-              <AppButton variant="ghost" size="sm" onClick={() => setDetailsOpen(false)}>Fermer</AppButton>
+              <AppButton variant="ghost" size="sm" onClick={() => setDetailsOpen(false)}>
+                Fermer
+              </AppButton>
             </div>
 
             <div className="mt-5 grid grid-cols-2 gap-2">
-              <DetailsRow label="Direction cible" value={`${liveQuest.cardinalDirection ?? "Libre"}${liveQuest.azimuth !== null ? ` ${Math.round(liveQuest.azimuth)}°` : ""}`} />
-              <DetailsRow label="Direction tel." value={currentAzimuth !== null ? `${currentPhoneDirection} ${Math.round(currentAzimuth)}°` : "Inconnu"} />
+              <DetailsRow
+                label="Direction cible"
+                value={`${liveQuest.cardinalDirection ?? "Libre"}${liveQuest.azimuth !== null ? ` ${Math.round(liveQuest.azimuth)}°` : ""}`}
+              />
+              <DetailsRow
+                label="Direction tel."
+                value={
+                  currentAzimuth !== null
+                    ? `${currentPhoneDirection} ${Math.round(currentAzimuth)}°`
+                    : "Inconnu"
+                }
+              />
               <DetailsRow label="Hauteur cible" value={targetAltitudeLabel} />
-              <DetailsRow label="Hauteur tel." value={currentAltitude !== null ? `${Math.round(currentAltitude)}°` : "Inconnu"} />
+              <DetailsRow
+                label="Hauteur tel."
+                value={currentAltitude !== null ? `${Math.round(currentAltitude)}°` : "Inconnu"}
+              />
               <DetailsRow label="Delta direction" value={directionArrowLabel} />
               <DetailsRow label="Delta hauteur" value={altitudeArrowLabel} />
               <DetailsRow label="Zoom reel" value={zoomLabel} />
-              <DetailsRow label="Orientation" value={orientationStatus === "active" ? "Active" : "Inactive"} />
-              <DetailsRow label="Capteur" value={orientationConfidence === "high" ? "Absolu" : orientationConfidence === "medium" ? "Boussole" : "Inclinaison"} />
+              <DetailsRow
+                label="Orientation"
+                value={orientationStatus === "active" ? "Active" : "Inactive"}
+              />
+              <DetailsRow
+                label="Capteur"
+                value={
+                  orientationConfidence === "high"
+                    ? "Absolu"
+                    : orientationConfidence === "medium"
+                      ? "Boussole"
+                      : "Inclinaison"
+                }
+              />
             </div>
 
             <div className="mt-4 rounded-brand-lg border border-brand-border bg-white/[0.05] p-4">
@@ -804,13 +1016,17 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             <div className="mt-3 rounded-brand-lg border border-brand-border bg-white/[0.05] p-4">
               <p className="text-sm font-bold text-white">Boussole</p>
               <p className="mt-2 text-sm leading-6 text-muted">
-                La direction utilise la boussole du navigateur quand elle est disponible. Elle peut etre approximative dehors : suis aussi la direction texte et ton regard.
+                La direction utilise la boussole du navigateur quand elle est disponible. Elle peut
+                etre approximative dehors : suis aussi la direction texte et ton regard.
               </p>
-              {orientationError ? <p className="mt-2 text-sm text-warning">{orientationError}</p> : null}
+              {orientationError ? (
+                <p className="mt-2 text-sm text-warning">{orientationError}</p>
+              ) : null}
             </div>
             {SHOW_CAMERA_DEBUG ? (
               <div className="mt-3 rounded-brand-lg border border-warning/25 bg-warning/10 p-4 text-sm text-warning">
-                Debug actif : direction {DIRECTION_ALIGNMENT_THRESHOLD_DEGREES}°, hauteur {ALTITUDE_ALIGNMENT_THRESHOLD_DEGREES}°.
+                Debug actif : direction {DIRECTION_ALIGNMENT_THRESHOLD_DEGREES}°, hauteur{" "}
+                {ALTITUDE_ALIGNMENT_THRESHOLD_DEGREES}°.
               </div>
             ) : null}
           </AppCard>
@@ -818,7 +1034,12 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       ) : null}
 
       {photoSheetOpen ? (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-[#0a0a0b]" role="dialog" aria-modal="true" aria-labelledby="photo-title">
+        <div
+          className="fixed inset-0 z-50 overflow-hidden bg-[#0a0a0b]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="photo-title"
+        >
           {photoDraft ? (
             <div
               aria-label="Aperçu de la photo"
@@ -827,7 +1048,10 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               style={{ backgroundImage: `url(${photoDraft.photoDataUrl})` }}
             />
           ) : null}
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,5,12,0.72),transparent_28%,transparent_55%,rgba(3,5,12,0.92))]" aria-hidden="true" />
+          <div
+            className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,5,12,0.72),transparent_28%,transparent_55%,rgba(3,5,12,0.92))]"
+            aria-hidden="true"
+          />
 
           <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 flex h-32 w-32 -translate-x-1/2 -translate-y-1/2 items-center justify-center">
             <div className="absolute h-28 w-28 rounded-full border border-accent-cyan/90 bg-accent-cyan/[0.06] shadow-[0_0_55px_color-mix(in_srgb,var(--accent-cyan)_25%,transparent)]" />
@@ -838,11 +1062,20 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
           <div className="relative z-20 flex h-[100dvh] flex-col justify-between px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)]">
             <div className="rounded-[18px] border border-white/[0.08] bg-[#0a0a0b]/78 px-4 py-3 text-center backdrop-blur-xl">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent-cyan">Vérification</p>
-              <h2 id="photo-title" className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-lg font-normal text-white">
-                {photoCaptureStatus === "capturing" ? "Capture en cours..." : `${liveQuest.target} est-elle au centre ?`}
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent-cyan">
+                Vérification
+              </p>
+              <h2
+                id="photo-title"
+                className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-lg font-normal text-white"
+              >
+                {photoCaptureStatus === "capturing"
+                  ? "Capture en cours..."
+                  : `${liveQuest.target} est-elle au centre ?`}
               </h2>
-              <p className="mt-1 text-xs text-muted">Le cercle indique approximativement le centre du guidage.</p>
+              <p className="mt-1 text-xs text-muted">
+                Le cercle indique approximativement le centre du guidage.
+              </p>
             </div>
 
             <div className="rounded-[20px] border border-white/[0.08] bg-[#0a0a0b]/85 p-3 shadow-[0_-12px_44px_rgba(0,0,0,0.34)] backdrop-blur-xl">
@@ -853,7 +1086,9 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               ) : null}
 
               {photoCaptureStatus === "capturing" ? (
-                <p className="py-4 text-center text-sm font-semibold text-muted">Un instant, SkyQuest fige l’image et l’orientation.</p>
+                <p className="py-4 text-center text-sm font-semibold text-muted">
+                  Un instant, SkyQuest fige l’image et l’orientation.
+                </p>
               ) : photoDraft ? (
                 <div className="grid gap-2">
                   <AppButton variant="success" onClick={saveSeenWithPhoto} fullWidth>
@@ -876,7 +1111,9 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
                   </AppButton>
                 </div>
               )}
-              <p className="mt-3 text-center text-xs leading-5 text-faint">Photo compressée et conservée uniquement dans le journal local.</p>
+              <p className="mt-3 text-center text-xs leading-5 text-faint">
+                Photo compressée et conservée uniquement dans le journal local.
+              </p>
             </div>
           </div>
         </div>

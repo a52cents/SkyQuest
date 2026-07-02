@@ -22,7 +22,8 @@ export const meteorShowers: MeteorShower[] = [
     radiantName: "Bouvier",
     radiantRightAscensionHours: 15.33,
     radiantDeclinationDegrees: 49,
-    recommendedViewingTip: "Habille-toi chaudement et regarde une zone sombre du ciel pendant 10 à 15 minutes.",
+    recommendedViewingTip:
+      "Habille-toi chaudement et regarde une zone sombre du ciel pendant 10 à 15 minutes.",
   },
   {
     id: "lyrids",
@@ -44,7 +45,8 @@ export const meteorShowers: MeteorShower[] = [
     radiantName: "Persée",
     radiantRightAscensionHours: 3.07,
     radiantDeclinationDegrees: 58,
-    recommendedViewingTip: "Installe-toi confortablement et regarde large : pas besoin de viser exactement Persée.",
+    recommendedViewingTip:
+      "Installe-toi confortablement et regarde large : pas besoin de viser exactement Persée.",
   },
   {
     id: "orionids",
@@ -55,7 +57,8 @@ export const meteorShowers: MeteorShower[] = [
     radiantName: "Orion",
     radiantRightAscensionHours: 6.33,
     radiantDeclinationDegrees: 16,
-    recommendedViewingTip: "Regarde une zone sombre et dégagée, idéalement après que tes yeux se sont adaptés.",
+    recommendedViewingTip:
+      "Regarde une zone sombre et dégagée, idéalement après que tes yeux se sont adaptés.",
   },
   {
     id: "leonids",
@@ -66,7 +69,8 @@ export const meteorShowers: MeteorShower[] = [
     radiantName: "Lion",
     radiantRightAscensionHours: 10.13,
     radiantDeclinationDegrees: 22,
-    recommendedViewingTip: "Observe sans fixer un point précis : les traces peuvent traverser une grande partie du ciel.",
+    recommendedViewingTip:
+      "Observe sans fixer un point précis : les traces peuvent traverser une grande partie du ciel.",
   },
   {
     id: "geminids",
@@ -77,7 +81,8 @@ export const meteorShowers: MeteorShower[] = [
     radiantName: "Gémeaux",
     radiantRightAscensionHours: 7.47,
     radiantDeclinationDegrees: 33,
-    recommendedViewingTip: "Choisis un endroit sombre, puis observe patiemment une large zone du ciel.",
+    recommendedViewingTip:
+      "Choisis un endroit sombre, puis observe patiemment une large zone du ciel.",
   },
 ];
 

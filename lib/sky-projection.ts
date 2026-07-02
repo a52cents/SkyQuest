@@ -1,3 +1,14 @@
+/**
+ * Projection caméra 2D
+ *
+ * Contient les mathématiques pures qui convertissent une cible azimut/altitude en position
+ * dans la vidéo, en tenant compte de l'orientation écran, du roll, du zoom, de la calibration
+ * et du recadrage `object-fit: cover`.
+ *
+ * Ce module ne lit aucun capteur et ne touche pas au DOM. Il doit retourner `null` ou un état
+ * hors écran lorsque les dimensions ou la base caméra ne permettent pas une projection sûre.
+ * Préserver la continuité des vecteurs autour du nord et éviter toute division par zéro.
+ */
 export type Vector3 = {
   x: number;
   y: number;
@@ -69,7 +80,9 @@ export function horizontalCoordinatesToVector(azimuth: number, altitude: number)
   };
 }
 
-export function vectorToHorizontalCoordinates(vector: Vector3): { azimuth: number; altitude: number } | null {
+export function vectorToHorizontalCoordinates(
+  vector: Vector3,
+): { azimuth: number; altitude: number } | null {
   const normalized = normalizeVector(vector);
   if (!normalized) {
     return null;
@@ -81,7 +94,11 @@ export function vectorToHorizontalCoordinates(vector: Vector3): { azimuth: numbe
   };
 }
 
-export function rotateVectorAroundAxis(vector: Vector3, axis: Vector3, angleDegrees: number): Vector3 {
+export function rotateVectorAroundAxis(
+  vector: Vector3,
+  axis: Vector3,
+  angleDegrees: number,
+): Vector3 {
   const unitAxis = normalizeVector(axis);
   if (!unitAxis) {
     return vector;
@@ -96,15 +113,22 @@ export function rotateVectorAroundAxis(vector: Vector3, axis: Vector3, angleDegr
   );
 }
 
-export function rotateBasisForScreenOrientation(basis: CameraBasis, screenAngle: number): CameraBasis {
+export function rotateBasisForScreenOrientation(
+  basis: CameraBasis,
+  screenAngle: number,
+): CameraBasis {
   const radians = ((((screenAngle % 360) + 360) % 360) * Math.PI) / 180;
   const cosine = Math.cos(radians);
   const sine = Math.sin(radians);
 
   return {
     ...basis,
-    right: normalizeVector(addVectors(scaleVector(basis.right, cosine), scaleVector(basis.up, sine))) ?? basis.right,
-    up: normalizeVector(addVectors(scaleVector(basis.up, cosine), scaleVector(basis.right, -sine))) ?? basis.up,
+    right:
+      normalizeVector(addVectors(scaleVector(basis.right, cosine), scaleVector(basis.up, sine))) ??
+      basis.right,
+    up:
+      normalizeVector(addVectors(scaleVector(basis.up, cosine), scaleVector(basis.right, -sine))) ??
+      basis.up,
   };
 }
 
@@ -125,7 +149,9 @@ export function applyCameraBasisOffsets(
   if (!axis) {
     return { ...basis, forward: targetForward };
   }
-  const angle = (Math.acos(Math.max(-1, Math.min(1, dotProduct(basis.forward, targetForward)))) * 180) / Math.PI;
+  const angle =
+    (Math.acos(Math.max(-1, Math.min(1, dotProduct(basis.forward, targetForward)))) * 180) /
+    Math.PI;
   return {
     ...basis,
     forward: targetForward,
@@ -144,7 +170,9 @@ export function calculateCameraRoll(basis: CameraBasis): number {
     return 0;
   }
 
-  return (Math.atan2(dotProduct(basis.up, levelRight), dotProduct(basis.up, levelUp)) * 180) / Math.PI;
+  return (
+    (Math.atan2(dotProduct(basis.up, levelRight), dotProduct(basis.up, levelUp)) * 180) / Math.PI
+  );
 }
 
 export function calculateVideoCover(
@@ -154,7 +182,13 @@ export function calculateVideoCover(
   viewportHeight: number,
 ): VideoCover {
   if (sourceWidth <= 0 || sourceHeight <= 0 || viewportWidth <= 0 || viewportHeight <= 0) {
-    return { scale: 1, offsetX: 0, offsetY: 0, renderedWidth: viewportWidth, renderedHeight: viewportHeight };
+    return {
+      scale: 1,
+      offsetX: 0,
+      offsetY: 0,
+      renderedWidth: viewportWidth,
+      renderedHeight: viewportHeight,
+    };
   }
 
   const scale = Math.max(viewportWidth / sourceWidth, viewportHeight / sourceHeight);
@@ -201,7 +235,9 @@ export function projectHorizontalTarget({
   const safeVideoHeight = videoHeight > 0 ? videoHeight : viewportHeight;
   const safeFov = Math.max(20, Math.min(120, longAxisFieldOfViewDegrees));
   const safeZoom = Math.max(0.25, zoom);
-  const focalLength = (Math.max(safeVideoWidth, safeVideoHeight) / (2 * Math.tan((safeFov * Math.PI) / 360))) * safeZoom;
+  const focalLength =
+    (Math.max(safeVideoWidth, safeVideoHeight) / (2 * Math.tan((safeFov * Math.PI) / 360))) *
+    safeZoom;
   const sourceX = safeVideoWidth / 2 + (dotProduct(target, basis.right) / depth) * focalLength;
   const sourceY = safeVideoHeight / 2 - (dotProduct(target, basis.up) / depth) * focalLength;
   const cover = calculateVideoCover(safeVideoWidth, safeVideoHeight, viewportWidth, viewportHeight);
@@ -217,7 +253,10 @@ export function projectHorizontalTarget({
 }
 
 function blendUnitVectors(previous: Vector3, next: Vector3, factor: number): Vector3 {
-  return normalizeVector(addVectors(scaleVector(previous, 1 - factor), scaleVector(next, factor))) ?? next;
+  return (
+    normalizeVector(addVectors(scaleVector(previous, 1 - factor), scaleVector(next, factor))) ??
+    next
+  );
 }
 
 export function smoothCameraBasis(previous: CameraBasis | null, next: CameraBasis): CameraBasis {

@@ -1,13 +1,7 @@
 import type { RequiredGear } from "@/lib/types";
 
 export type CatalogObjectType =
-  | "star"
-  | "asterism"
-  | "constellation"
-  | "star_cluster"
-  | "galaxy"
-  | "meteor_shower"
-  | "satellite";
+  "star" | "asterism" | "constellation" | "star_cluster" | "galaxy" | "meteor_shower" | "satellite";
 
 export type CatalogSkyObject = {
   id: string;
@@ -39,7 +33,8 @@ export const catalogSkyObjects: CatalogSkyObject[] = [
     priority: 95,
     questTitle: "Repère l'ISS",
     description: "Passage visible uniquement si une source satellite est configurée.",
-    observationTip: "Elle ressemble à une étoile très brillante qui traverse lentement le ciel sans clignoter.",
+    observationTip:
+      "Elle ressemble à une étoile très brillante qui traverse lentement le ciel sans clignoter.",
   },
   {
     id: "polaris",
@@ -147,7 +142,8 @@ export const catalogSkyObjects: CatalogSkyObject[] = [
     seasonHint: "été",
     priority: 62,
     questTitle: "Tente Antarès",
-    description: "Visible depuis la France seulement assez bas vers le Sud quand l'horizon est dégagé.",
+    description:
+      "Visible depuis la France seulement assez bas vers le Sud quand l'horizon est dégagé.",
     observationTip: "Regarde bas vers le Sud. Cherche une étoile rouge-orangée.",
   },
   {
@@ -180,7 +176,8 @@ export const catalogSkyObjects: CatalogSkyObject[] = [
     priority: 55,
     questTitle: "Tente la galaxie d'Andromède",
     description: "Une cible difficile à l'oeil nu : meilleure loin des lumières ou avec jumelles.",
-    observationTip: "Ne cherche pas une image comme sur les photos : Andromède ressemble plutôt à une faible tache floue.",
+    observationTip:
+      "Ne cherche pas une image comme sur les photos : Andromède ressemble plutôt à une faible tache floue.",
     warning: "Ciel sombre conseillé, jumelles utiles.",
   },
 ];

@@ -56,9 +56,10 @@ export function useDeviceOrientation(enabled: boolean): CameraPointing {
       }
 
       if (raw.altitude !== null) {
-        smoothedAltitude.current = smoothedAltitude.current === null
-          ? raw.altitude
-          : smoothedAltitude.current + (raw.altitude - smoothedAltitude.current) * 0.2;
+        smoothedAltitude.current =
+          smoothedAltitude.current === null
+            ? raw.altitude
+            : smoothedAltitude.current + (raw.altitude - smoothedAltitude.current) * 0.2;
       }
 
       setPointing({
@@ -87,16 +88,22 @@ export function useDeviceOrientation(enabled: boolean): CameraPointing {
       window.addEventListener("deviceorientation", handleFallback);
     };
 
-    const SensorConstructor = (window as Window & {
-      AbsoluteOrientationSensor?: AbsoluteOrientationSensorConstructor;
-    }).AbsoluteOrientationSensor;
+    const SensorConstructor = (
+      window as Window & {
+        AbsoluteOrientationSensor?: AbsoluteOrientationSensorConstructor;
+      }
+    ).AbsoluteOrientationSensor;
 
     if (SensorConstructor) {
       try {
         sensor = new SensorConstructor({ frequency: 30, referenceFrame: "device" });
         sensor.addEventListener("reading", () => {
           const quaternion = sensor?.quaternion;
-          if (!quaternion || quaternion.length < 4 || !quaternion.slice(0, 4).every(Number.isFinite)) {
+          if (
+            !quaternion ||
+            quaternion.length < 4 ||
+            !quaternion.slice(0, 4).every(Number.isFinite)
+          ) {
             return;
           }
           handleReading({

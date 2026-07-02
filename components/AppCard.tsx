@@ -35,7 +35,15 @@ export function AppCard({
   ...props
 }: AppCardProps) {
   return (
-    <Component className={joinClasses("rounded-[20px]", variantClasses[variant], paddingClasses[padding], className)} {...props}>
+    <Component
+      className={joinClasses(
+        "rounded-[20px]",
+        variantClasses[variant],
+        paddingClasses[padding],
+        className,
+      )}
+      {...props}
+    >
       {children}
     </Component>
   );

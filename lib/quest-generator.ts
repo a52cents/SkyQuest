@@ -1,3 +1,18 @@
+/**
+ * Génération des quêtes
+ *
+ * Combine la position GPS, la météo, l'heure, les objets astronomiques calculés, le
+ * catalogue éditorial, les météores et un éventuel passage ISS. Les candidats sont scorés,
+ * filtrés, diversifiés puis triés avant d'être retournés à l'interface.
+ *
+ * Règles produit :
+ * - classer les quêtes fiables par pertinence et préserver une sélection diversifiée ;
+ * - ne retenir que les scores >= 50 lorsque des candidats fiables existent ;
+ * - ne jamais promettre qu'une observation est certaine ;
+ * - retourner FreeObservation si la position manque, si un calcul échoue ou si aucune cible
+ *   suffisamment fiable n'est disponible ;
+ * - `limit` permet à l'appelant d'adapter la quantité de résultats à son interface.
+ */
 import { equatorialToHorizontal, getSkyObjects, getSunAltitude } from "@/lib/astro";
 import type { IssVisiblePass } from "@/lib/iss";
 import { isMeteorShowerActive, isNearMeteorShowerPeak, meteorShowers } from "@/lib/meteor-showers";
@@ -99,7 +114,8 @@ function createFreeObservationQuest(now: Date): SkyQuest {
     cardinalDirection: null,
     visibilityScore: 40,
     visibilityLabel: "Tentable",
-    description: "Le ciel n'est pas idéal maintenant. Observe la zone la plus dégagée et note ce que tu vois.",
+    description:
+      "Le ciel n'est pas idéal maintenant. Observe la zone la plus dégagée et note ce que tu vois.",
     tip: "Choisis un point sombre, laisse tes yeux s'habituer, puis regarde lentement du Nord au Sud.",
     requiredGear: "naked_eye",
   };
@@ -167,7 +183,9 @@ function createMeteorShowerQuest({
 }
 
 function createIssQuest(pass: IssVisiblePass, score: number, now: Date): SkyQuest {
-  const startTime = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(pass.startTime);
+  const startTime = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(
+    pass.startTime,
+  );
   const durationMinutes = Math.max(1, Math.round(pass.durationSeconds / 60));
 
   return {
@@ -212,7 +230,9 @@ function scoreIssPass(pass: IssVisiblePass, weather: WeatherNow): number {
 
 function shouldSkipDuplicate(candidate: SkyQuest, selected: SkyQuest[]): boolean {
   return selected.some(
-    (quest) => quest.target === candidate.target || (quest.targetType === "meteor_shower" && candidate.targetType === "meteor_shower"),
+    (quest) =>
+      quest.target === candidate.target ||
+      (quest.targetType === "meteor_shower" && candidate.targetType === "meteor_shower"),
   );
 }
 
@@ -270,7 +290,10 @@ export function generateQuests({
     const catalogCandidates = catalogSkyObjects
       .filter((object) => object.type !== "satellite")
       .flatMap<QuestCandidate>((object) => {
-        if (typeof object.rightAscensionHours !== "number" || typeof object.declinationDegrees !== "number") {
+        if (
+          typeof object.rightAscensionHours !== "number" ||
+          typeof object.declinationDegrees !== "number"
+        ) {
           return [];
         }
 
@@ -294,10 +317,18 @@ export function generateQuests({
           return [];
         }
 
-        return [{
-          quest: createCatalogQuest({ object, score, altitude: position.altitude, azimuth: position.azimuth, now }),
-          score,
-        }];
+        return [
+          {
+            quest: createCatalogQuest({
+              object,
+              score,
+              altitude: position.altitude,
+              azimuth: position.azimuth,
+              now,
+            }),
+            score,
+          },
+        ];
       });
 
     const meteorCandidates = meteorShowers
@@ -313,24 +344,35 @@ export function generateQuests({
           return [];
         }
 
-        return [{
-          quest: createMeteorShowerQuest({
-            showerName: shower.name,
-            radiantName: shower.radiantName,
-            tip: shower.recommendedViewingTip,
+        return [
+          {
+            quest: createMeteorShowerQuest({
+              showerName: shower.name,
+              radiantName: shower.radiantName,
+              tip: shower.recommendedViewingTip,
+              score,
+              now,
+            }),
             score,
-            now,
-          }),
-          score,
-        }];
+          },
+        ];
       });
 
     const issCandidates: QuestCandidate[] = issPass
-      ? [{ quest: createIssQuest(issPass, scoreIssPass(issPass, effectiveWeather), now), score: scoreIssPass(issPass, effectiveWeather) }]
-        .filter((candidate) => candidate.score >= 50)
+      ? [
+          {
+            quest: createIssQuest(issPass, scoreIssPass(issPass, effectiveWeather), now),
+            score: scoreIssPass(issPass, effectiveWeather),
+          },
+        ].filter((candidate) => candidate.score >= 50)
       : [];
 
-    const candidates = [...issCandidates, ...planetCandidates, ...catalogCandidates, ...meteorCandidates];
+    const candidates = [
+      ...issCandidates,
+      ...planetCandidates,
+      ...catalogCandidates,
+      ...meteorCandidates,
+    ];
     const selected = selectQuestCandidates(candidates, limit);
 
     if (selected.length === 0) {
@@ -403,12 +445,22 @@ export function recalculateQuestPosition({
   let position: { azimuth: number; altitude: number } | null = null;
 
   if (quest.targetType === "moon" || quest.targetType === "planet") {
-    const object = getSkyObjects(latitude, longitude, now).find((skyObject) => skyObject.name === quest.target);
+    const object = getSkyObjects(latitude, longitude, now).find(
+      (skyObject) => skyObject.name === quest.target,
+    );
     position = object ? { azimuth: object.azimuth, altitude: object.altitude } : null;
-  } else if (quest.targetType !== "satellite" && quest.targetType !== "meteor_shower" && quest.targetType !== "free_observation") {
+  } else if (
+    quest.targetType !== "satellite" &&
+    quest.targetType !== "meteor_shower" &&
+    quest.targetType !== "free_observation"
+  ) {
     const object = catalogSkyObjects.find((catalogObject) => catalogObject.id === quest.target);
 
-    if (object && typeof object.rightAscensionHours === "number" && typeof object.declinationDegrees === "number") {
+    if (
+      object &&
+      typeof object.rightAscensionHours === "number" &&
+      typeof object.declinationDegrees === "number"
+    ) {
       position = equatorialToHorizontal({
         rightAscensionHours: object.rightAscensionHours,
         declinationDegrees: object.declinationDegrees,

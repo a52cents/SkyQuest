@@ -9,7 +9,12 @@ type OnboardingStep = 1 | 2 | 3;
 
 function TelescopeIcon() {
   return (
-    <svg viewBox="0 0 120 120" className="h-24 w-24 text-accent-cyan" aria-hidden="true" fill="none">
+    <svg
+      viewBox="0 0 120 120"
+      className="h-24 w-24 text-accent-cyan"
+      aria-hidden="true"
+      fill="none"
+    >
       <defs>
         <linearGradient id="onboarding-glow" x1="0" x2="1" y1="0" y2="1">
           <stop offset="0%" stopColor="currentColor" stopOpacity="0.95" />
@@ -18,7 +23,12 @@ function TelescopeIcon() {
       </defs>
       <circle cx="82" cy="28" r="6" fill="currentColor" opacity="0.95" />
       <path d="M22 76l28-28 12 12-28 28z" fill="url(#onboarding-glow)" opacity="0.95" />
-      <path d="M44 60l18-18 22 22-18 18z" stroke="currentColor" strokeWidth="5" strokeLinejoin="round" />
+      <path
+        d="M44 60l18-18 22 22-18 18z"
+        stroke="currentColor"
+        strokeWidth="5"
+        strokeLinejoin="round"
+      />
       <path d="M63 44l16-16" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
       <path d="M32 87h54" stroke="currentColor" strokeWidth="6" strokeLinecap="round" />
       <path d="M45 87l-10 14" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
@@ -57,7 +67,11 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
       await getCurrentPosition();
       setStep(3);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Impossible de récupérer la position pour le moment.");
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Impossible de récupérer la position pour le moment.",
+      );
     } finally {
       setIsRequestingPosition(false);
     }
@@ -71,7 +85,9 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
             <TelescopeIcon />
           </div>
           <div className="max-w-md">
-            <h1 className="font-[Georgia,'Times_New_Roman',serif] text-[2.35rem] font-normal leading-[1.02] tracking-[-0.04em] text-white sm:text-[3.1rem]">Le ciel a une quête pour toi</h1>
+            <h1 className="font-[Georgia,'Times_New_Roman',serif] text-[2.35rem] font-normal leading-[1.02] tracking-[-0.04em] text-white sm:text-[3.1rem]">
+              Le ciel a une quête pour toi
+            </h1>
             <p className="mt-4 text-base leading-7 text-muted sm:text-lg">
               SkyQuest te dit quoi regarder dans le ciel maintenant, selon ta position et la météo.
             </p>
@@ -90,14 +106,18 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
         <div className="flex flex-col gap-6">
           <div className="space-y-3">
             <p className="premium-kicker">Position</p>
-            <h2 className="font-[Georgia,'Times_New_Roman',serif] text-[2rem] font-normal tracking-[-0.04em] text-white sm:text-[2.35rem]">Trouve ta position</h2>
+            <h2 className="font-[Georgia,'Times_New_Roman',serif] text-[2rem] font-normal tracking-[-0.04em] text-white sm:text-[2.35rem]">
+              Trouve ta position
+            </h2>
             <p className="max-w-md text-base leading-7 text-muted sm:text-lg">
               {"Pour te montrer ce qui est visible, j'ai besoin de savoir où tu es."}
             </p>
           </div>
 
           <div className="rounded-[20px] border border-white/[0.06] bg-white/[0.025] p-4 text-sm leading-6 text-muted">
-            {"La localisation ne sert qu'à choisir des quêtes réalistes. Tu peux continuer même si tu refuses."}
+            {
+              "La localisation ne sert qu'à choisir des quêtes réalistes. Tu peux continuer même si tu refuses."
+            }
           </div>
 
           {errorMessage ? (
@@ -108,7 +128,12 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
           ) : null}
 
           <div className="grid gap-3">
-            <AppButton size="lg" fullWidth onClick={() => void handleAuthorizePosition()} isLoading={isRequestingPosition}>
+            <AppButton
+              size="lg"
+              fullWidth
+              onClick={() => void handleAuthorizePosition()}
+              isLoading={isRequestingPosition}
+            >
               {isRequestingPosition ? "Demande en cours..." : "Autoriser ma position"}
             </AppButton>
             {errorMessage ? (
@@ -125,19 +150,28 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
       <div className="flex flex-col gap-6">
         <div className="rounded-[20px] border border-success/20 bg-success/[0.08] p-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-success/20 bg-success/[0.08] text-2xl text-success" aria-hidden="true">
+            <span
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-success/20 bg-success/[0.08] text-2xl text-success"
+              aria-hidden="true"
+            >
               ✦
             </span>
             <div>
               <p className="premium-kicker">Prêt à observer</p>
-              <p className="mt-1 text-sm text-muted">{"Tu es prêt. Regarde le ciel, le bouton Maintenant t'attend."}</p>
+              <p className="mt-1 text-sm text-muted">
+                {"Tu es prêt. Regarde le ciel, le bouton Maintenant t'attend."}
+              </p>
             </div>
           </div>
         </div>
 
         <div className="max-w-md">
-          <h2 className="font-[Georgia,'Times_New_Roman',serif] text-[2.1rem] font-normal tracking-[-0.04em] text-white sm:text-[2.55rem]">{"C'est parti"}</h2>
-          <p className="mt-4 text-base leading-7 text-muted sm:text-lg">Tu peux lancer ta première quête dès que tu fermes cet écran.</p>
+          <h2 className="font-[Georgia,'Times_New_Roman',serif] text-[2.1rem] font-normal tracking-[-0.04em] text-white sm:text-[2.55rem]">
+            {"C'est parti"}
+          </h2>
+          <p className="mt-4 text-base leading-7 text-muted sm:text-lg">
+            Tu peux lancer ta première quête dès que tu fermes cet écran.
+          </p>
         </div>
 
         <div className="mt-auto w-full max-w-sm">
@@ -157,18 +191,30 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
             <p className="premium-kicker">Première visite</p>
             <p className="mt-1 text-sm text-muted">3 étapes pour démarrer sans surprise.</p>
           </div>
-          <div className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-xs font-semibold text-faint">SkyQuest</div>
+          <div className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-xs font-semibold text-faint">
+            SkyQuest
+          </div>
         </div>
 
         <div className="relative flex-1 overflow-hidden">
           <AnimatePresence mode="wait" initial={false}>
-            <motion.div key={`step-${step}`} className="absolute inset-0 flex flex-col justify-center" variants={stepVariants} initial="hidden" animate="visible" exit="exit">
+            <motion.div
+              key={`step-${step}`}
+              className="absolute inset-0 flex flex-col justify-center"
+              variants={stepVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
               {renderStepContent(step)}
             </motion.div>
           </AnimatePresence>
         </div>
 
-        <div className="mt-6 flex items-center justify-center gap-2" aria-label="Progression onboarding">
+        <div
+          className="mt-6 flex items-center justify-center gap-2"
+          aria-label="Progression onboarding"
+        >
           {dots.map((dot) => (
             <span
               key={dot}

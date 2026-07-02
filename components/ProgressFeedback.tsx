@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, animate, motion, useMotionValue, useMotionValueEvent, useReducedMotion, useTransform } from "framer-motion";
+import {
+  AnimatePresence,
+  animate,
+  motion,
+  useMotionValue,
+  useMotionValueEvent,
+  useReducedMotion,
+  useTransform,
+} from "framer-motion";
 import { AppCard } from "@/components/AppCard";
 import { getAppButtonClassName } from "@/components/AppButton";
 import { ACHIEVEMENTS, getRankProgress } from "@/lib/progression";
@@ -19,7 +27,10 @@ function AnimatedXp({ value }: { value: number }) {
 
   useEffect(() => {
     setDisplayValue(prefersReducedMotion ? value : 0);
-    const controls = animate(motionValue, value, { duration: prefersReducedMotion ? 0 : 0.6, ease: "easeOut" });
+    const controls = animate(motionValue, value, {
+      duration: prefersReducedMotion ? 0 : 0.6,
+      ease: "easeOut",
+    });
     return () => controls.stop();
   }, [motionValue, prefersReducedMotion, value]);
 
@@ -61,16 +72,42 @@ export function ProgressFeedback({
       <motion.div
         key={`${reward.totalXp}-${reward.xpEarned}-${currentRankName}`}
         initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.9, y: 20 }}
-        animate={prefersReducedMotion ? { opacity: 1, scale: 1, y: 0 } : { opacity: 1, scale: 1, y: 0, transition: { type: "spring", stiffness: 200, damping: 20 } }}
-        exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.15 } }}
+        animate={
+          prefersReducedMotion
+            ? { opacity: 1, scale: 1, y: 0 }
+            : {
+                opacity: 1,
+                scale: 1,
+                y: 0,
+                transition: { type: "spring", stiffness: 200, damping: 20 },
+              }
+        }
+        exit={
+          prefersReducedMotion
+            ? { opacity: 0 }
+            : { opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.15 } }
+        }
       >
-        <AppCard className="border-accent/25 bg-[radial-gradient(circle_at_100%_0%,rgba(124,92,255,0.14),transparent_48%),#161619]" aria-live="polite">
+        <AppCard
+          className="border-accent/25 bg-[radial-gradient(circle_at_100%_0%,rgba(124,92,255,0.14),transparent_48%),#161619]"
+          aria-live="polite"
+        >
           <p className="premium-kicker">Progression enregistrée</p>
           <h2 className="mt-2 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal tracking-[-0.03em] text-white">
-            {reward.xpEarned > 0 ? <AnimatedXp value={reward.xpEarned} /> : "Déjà compté cette nuit"}
+            {reward.xpEarned > 0 ? (
+              <AnimatedXp value={reward.xpEarned} />
+            ) : (
+              "Déjà compté cette nuit"
+            )}
           </h2>
-          {reward.streakMessage ? <p className="mt-2 text-sm font-semibold text-accent">{reward.streakMessage}</p> : null}
-          {reward.isFirstDiscovery ? <p className="mt-2 text-sm font-semibold text-accent">Nouvelle cible dans ton ciel découvert.</p> : null}
+          {reward.streakMessage ? (
+            <p className="mt-2 text-sm font-semibold text-accent">{reward.streakMessage}</p>
+          ) : null}
+          {reward.isFirstDiscovery ? (
+            <p className="mt-2 text-sm font-semibold text-accent">
+              Nouvelle cible dans ton ciel découvert.
+            </p>
+          ) : null}
           {reward.unlockedAchievements.map((id) => (
             <p key={id} className="mt-2 text-sm font-semibold text-success">
               Accomplissement · {ACHIEVEMENTS.find((item) => item.id === id)?.title ?? id}
@@ -79,14 +116,18 @@ export function ProgressFeedback({
           <div className="mt-4">
             <div className="flex justify-between gap-3 text-xs text-muted">
               <span>{rank.current.name}</span>
-              <span>{rank.next ? `${rank.xpToNext} Éclats avant ${rank.next.name}` : "Rang maximal"}</span>
+              <span>
+                {rank.next ? `${rank.xpToNext} Éclats avant ${rank.next.name}` : "Rang maximal"}
+              </span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.07]">
               <motion.div
                 className="h-full rounded-full bg-accent shadow-[0_0_14px_rgba(124,92,255,0.35)]"
                 initial={prefersReducedMotion ? false : { width: 0 }}
                 animate={{ width: `${rank.progressPercent}%` }}
-                transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.8, ease: "easeOut" }}
+                transition={
+                  prefersReducedMotion ? { duration: 0 } : { duration: 0.8, ease: "easeOut" }
+                }
               />
             </div>
           </div>

@@ -29,14 +29,25 @@ test("a target on the optical axis projects to screen center", () => {
 });
 
 test("right and higher targets move right and up", () => {
-  const right = projectHorizontalTarget({ target: horizontalCoordinatesToVector(10, 0), basis, ...viewport });
-  const higher = projectHorizontalTarget({ target: horizontalCoordinatesToVector(0, 10), basis, ...viewport });
+  const right = projectHorizontalTarget({
+    target: horizontalCoordinatesToVector(10, 0),
+    basis,
+    ...viewport,
+  });
+  const higher = projectHorizontalTarget({
+    target: horizontalCoordinatesToVector(0, 10),
+    basis,
+    ...viewport,
+  });
   assert.ok(right && right.x > 200);
   assert.ok(higher && higher.y < 400);
 });
 
 test("a target behind the camera is not projected", () => {
-  assert.equal(projectHorizontalTarget({ target: horizontalCoordinatesToVector(180, 0), basis, ...viewport }), null);
+  assert.equal(
+    projectHorizontalTarget({ target: horizontalCoordinatesToVector(180, 0), basis, ...viewport }),
+    null,
+  );
 });
 
 test("missing camera dimensions degrade safely instead of throwing", () => {
@@ -95,8 +106,16 @@ test("calibration offsets rotate the camera basis toward the reference", () => {
 });
 
 test("front-facing constellation endpoints can be partially outside the viewport", () => {
-  const inside = projectHorizontalTarget({ target: horizontalCoordinatesToVector(2, 0), basis, ...viewport });
-  const outside = projectHorizontalTarget({ target: horizontalCoordinatesToVector(60, 0), basis, ...viewport });
+  const inside = projectHorizontalTarget({
+    target: horizontalCoordinatesToVector(2, 0),
+    basis,
+    ...viewport,
+  });
+  const outside = projectHorizontalTarget({
+    target: horizontalCoordinatesToVector(60, 0),
+    basis,
+    ...viewport,
+  });
   assert.ok(inside?.onScreen);
   assert.ok(outside && !outside.onScreen);
 });

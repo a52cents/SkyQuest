@@ -22,8 +22,21 @@ test("eclipses replace their simultaneous ordinary moon phase", () => {
 
   assert.ok(solarEclipse);
   assert.ok(lunarEclipse);
-  assert.equal(events.some((event) => event.type === "new_moon" && Math.abs(event.date - solarEclipse.date) < 12 * 60 * 60 * 1000), false);
-  assert.equal(events.some((event) => event.type === "full_moon" && Math.abs(event.date - lunarEclipse.date) < 12 * 60 * 60 * 1000), false);
+  assert.equal(
+    events.some(
+      (event) =>
+        event.type === "new_moon" && Math.abs(event.date - solarEclipse.date) < 12 * 60 * 60 * 1000,
+    ),
+    false,
+  );
+  assert.equal(
+    events.some(
+      (event) =>
+        event.type === "full_moon" &&
+        Math.abs(event.date - lunarEclipse.date) < 12 * 60 * 60 * 1000,
+    ),
+    false,
+  );
 });
 
 test("supermoons are backed by a computed perigee below 360000 km", () => {

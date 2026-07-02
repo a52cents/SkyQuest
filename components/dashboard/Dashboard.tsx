@@ -1,5 +1,19 @@
 "use client";
 
+/**
+ * Dashboard
+ *
+ * Orchestre le parcours « Maintenant » de la PWA installée : permission GPS, météo,
+ * passage ISS optionnel, génération des quêtes, cache de l'analyse et navigation vers
+ * le guidage. Il affiche aussi la progression, le journal récent et les événements à venir.
+ *
+ * Important :
+ * - le GPS doit rester déclenché par une action utilisateur ;
+ * - une panne météo ou ISS ne doit jamais bloquer les autres quêtes ;
+ * - une analyse relue du cache peut être affichée, mais son guidage reste verrouillé jusqu'à
+ *   une nouvelle analyse afin de ne pas utiliser silencieusement une position périmée ;
+ * - l'interface classe les quêtes par pertinence et permet d'afficher progressivement la suite.
+ */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -13,9 +27,24 @@ import { isOnboardingCompleted, setOnboardingCompleted } from "@/lib/onboarding"
 import { meteorShowers } from "@/lib/meteor-showers";
 import { isPopunderAdOnCooldown, triggerPopunderAd } from "@/lib/popunder-ad";
 import { getAchievementProgress, getRankProgress } from "@/lib/progression";
-import { generateFutureQuestSuggestions, generateQuests, type FutureQuestSuggestion } from "@/lib/quest-generator";
-import { getObservations, getProgressProfile, saveActiveQuest, saveLastLocation } from "@/lib/storage";
-import type { Observation, ProgressProfile, QuestTargetType, SkyQuest, WeatherNow } from "@/lib/types";
+import {
+  generateFutureQuestSuggestions,
+  generateQuests,
+  type FutureQuestSuggestion,
+} from "@/lib/quest-generator";
+import {
+  getObservations,
+  getProgressProfile,
+  saveActiveQuest,
+  saveLastLocation,
+} from "@/lib/storage";
+import type {
+  Observation,
+  ProgressProfile,
+  QuestTargetType,
+  SkyQuest,
+  WeatherNow,
+} from "@/lib/types";
 import { fetchWeatherNow, getFallbackWeather } from "@/lib/weather";
 
 type LoadState = "idle" | "loading" | "ready";
@@ -92,17 +121,23 @@ function getMeteorShowerTimelineEvents(startDate: Date, limitDays: number): Time
 }
 
 function createEventTimeline(startDate: Date): TimelineEvent[] {
-  const celestialEvents = getUpcomingCelestialEvents(startDate, CELESTIAL_EVENT_WINDOW_DAYS).map<TimelineEvent>((event) => ({
+  const celestialEvents = getUpcomingCelestialEvents(
+    startDate,
+    CELESTIAL_EVENT_WINDOW_DAYS,
+  ).map<TimelineEvent>((event) => ({
     id: event.id,
     type: event.type,
     title: event.title,
     date: event.date,
     description: event.description,
-    timeLabel: event.type === "lunar_eclipse" || event.type === "solar_eclipse" ? "peak" : "instant",
+    timeLabel:
+      event.type === "lunar_eclipse" || event.type === "solar_eclipse" ? "peak" : "instant",
   }));
 
-  return [...celestialEvents, ...getMeteorShowerTimelineEvents(startDate, CELESTIAL_EVENT_WINDOW_DAYS)]
-    .sort((left, right) => left.date.getTime() - right.date.getTime());
+  return [
+    ...celestialEvents,
+    ...getMeteorShowerTimelineEvents(startDate, CELESTIAL_EVENT_WINDOW_DAYS),
+  ].sort((left, right) => left.date.getTime() - right.date.getTime());
 }
 
 function readCachedAnalysis(): DashboardAnalysis | null {
@@ -149,7 +184,12 @@ function LogoMark() {
         <circle className="star" cx="12" cy="5" r="1.2" />
         <circle className="star" cx="7" cy="16" r="0.8" />
         <circle className="star" cx="19" cy="14" r="1" />
-        <path d="M12 5 L7 16 L19 14 Z" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
+        <path
+          d="M12 5 L7 16 L19 14 Z"
+          fill="none"
+          stroke="rgba(255,255,255,0.2)"
+          strokeWidth="0.5"
+        />
       </svg>
     </span>
   );
@@ -177,49 +217,92 @@ function MotionBlock({ children, className }: { children: ReactNode; className?:
   return (
     <motion.div
       className={className}
-      variants={prefersReducedMotion ? { hidden: { opacity: 1 }, visible: { opacity: 1 } } : itemVariants}
+      variants={
+        prefersReducedMotion ? { hidden: { opacity: 1 }, visible: { opacity: 1 } } : itemVariants
+      }
     >
       {children}
     </motion.div>
   );
 }
 
-function QuestCard({ quest, onStart, locked, stale }: { quest: SkyQuest; onStart: (quest: SkyQuest) => void; locked: boolean; stale: boolean }) {
+function QuestCard({
+  quest,
+  onStart,
+  locked,
+  stale,
+}: {
+  quest: SkyQuest;
+  onStart: (quest: SkyQuest) => void;
+  locked: boolean;
+  stale: boolean;
+}) {
   const prefersReducedMotion = useReducedMotion() ?? false;
   return (
     <motion.article
       layout
-      variants={prefersReducedMotion ? { hidden: { opacity: 1 }, visible: { opacity: 1 } } : itemVariants}
+      variants={
+        prefersReducedMotion ? { hidden: { opacity: 1 }, visible: { opacity: 1 } } : itemVariants
+      }
       whileHover={prefersReducedMotion || locked ? undefined : { scale: 1.02, y: -2 }}
       whileTap={prefersReducedMotion || locked ? undefined : { scale: 0.99 }}
       className={`quest-card ${locked ? "locked" : ""}`}
-      onClick={() => { if (!locked) onStart(quest); }}
+      onClick={() => {
+        if (!locked) onStart(quest);
+      }}
     >
-      <div className={`quest-badge ${quest.altitude !== null && quest.altitude >= 10 ? "now" : "soon"}`}>
+      <div
+        className={`quest-badge ${quest.altitude !== null && quest.altitude >= 10 ? "now" : "soon"}`}
+      >
         <span className="dot" />
-        {locked ? stale ? "Dernière analyse" : "Guidage indisponible" : quest.altitude !== null && quest.altitude >= 10 ? "Visible maintenant" : "Observation prudente"}
+        {locked
+          ? stale
+            ? "Dernière analyse"
+            : "Guidage indisponible"
+          : quest.altitude !== null && quest.altitude >= 10
+            ? "Visible maintenant"
+            : "Observation prudente"}
       </div>
       <h3>{quest.title}</h3>
       <p>{quest.description}</p>
       <div className="quest-meta">
         <div className="quest-meta-item">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M12 2L12 22M2 12L22 12" /></svg>
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 2L12 22M2 12L22 12" />
+          </svg>
           {quest.altitude === null ? "Zone libre" : `Altitude ${Math.round(quest.altitude)}°`}
         </div>
         <div className="quest-meta-item">
-          <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+          <svg viewBox="0 0 24 24">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+            <circle cx="12" cy="10" r="3" />
+          </svg>
           {quest.cardinalDirection ?? "Horizon dégagé"}
         </div>
         <div className="quest-meta-item">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2" /></svg>
+          <svg viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2" />
+          </svg>
           Visibilité {quest.visibilityScore}/100
         </div>
       </div>
       <div className="quest-action">
         <span className="quest-hint">{quest.tip}</span>
-        <button type="button" className="quest-btn" disabled={locked} onClick={(event) => { event.stopPropagation(); if (!locked) onStart(quest); }}>
+        <button
+          type="button"
+          className="quest-btn"
+          disabled={locked}
+          onClick={(event) => {
+            event.stopPropagation();
+            if (!locked) onStart(quest);
+          }}
+        >
           {locked ? "Actualise d'abord" : "Guider"}
-          <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+          <svg viewBox="0 0 24 24">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
         </button>
       </div>
     </motion.article>
@@ -275,8 +358,17 @@ export function Dashboard() {
     });
     const currentDate = new Date();
     const [currentIssPass, futureIssPass] = await Promise.all([
-      fetchNextIssVisiblePass({ latitude: coords.latitude, longitude: coords.longitude, now: currentDate }).catch(() => null),
-      fetchNextIssVisiblePass({ latitude: coords.latitude, longitude: coords.longitude, now: currentDate, horizonMinutes: 24 * 60 }).catch(() => null),
+      fetchNextIssVisiblePass({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        now: currentDate,
+      }).catch(() => null),
+      fetchNextIssVisiblePass({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        now: currentDate,
+        horizonMinutes: 24 * 60,
+      }).catch(() => null),
     ]);
 
     const nextQuests = generateQuests({
@@ -298,7 +390,13 @@ export function Dashboard() {
     });
 
     const savedAt = Date.now();
-    const analysis = { savedAt, position: coords, weather: currentWeather, quests: nextQuests, futureSuggestions: nextFutureSuggestions };
+    const analysis = {
+      savedAt,
+      position: coords,
+      weather: currentWeather,
+      quests: nextQuests,
+      futureSuggestions: nextFutureSuggestions,
+    };
 
     setWeather(currentWeather);
     setQuests(nextQuests);
@@ -357,10 +455,19 @@ export function Dashboard() {
       setPendingAdPosition(coords);
       setShowAdConsent(true);
     } catch (error) {
-      const fallbackQuests = generateQuests({ latitude: null, longitude: null, weather: getFallbackWeather(), now: new Date() });
-      setQuests((currentQuests) => currentQuests.length > 0 ? currentQuests : fallbackQuests);
+      const fallbackQuests = generateQuests({
+        latitude: null,
+        longitude: null,
+        weather: getFallbackWeather(),
+        now: new Date(),
+      });
+      setQuests((currentQuests) => (currentQuests.length > 0 ? currentQuests : fallbackQuests));
       setLoadState("ready");
-      setNotice(error instanceof Error ? error.message : "Position indisponible. Une observation libre reste possible.");
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "Position indisponible. Une observation libre reste possible.",
+      );
     } finally {
       setIsLocationLoading(false);
     }
@@ -394,83 +501,171 @@ export function Dashboard() {
 
   const rank = profile ? getRankProgress(profile.totalXp) : null;
   const achievementProgress = profile ? getAchievementProgress(profile) : [];
-  const unlockedAchievementCount = achievementProgress.filter((achievement) => achievement.unlocked).length;
-  const averageVisibility = quests.length > 0
-    ? Math.round(quests.reduce((total, quest) => total + quest.visibilityScore, 0) / quests.length)
-    : null;
+  const unlockedAchievementCount = achievementProgress.filter(
+    (achievement) => achievement.unlocked,
+  ).length;
+  const averageVisibility =
+    quests.length > 0
+      ? Math.round(
+          quests.reduce((total, quest) => total + quest.visibilityScore, 0) / quests.length,
+        )
+      : null;
   const guidableQuests = quests.filter((quest) => quest.targetType !== "free_observation");
   const visibleQuests = showAllQuests ? quests : quests.slice(0, 3);
   const currentTargets = new Set(quests.map((quest) => quest.target));
-  const distinctFutureSuggestions = futureSuggestions.filter((suggestion) => !currentTargets.has(suggestion.quest.target));
+  const distinctFutureSuggestions = futureSuggestions.filter(
+    (suggestion) => !currentTargets.has(suggestion.quest.target),
+  );
   const recentObservations = observations.slice(0, 2);
   const locationLabel = position
     ? `${position.latitude.toFixed(2)}°, ${position.longitude.toFixed(2)}°`
     : "Position non chargée";
-  const conditionsLabel = analysisSavedAt && !isGuidanceUnlocked
-    ? "Analyse passée"
-    : weather?.isDay
-      ? "Ciel de jour"
-      : averageVisibility !== null && averageVisibility >= 70
-        ? "Ciel favorable"
-        : "Ciel à vérifier";
+  const conditionsLabel =
+    analysisSavedAt && !isGuidanceUnlocked
+      ? "Analyse passée"
+      : weather?.isDay
+        ? "Ciel de jour"
+        : averageVisibility !== null && averageVisibility >= 70
+          ? "Ciel favorable"
+          : "Ciel à vérifier";
   const analysisDateLabel = analysisSavedAt
-    ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(analysisSavedAt))
+    ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(
+        new Date(analysisSavedAt),
+      )
     : null;
-  const rootVariants = prefersReducedMotion ? { hidden: { opacity: 1 }, visible: { opacity: 1 } } : pageVariants;
+  const rootVariants = prefersReducedMotion
+    ? { hidden: { opacity: 1 }, visible: { opacity: 1 } }
+    : pageVariants;
 
   return (
     <div className="sky-dashboard">
       {isOnboardingReady && showOnboarding ? (
-        <Onboarding onFinish={() => { setShowOnboarding(false); setOnboardingCompleted(); }} />
+        <Onboarding
+          onFinish={() => {
+            setShowOnboarding(false);
+            setOnboardingCompleted();
+          }}
+        />
       ) : null}
 
       <AnimatePresence>
         {showAdConsent ? (
-          <motion.div className="dashboard-modal" role="dialog" aria-modal="true" aria-labelledby="dashboard-ad-title" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <motion.div className="dashboard-modal-card" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}>
+          <motion.div
+            className="dashboard-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dashboard-ad-title"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="dashboard-modal-card"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 24 }}
+            >
               <h2 id="dashboard-ad-title">Avant de lire le ciel</h2>
-              <p>{"Ta position est prête. Une publicité s'ouvre seulement après ton accord, puis SkyQuest charge les conditions et les quêtes autour de toi."}</p>
+              <p>
+                {
+                  "Ta position est prête. Une publicité s'ouvre seulement après ton accord, puis SkyQuest charge les conditions et les quêtes autour de toi."
+                }
+              </p>
               <div className="modal-actions">
-                <button type="button" className="camera-btn" onClick={() => void handleAdConfirm()} disabled={isAdLoading}>{isAdLoading ? "Ouverture…" : "Continuer"}</button>
-                <button type="button" className="modal-secondary" onClick={dismissAdConsent} disabled={isAdLoading}>Pas maintenant</button>
+                <button
+                  type="button"
+                  className="camera-btn"
+                  onClick={() => void handleAdConfirm()}
+                  disabled={isAdLoading}
+                >
+                  {isAdLoading ? "Ouverture…" : "Continuer"}
+                </button>
+                <button
+                  type="button"
+                  className="modal-secondary"
+                  onClick={dismissAdConsent}
+                  disabled={isAdLoading}
+                >
+                  Pas maintenant
+                </button>
               </div>
             </motion.div>
           </motion.div>
         ) : null}
       </AnimatePresence>
 
-      <motion.header id="dashboard-top" className="app-header" initial={prefersReducedMotion ? false : { opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: prefersReducedMotion ? 0 : 0.45 }}>
+      <motion.header
+        id="dashboard-top"
+        className="app-header"
+        initial={prefersReducedMotion ? false : { opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: prefersReducedMotion ? 0 : 0.45 }}
+      >
         <div className="header-inner">
-          <div className="header-logo"><LogoMark />SkyQuest</div>
+          <div className="header-logo">
+            <LogoMark />
+            SkyQuest
+          </div>
           <div className="header-meta">
-            <div className="header-time">{now ? new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(now) : "--:--"}</div>
+            <div className="header-time">
+              {now
+                ? new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(
+                    now,
+                  )
+                : "--:--"}
+            </div>
             <div className="header-location">
-              <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+              <svg viewBox="0 0 24 24">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
               {locationLabel}
             </div>
           </div>
         </div>
       </motion.header>
 
-      <motion.main className="dashboard-main" variants={rootVariants} initial="hidden" animate="visible">
+      <motion.main
+        className="dashboard-main"
+        variants={rootVariants}
+        initial="hidden"
+        animate="visible"
+      >
         <MotionBlock className="conditions-bar">
           <div className="condition-item">
-            <svg className="condition-icon" viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" /></svg>
+            <svg className="condition-icon" viewBox="0 0 24 24">
+              <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+            </svg>
             <AnimatedValue value={weather ? `${Math.round(weather.cloudCover)}%` : "—"} />
             <div className="condition-label">Nuages</div>
           </div>
           <div className="condition-item">
-            <svg className="condition-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
-            <AnimatedValue value={averageVisibility === null ? "—" : `${Math.round(averageVisibility / 10)}/10`} />
+            <svg className="condition-icon" viewBox="0 0 24 24">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
+            </svg>
+            <AnimatedValue
+              value={averageVisibility === null ? "—" : `${Math.round(averageVisibility / 10)}/10`}
+            />
             <div className="condition-label">Visibilité</div>
           </div>
           <div className="condition-item">
-            <svg className="condition-icon" viewBox="0 0 24 24"><path d="M14 14.76V3.5a2 2 0 0 0-4 0v11.26a4 4 0 1 0 4 0z" /></svg>
-            <AnimatedValue value={typeof weather?.temperature === "number" ? `${Math.round(weather.temperature)}°` : "—"} />
+            <svg className="condition-icon" viewBox="0 0 24 24">
+              <path d="M14 14.76V3.5a2 2 0 0 0-4 0v11.26a4 4 0 1 0 4 0z" />
+            </svg>
+            <AnimatedValue
+              value={
+                typeof weather?.temperature === "number"
+                  ? `${Math.round(weather.temperature)}°`
+                  : "—"
+              }
+            />
             <div className="condition-label">Temp.</div>
           </div>
           <div className="condition-item">
-            <svg className="condition-icon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" /></svg>
+            <svg className="condition-icon" viewBox="0 0 24 24">
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" />
+            </svg>
             <AnimatedValue value={loadState === "ready" ? String(guidableQuests.length) : "—"} />
             <div className="condition-label">Cibles</div>
           </div>
@@ -478,23 +673,85 @@ export function Dashboard() {
 
         {analysisDateLabel ? (
           <MotionBlock className={`analysis-banner ${isGuidanceUnlocked ? "current" : "stale"}`}>
-            <div><strong>{isGuidanceUnlocked ? "Analyse actuelle" : "Dernière analyse"}</strong><span>{analysisDateLabel}</span></div>
-            <p>{isGuidanceUnlocked ? "Les guidages sont disponibles pour cette analyse." : "Ces résultats sont affichés à titre indicatif. Appuie sur « Maintenant » avant tout guidage."}</p>
+            <div>
+              <strong>{isGuidanceUnlocked ? "Analyse actuelle" : "Dernière analyse"}</strong>
+              <span>{analysisDateLabel}</span>
+            </div>
+            <p>
+              {isGuidanceUnlocked
+                ? "Les guidages sont disponibles pour cette analyse."
+                : "Ces résultats sont affichés à titre indicatif. Appuie sur « Maintenant » avant tout guidage."}
+            </p>
           </MotionBlock>
         ) : null}
 
-        <AnimatePresence mode="wait">{notice ? <motion.div key={notice} className="dashboard-notice" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>{notice}</motion.div> : null}</AnimatePresence>
+        <AnimatePresence mode="wait">
+          {notice ? (
+            <motion.div
+              key={notice}
+              className="dashboard-notice"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+            >
+              {notice}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
 
         <MotionBlock className="camera-guide">
           <div className="camera-guide-inner">
-            <motion.div className="camera-icon" animate={prefersReducedMotion ? undefined : { boxShadow: ["0 0 0 rgba(124,92,255,0)", "0 0 28px rgba(124,92,255,.22)", "0 0 0 rgba(124,92,255,0)"] }} transition={{ duration: 3, repeat: Infinity }}>
-              <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
+            <motion.div
+              className="camera-icon"
+              animate={
+                prefersReducedMotion
+                  ? undefined
+                  : {
+                      boxShadow: [
+                        "0 0 0 rgba(124,92,255,0)",
+                        "0 0 28px rgba(124,92,255,.22)",
+                        "0 0 0 rgba(124,92,255,0)",
+                      ],
+                    }
+              }
+              transition={{ duration: 3, repeat: Infinity }}
+            >
+              <svg viewBox="0 0 24 24">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
             </motion.div>
-            <h3>{isGuidanceUnlocked ? "Ton ciel est prêt" : analysisSavedAt ? "Actualise avant d'observer" : "Découvre ton ciel maintenant"}</h3>
-            <p>{isGuidanceUnlocked ? `${guidableQuests.length} cible${guidableQuests.length > 1 ? "s" : ""} guidable${guidableQuests.length > 1 ? "s" : ""} selon les conditions actuelles.` : analysisSavedAt ? "Une ancienne analyse est disponible ci-dessous, mais le ciel peut avoir changé depuis." : "Autorise la position pour calculer les objets réellement visibles et préparer tes quêtes."}</p>
-            <motion.button type="button" className="camera-btn" onClick={() => void handleRefreshRequest()} disabled={loadState === "loading" || isLocationLoading || isAdLoading} whileHover={prefersReducedMotion ? undefined : { y: -2 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}>
-              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2" /></svg>
-              {isLocationLoading ? "Localisation…" : loadState === "loading" ? "Lecture du ciel…" : "Maintenant"}
+            <h3>
+              {isGuidanceUnlocked
+                ? "Ton ciel est prêt"
+                : analysisSavedAt
+                  ? "Actualise avant d'observer"
+                  : "Découvre ton ciel maintenant"}
+            </h3>
+            <p>
+              {isGuidanceUnlocked
+                ? `${guidableQuests.length} cible${guidableQuests.length > 1 ? "s" : ""} guidable${guidableQuests.length > 1 ? "s" : ""} selon les conditions actuelles.`
+                : analysisSavedAt
+                  ? "Une ancienne analyse est disponible ci-dessous, mais le ciel peut avoir changé depuis."
+                  : "Autorise la position pour calculer les objets réellement visibles et préparer tes quêtes."}
+            </p>
+            <motion.button
+              type="button"
+              className="camera-btn"
+              onClick={() => void handleRefreshRequest()}
+              disabled={loadState === "loading" || isLocationLoading || isAdLoading}
+              whileHover={prefersReducedMotion ? undefined : { y: -2 }}
+              whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+            >
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2" />
+              </svg>
+              {isLocationLoading
+                ? "Localisation…"
+                : loadState === "loading"
+                  ? "Lecture du ciel…"
+                  : "Maintenant"}
             </motion.button>
           </div>
         </MotionBlock>
@@ -502,67 +759,194 @@ export function Dashboard() {
         <MotionBlock className="section-header">
           <h2 className="section-title">Quêtes du soir</h2>
           <span className={`status-pill ${loadState === "loading" ? "loading" : ""}`}>
-            <span className="dot" />{loadState === "loading" ? "Calcul…" : conditionsLabel}
+            <span className="dot" />
+            {loadState === "loading" ? "Calcul…" : conditionsLabel}
           </span>
         </MotionBlock>
 
         <motion.div className="quest-list" variants={rootVariants}>
           <AnimatePresence mode="popLayout">
-            {visibleQuests.map((quest) => <QuestCard key={quest.id} quest={quest} onStart={handleStart} locked={!isGuidanceUnlocked} stale={analysisSavedAt !== null} />)}
+            {visibleQuests.map((quest) => (
+              <QuestCard
+                key={quest.id}
+                quest={quest}
+                onStart={handleStart}
+                locked={!isGuidanceUnlocked}
+                stale={analysisSavedAt !== null}
+              />
+            ))}
           </AnimatePresence>
         </motion.div>
-        {quests.length > 3 ? <button type="button" className="show-more-btn" onClick={() => setShowAllQuests((current) => !current)}>{showAllQuests ? "Réduire la liste" : `Voir les ${quests.length - 3} autres quêtes`}</button> : null}
-        {loadState === "idle" ? <MotionBlock className="empty-state"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" /></svg><p>Appuie sur « Maintenant » pour générer tes quêtes.</p></MotionBlock> : null}
+        {quests.length > 3 ? (
+          <button
+            type="button"
+            className="show-more-btn"
+            onClick={() => setShowAllQuests((current) => !current)}
+          >
+            {showAllQuests ? "Réduire la liste" : `Voir les ${quests.length - 3} autres quêtes`}
+          </button>
+        ) : null}
+        {loadState === "idle" ? (
+          <MotionBlock className="empty-state">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" />
+            </svg>
+            <p>Appuie sur « Maintenant » pour générer tes quêtes.</p>
+          </MotionBlock>
+        ) : null}
 
         <section id="objects">
-          <MotionBlock className="section-header spaced"><h2 className="section-title">Objets observables</h2><span className="section-sub">{guidableQuests.length} cible{guidableQuests.length > 1 ? "s" : ""}</span></MotionBlock>
+          <MotionBlock className="section-header spaced">
+            <h2 className="section-title">Objets observables</h2>
+            <span className="section-sub">
+              {guidableQuests.length} cible{guidableQuests.length > 1 ? "s" : ""}
+            </span>
+          </MotionBlock>
           <motion.div className="upcoming-list" variants={rootVariants}>
             {guidableQuests.map((quest) => (
-              <motion.button key={quest.id} type="button" disabled={!isGuidanceUnlocked} onClick={() => handleStart(quest)} className={`upcoming-item ${!isGuidanceUnlocked ? "locked" : ""}`} variants={itemVariants} whileHover={prefersReducedMotion || !isGuidanceUnlocked ? undefined : { scale: 1.02 }}>
-                <div className="upcoming-date"><AnimatePresence mode="wait" initial={false}><motion.div className="day" key={Math.round(quest.altitude ?? 0)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{quest.altitude === null ? "—" : `${Math.round(quest.altitude)}°`}</motion.div></AnimatePresence><div className="month">Alt.</div></div>
-                <div className="upcoming-info"><h4>{quest.title}</h4><p>{QUEST_TARGET_LABELS[quest.targetType]} · {quest.cardinalDirection ?? "Zone large"} · {quest.visibilityScore}/100</p></div>
-                <svg className="upcoming-arrow" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" /></svg>
+              <motion.button
+                key={quest.id}
+                type="button"
+                disabled={!isGuidanceUnlocked}
+                onClick={() => handleStart(quest)}
+                className={`upcoming-item ${!isGuidanceUnlocked ? "locked" : ""}`}
+                variants={itemVariants}
+                whileHover={
+                  prefersReducedMotion || !isGuidanceUnlocked ? undefined : { scale: 1.02 }
+                }
+              >
+                <div className="upcoming-date">
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      className="day"
+                      key={Math.round(quest.altitude ?? 0)}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                    >
+                      {quest.altitude === null ? "—" : `${Math.round(quest.altitude)}°`}
+                    </motion.div>
+                  </AnimatePresence>
+                  <div className="month">Alt.</div>
+                </div>
+                <div className="upcoming-info">
+                  <h4>{quest.title}</h4>
+                  <p>
+                    {QUEST_TARGET_LABELS[quest.targetType]} ·{" "}
+                    {quest.cardinalDirection ?? "Zone large"} · {quest.visibilityScore}/100
+                  </p>
+                </div>
+                <svg className="upcoming-arrow" viewBox="0 0 24 24">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
               </motion.button>
             ))}
           </motion.div>
-          {loadState === "ready" && guidableQuests.length === 0 ? <div className="empty-state"><p>Aucun objet suffisamment fiable maintenant. Une observation libre reste possible.</p></div> : null}
+          {loadState === "ready" && guidableQuests.length === 0 ? (
+            <div className="empty-state">
+              <p>
+                Aucun objet suffisamment fiable maintenant. Une observation libre reste possible.
+              </p>
+            </div>
+          ) : null}
         </section>
 
         <section id="observation-windows">
-          <MotionBlock className="section-header spaced"><h2 className="section-title">À venir</h2><span className="section-sub">Informatif · non guidable</span></MotionBlock>
+          <MotionBlock className="section-header spaced">
+            <h2 className="section-title">À venir</h2>
+            <span className="section-sub">Informatif · non guidable</span>
+          </MotionBlock>
           <motion.div className="upcoming-list" variants={rootVariants}>
             {distinctFutureSuggestions.slice(0, 3).map((suggestion) => {
               const date = new Date(suggestion.availableAt);
               return (
-                <motion.article key={`${suggestion.quest.id}-${suggestion.availableAt}`} className="upcoming-item future-item" variants={itemVariants}>
-                  <div className="upcoming-date"><div className="day">{date.getDate()}</div><div className="month">{new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(date)}</div></div>
-                  <div className="upcoming-info"><h4>{suggestion.quest.title}</h4><p>{new Intl.DateTimeFormat("fr-FR", { weekday: "short", hour: "2-digit", minute: "2-digit" }).format(date)} · conditions à revérifier</p></div>
-                  <svg className="upcoming-arrow" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+                <motion.article
+                  key={`${suggestion.quest.id}-${suggestion.availableAt}`}
+                  className="upcoming-item future-item"
+                  variants={itemVariants}
+                >
+                  <div className="upcoming-date">
+                    <div className="day">{date.getDate()}</div>
+                    <div className="month">
+                      {new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(date)}
+                    </div>
+                  </div>
+                  <div className="upcoming-info">
+                    <h4>{suggestion.quest.title}</h4>
+                    <p>
+                      {new Intl.DateTimeFormat("fr-FR", {
+                        weekday: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }).format(date)}{" "}
+                      · conditions à revérifier
+                    </p>
+                  </div>
+                  <svg className="upcoming-arrow" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 2" />
+                  </svg>
                 </motion.article>
               );
             })}
           </motion.div>
-          {loadState === "ready" && distinctFutureSuggestions.length === 0 ? <div className="empty-state"><p>Aucune cible différente trouvée dans les sept prochains jours.</p></div> : null}
+          {loadState === "ready" && distinctFutureSuggestions.length === 0 ? (
+            <div className="empty-state">
+              <p>Aucune cible différente trouvée dans les sept prochains jours.</p>
+            </div>
+          ) : null}
         </section>
 
         <section id="upcoming">
-          <MotionBlock className="section-header spaced"><h2 className="section-title">Prochains événements</h2><span className="section-sub">Dans les 60 jours</span></MotionBlock>
-          <motion.div className="upcoming-list" variants={rootVariants} initial="hidden" animate="visible">
+          <MotionBlock className="section-header spaced">
+            <h2 className="section-title">Prochains événements</h2>
+            <span className="section-sub">Dans les 60 jours</span>
+          </MotionBlock>
+          <motion.div
+            className="upcoming-list"
+            variants={rootVariants}
+            initial="hidden"
+            animate="visible"
+          >
             {eventTimeline.map((event) => {
-              const localDate = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: "Europe/Paris" }).format(event.date);
+              const localDate = new Intl.DateTimeFormat("fr-FR", {
+                day: "numeric",
+                month: "short",
+                timeZone: "Europe/Paris",
+              }).format(event.date);
               const [day, ...monthParts] = localDate.replace(".", "").split(" ");
-              const localTime = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).format(event.date);
-              const timing = event.timeLabel === "approximate_peak"
-                ? "Pic approximatif"
-                : event.timeLabel === "peak"
-                  ? `Pic à ${localTime}`
-                  : `À ${localTime}`;
+              const localTime = new Intl.DateTimeFormat("fr-FR", {
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "Europe/Paris",
+              }).format(event.date);
+              const timing =
+                event.timeLabel === "approximate_peak"
+                  ? "Pic approximatif"
+                  : event.timeLabel === "peak"
+                    ? `Pic à ${localTime}`
+                    : `À ${localTime}`;
 
               return (
-                <motion.article key={event.id} className="upcoming-item" variants={itemVariants} whileHover={prefersReducedMotion ? undefined : { scale: 1.02 }}>
-                  <div className="upcoming-date"><div className="day">{day}</div><div className="month">{monthParts.join(" ")}</div></div>
-                  <div className="upcoming-info"><h4>{event.title}</h4><p>{timing} · {event.description}</p></div>
-                  <svg className="upcoming-arrow event-star" viewBox="0 0 24 24"><path d="M12 2l1.7 6.3L20 10l-6.3 1.7L12 18l-1.7-6.3L4 10l6.3-1.7L12 2z" /></svg>
+                <motion.article
+                  key={event.id}
+                  className="upcoming-item"
+                  variants={itemVariants}
+                  whileHover={prefersReducedMotion ? undefined : { scale: 1.02 }}
+                >
+                  <div className="upcoming-date">
+                    <div className="day">{day}</div>
+                    <div className="month">{monthParts.join(" ")}</div>
+                  </div>
+                  <div className="upcoming-info">
+                    <h4>{event.title}</h4>
+                    <p>
+                      {timing} · {event.description}
+                    </p>
+                  </div>
+                  <svg className="upcoming-arrow event-star" viewBox="0 0 24 24">
+                    <path d="M12 2l1.7 6.3L20 10l-6.3 1.7L12 18l-1.7-6.3L4 10l6.3-1.7L12 2z" />
+                  </svg>
                 </motion.article>
               );
             })}
@@ -570,29 +954,69 @@ export function Dashboard() {
         </section>
 
         <section id="journal">
-          <MotionBlock className="section-header spaced"><h2 className="section-title">Journal</h2><span className="section-sub">Tes observations</span></MotionBlock>
+          <MotionBlock className="section-header spaced">
+            <h2 className="section-title">Journal</h2>
+            <span className="section-sub">Tes observations</span>
+          </MotionBlock>
           <MotionBlock className="journal-preview">
             {recentObservations.map((observation) => (
               <Link href="/journal" className="journal-card" key={observation.id}>
-                <div className="date">{new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(new Date(observation.createdAt))}</div>
+                <div className="date">
+                  {new Intl.DateTimeFormat("fr-FR", {
+                    day: "numeric",
+                    month: "long",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }).format(new Date(observation.createdAt))}
+                </div>
                 <h4>{observation.questTitle}</h4>
-                <p>{observation.status === "seen" ? `Observation confirmée · +${observation.xpEarned ?? 0} XP` : "Cible non aperçue · résultat enregistré"}</p>
+                <p>
+                  {observation.status === "seen"
+                    ? `Observation confirmée · +${observation.xpEarned ?? 0} XP`
+                    : "Cible non aperçue · résultat enregistré"}
+                </p>
               </Link>
             ))}
-            <Link href="/journal" className="journal-card empty"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg><span>{recentObservations.length ? "Voir le journal" : "Première observation"}</span></Link>
+            <Link href="/journal" className="journal-card empty">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              <span>{recentObservations.length ? "Voir le journal" : "Première observation"}</span>
+            </Link>
           </MotionBlock>
         </section>
 
         <section id="progression">
-          <MotionBlock className="section-header spaced"><h2 className="section-title">Progression</h2><span className="section-sub">{unlockedAchievementCount}/{achievementProgress.length || 7} succès</span></MotionBlock>
+          <MotionBlock className="section-header spaced">
+            <h2 className="section-title">Progression</h2>
+            <span className="section-sub">
+              {unlockedAchievementCount}/{achievementProgress.length || 7} succès
+            </span>
+          </MotionBlock>
           <MotionBlock className="progress-card">
-            <div className="progress-top"><div className="progress-rank">{rank?.current.name ?? "Curieux du ciel"}</div><div className="progress-xp">{profile?.totalXp ?? 0} XP</div></div>
-            <div className="progress-track"><motion.div className="progress-fill" initial={{ width: 0 }} animate={{ width: `${rank?.progressPercent ?? 0}%` }} transition={{ duration: prefersReducedMotion ? 0 : 0.8, ease: "easeOut" }} /></div>
-            <div className="progress-meta"><span>{profile?.currentStreak ?? 0} nuit{profile?.currentStreak === 1 ? "" : "s"} de suite</span><span>{rank?.next ? `${rank.xpToNext} XP avant ${rank.next.name}` : "Rang maximum"}</span></div>
+            <div className="progress-top">
+              <div className="progress-rank">{rank?.current.name ?? "Curieux du ciel"}</div>
+              <div className="progress-xp">{profile?.totalXp ?? 0} XP</div>
+            </div>
+            <div className="progress-track">
+              <motion.div
+                className="progress-fill"
+                initial={{ width: 0 }}
+                animate={{ width: `${rank?.progressPercent ?? 0}%` }}
+                transition={{ duration: prefersReducedMotion ? 0 : 0.8, ease: "easeOut" }}
+              />
+            </div>
+            <div className="progress-meta">
+              <span>
+                {profile?.currentStreak ?? 0} nuit{profile?.currentStreak === 1 ? "" : "s"} de suite
+              </span>
+              <span>
+                {rank?.next ? `${rank.xpToNext} XP avant ${rank.next.name}` : "Rang maximum"}
+              </span>
+            </div>
           </MotionBlock>
         </section>
       </motion.main>
-
     </div>
   );
 }

@@ -45,10 +45,18 @@ type SkyOverlayProps = {
 function pointFromQuest(quest: SkyQuest, label = quest.title): OverlayPoint | null {
   return quest.azimuth === null || quest.altitude === null
     ? null
-    : { id: quest.target, label, vector: horizontalCoordinatesToVector(quest.azimuth, quest.altitude) };
+    : {
+        id: quest.target,
+        label,
+        vector: horizontalCoordinatesToVector(quest.azimuth, quest.altitude),
+      };
 }
 
-function buildScene(quest: SkyQuest, location: ObserverLocation | null, date: Date): OverlayScene | null {
+function buildScene(
+  quest: SkyQuest,
+  location: ObserverLocation | null,
+  date: Date,
+): OverlayScene | null {
   if (quest.targetType === "free_observation") {
     return null;
   }
@@ -79,7 +87,9 @@ function buildScene(quest: SkyQuest, location: ObserverLocation | null, date: Da
   }
 
   if (quest.targetType === "meteor_shower" && location) {
-    const shower = meteorShowers.find((candidate) => quest.target === `meteor-${candidate.name.toLowerCase()}`);
+    const shower = meteorShowers.find(
+      (candidate) => quest.target === `meteor-${candidate.name.toLowerCase()}`,
+    );
     if (!shower) {
       return null;
     }
@@ -93,7 +103,12 @@ function buildScene(quest: SkyQuest, location: ObserverLocation | null, date: Da
     return {
       kind: "meteor",
       label: "Regarde large autour de cette zone",
-      points: [{ id: shower.id, vector: horizontalCoordinatesToVector(horizontal.azimuth, horizontal.altitude) }],
+      points: [
+        {
+          id: shower.id,
+          vector: horizontalCoordinatesToVector(horizontal.azimuth, horizontal.altitude),
+        },
+      ],
       segments: [],
     };
   }
@@ -111,11 +126,12 @@ function buildScene(quest: SkyQuest, location: ObserverLocation | null, date: Da
     return { kind: "iss", label: "Passage prévu dans cette zone", points: [point], segments: [] };
   }
 
-  const kind = quest.targetType === "galaxy"
-    ? "galaxy"
-    : quest.targetType === "star_cluster"
-      ? "cluster"
-      : "point";
+  const kind =
+    quest.targetType === "galaxy"
+      ? "galaxy"
+      : quest.targetType === "star_cluster"
+        ? "cluster"
+        : "point";
   return { kind, label: point.label ?? quest.title, points: [point], segments: [] };
 }
 
@@ -168,8 +184,10 @@ function drawScene(
   if (scene.kind === "cluster") {
     const visiblePoints = [...projections.values()].filter((projection) => projection.onScreen);
     if (visiblePoints.length > 0) {
-      const centerX = visiblePoints.reduce((total, point) => total + point.x, 0) / visiblePoints.length;
-      const centerY = visiblePoints.reduce((total, point) => total + point.y, 0) / visiblePoints.length;
+      const centerX =
+        visiblePoints.reduce((total, point) => total + point.x, 0) / visiblePoints.length;
+      const centerY =
+        visiblePoints.reduce((total, point) => total + point.y, 0) / visiblePoints.length;
       const gradient = context.createRadialGradient(centerX, centerY, 2, centerX, centerY, 34);
       gradient.addColorStop(0, "rgba(125, 211, 252, 0.28)");
       gradient.addColorStop(1, "rgba(124, 92, 255, 0)");
@@ -188,7 +206,14 @@ function drawScene(
 
     if (scene.kind === "galaxy") {
       const radius = 42;
-      const gradient = context.createRadialGradient(projected.x, projected.y, 2, projected.x, projected.y, radius);
+      const gradient = context.createRadialGradient(
+        projected.x,
+        projected.y,
+        2,
+        projected.x,
+        projected.y,
+        radius,
+      );
       gradient.addColorStop(0, "rgba(125, 211, 252, 0.3)");
       gradient.addColorStop(1, "rgba(124, 92, 255, 0)");
       context.fillStyle = gradient;
@@ -203,14 +228,23 @@ function drawScene(
       context.strokeStyle = "rgba(125, 211, 252, 0.72)";
       context.lineWidth = 1.4;
       context.beginPath();
-      context.ellipse(projected.x, projected.y, scene.kind === "meteor" ? 76 : 82, scene.kind === "meteor" ? 55 : 30, -0.28, 0, Math.PI * 2);
+      context.ellipse(
+        projected.x,
+        projected.y,
+        scene.kind === "meteor" ? 76 : 82,
+        scene.kind === "meteor" ? 55 : 30,
+        -0.28,
+        0,
+        Math.PI * 2,
+      );
       context.stroke();
       context.restore();
       drawLabel(context, scene.label, Math.max(12, projected.x - 78), projected.y + 74);
       continue;
     }
 
-    const starRadius = point.magnitude === undefined ? 3.2 : Math.max(1.8, 4.2 - point.magnitude * 0.45);
+    const starRadius =
+      point.magnitude === undefined ? 3.2 : Math.max(1.8, 4.2 - point.magnitude * 0.45);
     context.fillStyle = "rgba(226, 240, 255, 0.96)";
     context.beginPath();
     context.arc(projected.x, projected.y, starRadius, 0, Math.PI * 2);
@@ -236,18 +270,31 @@ function drawScene(
   }
 }
 
-export function SkyOverlay({ quest, location, orientationRef, videoRef, zoom, enabled }: SkyOverlayProps) {
+export function SkyOverlay({
+  quest,
+  location,
+  orientationRef,
+  videoRef,
+  zoom,
+  enabled,
+}: SkyOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneRef = useRef<OverlayScene | null>(null);
   const zoomRef = useRef(zoom);
   const enabledRef = useRef(enabled);
   const smoothedBasisRef = useRef<CameraBasis | null>(null);
 
-  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
-  useEffect(() => { enabledRef.current = enabled; }, [enabled]);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+  useEffect(() => {
+    enabledRef.current = enabled;
+  }, [enabled]);
 
   useEffect(() => {
-    const refresh = () => { sceneRef.current = buildScene(quest, location, new Date()); };
+    const refresh = () => {
+      sceneRef.current = buildScene(quest, location, new Date());
+    };
     refresh();
     const intervalId = window.setInterval(refresh, 30_000);
     return () => window.clearInterval(intervalId);
@@ -285,7 +332,14 @@ export function SkyOverlay({ quest, location, orientationRef, videoRef, zoom, en
       context?.clearRect(0, 0, width, height);
       const pointing = orientationRef.current;
       const scene = sceneRef.current;
-      if (context && enabledRef.current && pointing && pointing.azimuth !== null && pointing.altitude !== null && scene) {
+      if (
+        context &&
+        enabledRef.current &&
+        pointing &&
+        pointing.azimuth !== null &&
+        pointing.altitude !== null &&
+        scene
+      ) {
         const forward = horizontalCoordinatesToVector(pointing.azimuth, pointing.altitude);
         const right = normalizeVector(crossProduct(forward, { x: 0, y: 0, z: 1 }));
         const up = right ? normalizeVector(crossProduct(right, forward)) : null;
@@ -330,5 +384,11 @@ export function SkyOverlay({ quest, location, orientationRef, videoRef, zoom, en
     };
   }, [orientationRef, videoRef]);
 
-  return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none absolute inset-0 z-[5]" />;
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 z-[5]"
+    />
+  );
 }

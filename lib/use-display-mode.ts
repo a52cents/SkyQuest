@@ -22,7 +22,8 @@ export function useDisplayMode(): DisplayMode {
     const mediaQueries = INSTALLED_DISPLAY_MODE_QUERIES.map((query) => window.matchMedia(query));
 
     const detectDisplayMode = () => {
-      const isLegacyIosStandalone = (window.navigator as NavigatorWithStandalone).standalone === true;
+      const isLegacyIosStandalone =
+        (window.navigator as NavigatorWithStandalone).standalone === true;
       const isInstalledDisplayMode = mediaQueries.some((mediaQuery) => mediaQuery.matches);
       setDisplayMode(isInstalledDisplayMode || isLegacyIosStandalone ? "standalone" : "browser");
     };
@@ -30,7 +31,10 @@ export function useDisplayMode(): DisplayMode {
     detectDisplayMode();
     mediaQueries.forEach((mediaQuery) => mediaQuery.addEventListener("change", detectDisplayMode));
 
-    return () => mediaQueries.forEach((mediaQuery) => mediaQuery.removeEventListener("change", detectDisplayMode));
+    return () =>
+      mediaQueries.forEach((mediaQuery) =>
+        mediaQuery.removeEventListener("change", detectDisplayMode),
+      );
   }, []);
 
   return displayMode;

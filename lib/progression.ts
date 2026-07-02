@@ -1,3 +1,16 @@
+/**
+ * Progression locale
+ *
+ * Calcule XP, rangs, premières découvertes, accomplissements et séries à partir d'une
+ * observation. Les fonctions restent pures : `storage.ts` est seul responsable de persister
+ * le profil retourné.
+ *
+ * Important :
+ * - une observation `missed` reste dans le journal sans devenir une découverte confirmée ;
+ * - l'historique de récompenses empêche les gains répétés abusifs pour une même cible/nuit ;
+ * - les migrations doivent préserver autant que possible la progression existante ;
+ * - ne pas dépendre de l'heure UTC seule pour une notion de « nuit locale ».
+ */
 import type {
   AchievementId,
   Observation,
@@ -35,13 +48,38 @@ export const RANKS: readonly Rank[] = [
 ];
 
 export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
-  { id: "first-look", title: "Premier regard", description: "Réussir une première observation.", goal: 1 },
-  { id: "planet-tour", title: "Tour des planètes", description: "Observer trois planètes différentes.", goal: 3 },
-  { id: "night-landmarks", title: "Repères nocturnes", description: "Observer trois constellations ou astérismes.", goal: 3 },
+  {
+    id: "first-look",
+    title: "Premier regard",
+    description: "Réussir une première observation.",
+    goal: 1,
+  },
+  {
+    id: "planet-tour",
+    title: "Tour des planètes",
+    description: "Observer trois planètes différentes.",
+    goal: 3,
+  },
+  {
+    id: "night-landmarks",
+    title: "Repères nocturnes",
+    description: "Observer trois constellations ou astérismes.",
+    goal: 3,
+  },
   { id: "orbital-watcher", title: "Guetteur orbital", description: "Observer l’ISS.", goal: 1 },
-  { id: "persistent", title: "Persévérant", description: "Réussir une cible déjà manquée.", goal: 1 },
+  {
+    id: "persistent",
+    title: "Persévérant",
+    description: "Réussir une cible déjà manquée.",
+    goal: 1,
+  },
   { id: "explorer", title: "Explorateur", description: "Découvrir cinq cibles uniques.", goal: 5 },
-  { id: "confirmed-watcher", title: "Veilleur confirmé", description: "Réussir dix observations.", goal: 10 },
+  {
+    id: "confirmed-watcher",
+    title: "Veilleur confirmé",
+    description: "Réussir dix observations.",
+    goal: 10,
+  },
 ];
 
 export const COLLECTION_CATEGORIES: ReadonlyArray<{ type: QuestTargetType; label: string }> = [
@@ -85,7 +123,11 @@ export function getConditionsBonus(visibilityScore: number): number {
   return Math.min(15, Math.round(Math.max(0, 80 - visibilityScore) / 2));
 }
 
-export function getSuccessXp(difficulty: QuestDifficulty, visibilityScore: number, isFirstDiscovery: boolean): number {
+export function getSuccessXp(
+  difficulty: QuestDifficulty,
+  visibilityScore: number,
+  isFirstDiscovery: boolean,
+): number {
   const base = difficulty === "easy" ? 40 : 60;
   return Math.min(100, base + getConditionsBonus(visibilityScore) + (isFirstDiscovery ? 25 : 0));
 }
@@ -101,10 +143,18 @@ export function getRankProgress(totalXp: number): {
   const currentIndex = RANKS.findIndex((rank) => rank.name === current.name);
   const next = RANKS[currentIndex + 1] ?? null;
   const progressPercent = next
-    ? Math.min(100, Math.round(((safeXp - current.minimumXp) / (next.minimumXp - current.minimumXp)) * 100))
+    ? Math.min(
+        100,
+        Math.round(((safeXp - current.minimumXp) / (next.minimumXp - current.minimumXp)) * 100),
+      )
     : 100;
 
-  return { current, next, progressPercent, xpToNext: next ? Math.max(0, next.minimumXp - safeXp) : 0 };
+  return {
+    current,
+    next,
+    progressPercent,
+    xpToNext: next ? Math.max(0, next.minimumXp - safeXp) : 0,
+  };
 }
 
 function getNightDayNumber(nightKey: string): number {
@@ -135,7 +185,9 @@ function computeStreakOnSuccess(profile: ProgressProfile, now: Date): StreakUpda
   }
 
   const timestamp = now.toISOString();
-  const nightDifference = previousNightKey ? getNightDifference(currentNightKey, previousNightKey) : null;
+  const nightDifference = previousNightKey
+    ? getNightDifference(currentNightKey, previousNightKey)
+    : null;
   let currentStreak = 1;
   let streakFreezeCount = Math.min(1, Math.max(0, profile.streakFreezeCount));
   let lastFreezeRegenerationKey = profile.lastFreezeRegenerationKey;
@@ -145,7 +197,9 @@ function computeStreakOnSuccess(profile: ProgressProfile, now: Date): StreakUpda
     currentStreak = previousStreak > 0 ? previousStreak + 1 : 1;
     streakMessage = `Série de ${currentStreak} nuit${currentStreak > 1 ? "s" : ""} !`;
   } else if (previousStreak > 0) {
-    const freezeDifference = lastFreezeRegenerationKey ? getNightDifference(currentNightKey, lastFreezeRegenerationKey) : Number.POSITIVE_INFINITY;
+    const freezeDifference = lastFreezeRegenerationKey
+      ? getNightDifference(currentNightKey, lastFreezeRegenerationKey)
+      : Number.POSITIVE_INFINITY;
     if (streakFreezeCount < 1 && freezeDifference >= 7) {
       streakFreezeCount = 1;
       lastFreezeRegenerationKey = currentNightKey;
@@ -193,11 +247,16 @@ function getAchievementValue(profile: ProgressProfile, id: AchievementId): numbe
     case "planet-tour":
       return discoveries.filter((item) => item.targetType === "planet").length;
     case "night-landmarks":
-      return discoveries.filter((item) => item.targetType === "constellation" || item.targetType === "asterism").length;
+      return discoveries.filter(
+        (item) => item.targetType === "constellation" || item.targetType === "asterism",
+      ).length;
     case "orbital-watcher":
       return Math.min(1, discoveries.some((item) => item.target.toLowerCase() === "iss") ? 1 : 0);
     case "persistent":
-      return Math.min(1, profile.rewardHistory.some((entry) => entry.status === "seen" && entry.hadMissed) ? 1 : 0);
+      return Math.min(
+        1,
+        profile.rewardHistory.some((entry) => entry.status === "seen" && entry.hadMissed) ? 1 : 0,
+      );
     case "explorer":
       return discoveries.length;
     case "confirmed-watcher":
@@ -229,14 +288,20 @@ export function applyQuestReward(
   const key = `${localNight}:${target}`;
   const existingReward = profile.rewardHistory.find((entry) => entry.key === key);
   const isFreeObservation = quest.targetType === "free_observation";
-  const isFirstDiscovery = status === "seen" && !isFreeObservation && !profile.discoveredTargets.some((item) => item.target.toLowerCase() === target);
+  const isFirstDiscovery =
+    status === "seen" &&
+    !isFreeObservation &&
+    !profile.discoveredTargets.some((item) => item.target.toLowerCase() === target);
   const desiredXp = isFreeObservation
     ? 15
     : status === "missed"
       ? 10
       : getSuccessXp(quest.difficulty, quest.visibilityScore, isFirstDiscovery);
   const xpEarned = Math.max(0, desiredXp - (existingReward?.awardedXp ?? 0));
-  const hadMissed = existingReward?.hadMissed === true || existingReward?.status === "missed" || status === "missed" ||
+  const hadMissed =
+    existingReward?.hadMissed === true ||
+    existingReward?.status === "missed" ||
+    status === "missed" ||
     profile.rewardHistory.some((entry) => entry.target === target && entry.status === "missed");
 
   const rewardEntry = {
@@ -244,15 +309,18 @@ export function applyQuestReward(
     target,
     localNight,
     awardedXp: Math.max(existingReward?.awardedXp ?? 0, desiredXp),
-    status: status === "seen" ? "seen" as const : existingReward?.status ?? "missed" as const,
+    status: status === "seen" ? ("seen" as const) : (existingReward?.status ?? ("missed" as const)),
     hadMissed,
     updatedAt: timestamp,
   };
   const rewardHistory = existingReward
-    ? profile.rewardHistory.map((entry) => entry.key === key ? rewardEntry : entry)
+    ? profile.rewardHistory.map((entry) => (entry.key === key ? rewardEntry : entry))
     : [...profile.rewardHistory, rewardEntry];
   const discoveredTargets = isFirstDiscovery
-    ? [...profile.discoveredTargets, { target: quest.target, targetType: quest.targetType, discoveredAt: timestamp }]
+    ? [
+        ...profile.discoveredTargets,
+        { target: quest.target, targetType: quest.targetType, discoveredAt: timestamp },
+      ]
     : profile.discoveredTargets;
   const intermediate: ProgressProfile = {
     ...profile,
@@ -261,9 +329,10 @@ export function applyQuestReward(
     rewardHistory,
     updatedAt: timestamp,
   };
-  const streakResult = status === "seen"
-    ? computeStreakOnSuccess(intermediate, now)
-    : { profile: intermediate, previousStreak: intermediate.currentStreak, streakMessage: null };
+  const streakResult =
+    status === "seen"
+      ? computeStreakOnSuccess(intermediate, now)
+      : { profile: intermediate, previousStreak: intermediate.currentStreak, streakMessage: null };
   const streakProfile = streakResult.profile;
   const newlyUnlocked = getAchievementProgress(streakProfile)
     .filter((achievement) => achievement.progress >= achievement.goal)

@@ -2,7 +2,7 @@
 
 ## Objectif du MVP
 
-Construire une PWA mobile-first qui propose 1 a 3 quetes d'observation du ciel a faire maintenant, selon la position GPS, l'heure, la meteo Open-Meteo et les objets visibles calcules avec `astronomy-engine`.
+Construire une PWA mobile-first qui propose une liste classée de quêtes d'observation du ciel à faire maintenant, selon la position GPS, l'heure, la météo Open-Meteo et les objets visibles calculés avec `astronomy-engine`.
 
 Le produit doit rester une experience guidee simple : `Maintenant -> quoi regarder -> aide camera 2D -> journal`. Ne pas construire une carte du ciel complete.
 
@@ -40,6 +40,58 @@ Le produit doit rester une experience guidee simple : `Maintenant -> quoi regard
 - `lib/quest-generator.ts` pour generation des quetes.
 - `lib/types.ts` pour types partages.
 
+## Conventions de nommage
+
+### Concepts métier
+
+- `Quest` / `SkyQuest` = mission proposée à l'utilisateur. Une quête contient la cible, les indications de guidage et les conditions estimées au moment de sa génération.
+- `Observation` = résultat enregistré dans le journal après une quête. Elle indique notamment si la cible a été vue ou non trouvée.
+- `target` = identifiant de l'objet ou du phénomène à observer. Ne pas l'utiliser pour désigner la quête complète.
+- `targetType` / `QuestTargetType` = famille fonctionnelle de la cible : Lune, planète, étoile, constellation, météores, satellite, etc.
+- `SkyObject` = position astronomique calculée d'un objet à un instant donné. Ce n'est ni une quête ni une observation enregistrée.
+- `catalogSkyObject` / `CatalogSkyObject` = entrée éditoriale du catalogue avec coordonnées, description et conseils d'observation.
+- `candidate` / `QuestCandidate` = cible évaluée pendant la génération, avant sa sélection comme quête.
+- `activeQuest` = quête sélectionnée et stockée localement pour être relue par `/quest/[id]`.
+- `FreeObservation` / `free_observation` = fallback proposé quand aucune quête fiable n'est disponible ou que la position manque.
+
+### Coordonnées et orientation
+
+- `latitude` / `longitude` = coordonnées géographiques de l'observateur, en degrés décimaux. Toujours préciser `observer` ou `location` si une ambiguïté est possible.
+- `azimuth` = direction horizontale en degrés, mesurée depuis le nord dans le sens horaire, normalisée dans `[0, 360)`.
+- `altitude` = hauteur angulaire au-dessus de l'horizon en degrés. Une valeur négative désigne une cible sous l'horizon.
+- `cardinalDirection` = traduction lisible de l'azimut, par exemple nord-est ou sud-ouest.
+- `rightAscensionHours` = ascension droite équatoriale exprimée en heures.
+- `declinationDegrees` = déclinaison équatoriale exprimée en degrés.
+- `CameraPointing` = orientation estimée de la caméra sous forme d'azimut, d'altitude et de niveau de confiance.
+- `orientation` = mesure ou état des capteurs du téléphone ; ne pas employer ce terme comme synonyme de direction cardinale.
+- `heading` = cap horizontal brut fourni par un capteur ou Safari ; le convertir avant de l'utiliser comme azimut applicatif.
+
+### Visibilité et météo
+
+- `visibilityScore` = indice interne de conditions et de confort d'observation compris entre 0 et 100. Ce n'est pas une probabilité scientifique ni une garantie de visibilité.
+- `visibilityLabel` = formulation utilisateur dérivée du score, comme `Bonne chance` ou `Tentable`.
+- `cloudCover` = couverture nuageuse en pourcentage, comprise entre 0 et 100.
+- `isDay` = état jour/nuit fourni par la météo ; les calculs astronomiques plus précis utilisent plutôt l'altitude du Soleil.
+- `sunAltitude` = hauteur du Soleil en degrés, utilisée pour distinguer jour, crépuscule et nuit.
+- `WeatherNow` = photographie simplifiée des conditions météo utilisées pour générer les quêtes.
+
+### Journal et progression
+
+- `seen` = l'utilisateur déclare avoir trouvé la cible.
+- `missed` = l'utilisateur déclare ne pas avoir trouvé la cible. Préférer ce terme à `failed`, qui serait inutilement punitif.
+- `discovery` = première observation confirmée d'une cible ; une observation `missed` n'est pas une découverte.
+- `reward` / `ProgressReward` = résultat du calcul de progression produit par une observation.
+- `profile` / `ProgressProfile` = état local cumulé de la progression.
+- `localNight` / `nightKey` = nuit d'observation selon le calendrier local, pas uniquement selon la date UTC.
+
+### Règles générales
+
+- Utiliser les noms de domaine en anglais dans le code et les libellés français dans l'interface.
+- Conserver les unités dans le nom lorsque le type seul ne suffit pas : `durationSeconds`, `horizonMinutes`, `rightAscensionHours`.
+- Préférer un suffixe explicite comme `At`, `Date`, `Time`, `Seconds` ou `Minutes` pour les valeurs temporelles.
+- Réserver `current` aux données du moment et `future` / `upcoming` aux suggestions ou événements à venir.
+- Ne pas utiliser indifféremment `object`, `target`, `quest` et `observation` : chaque terme représente une étape différente du parcours.
+
 ## Regles de code
 
 - Favoriser fonctions pures dans `lib`.
@@ -52,7 +104,7 @@ Le produit doit rester une experience guidee simple : `Maintenant -> quoi regard
 
 ## Regles design
 
-- Respecter `DESIGN.md` comme source de verite.
+- Respecter `UI_SOURCE_OF_TRUTH.md` pour la hiérarchie des sources UI et `DESIGN.md` pour l'intention visuelle.
 - Dark spatial colore, accent bleu-violet, glass leger.
 - Mobile-first, gros controles, contraste fort.
 - Pas d'interface trop scientifique.
@@ -95,4 +147,3 @@ Le produit doit rester une experience guidee simple : `Maintenant -> quoi regard
 - v0.3 : compte utilisateur optionnel.
 - v0.4 : module AR 3D remplacant `CameraGuide`.
 - v0.4 : WebXR ou integration native si PWA insuffisante.
-
