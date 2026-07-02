@@ -1,0 +1,145 @@
+.sky-dashboard {
+  --dash-bg: #0a0a0b;
+  --dash-bg-elev: #131316;
+  --dash-bg-card: #161619;
+  --dash-fg: #f4f4f5;
+  --dash-fg-dim: #a1a1aa;
+  --dash-fg-muted: #52525b;
+  --dash-accent: #7c5cff;
+  --dash-accent-glow: rgba(124, 92, 255, 0.12);
+  --dash-accent-warm: #f59e0b;
+  --dash-accent-cyan: #38bdf8;
+  --dash-border: rgba(255, 255, 255, 0.06);
+  --dash-border-hover: rgba(255, 255, 255, 0.14);
+  --dash-radius: 20px;
+  --dash-radius-sm: 12px;
+  --dash-font-display: Georgia, "Times New Roman", serif;
+  --dash-font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --dash-font-mono: "SF Mono", "Fira Code", monospace;
+  min-height: 100vh;
+  padding-bottom: 100px;
+  overflow-x: hidden;
+  background: var(--dash-bg);
+  color: var(--dash-fg);
+  font-family: var(--dash-font-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.sky-dashboard::before { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none; opacity: .035; mix-blend-mode: overlay; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.sky-dashboard *, .sky-dashboard *::before, .sky-dashboard *::after { box-sizing: border-box; }
+.sky-dashboard * { margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+.sky-dashboard ::selection { background: var(--dash-accent); color: white; }
+.sky-dashboard button, .sky-dashboard a { font: inherit; }
+.sky-dashboard a { color: inherit; text-decoration: none; }
+
+.sky-dashboard .app-header { position: sticky; top: 0; z-index: 50; padding: 16px 20px; border-bottom: 1px solid var(--dash-border); background: rgba(10,10,11,.85); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); }
+.sky-dashboard .header-inner { display: flex; align-items: center; justify-content: space-between; max-width: 600px; margin: 0 auto; }
+.sky-dashboard .header-logo { display: flex; align-items: center; gap: 8px; font-family: var(--dash-font-display); font-size: 18px; font-weight: 400; letter-spacing: -.3px; }
+.sky-dashboard .logo-mark { width: 24px; height: 24px; position: relative; }
+.sky-dashboard .logo-mark svg { width: 100%; height: 100%; }
+.sky-dashboard .logo-mark .star { fill: var(--dash-fg); animation: dash-twinkle 3s ease-in-out infinite; }
+.sky-dashboard .logo-mark .star:nth-child(2) { animation-delay: .5s; }
+@keyframes dash-twinkle { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+.sky-dashboard .header-meta { text-align: right; }
+.sky-dashboard .header-time { color: var(--dash-fg-dim); font-size: 12px; font-variant-numeric: tabular-nums; }
+.sky-dashboard .header-location { display: flex; align-items: center; justify-content: flex-end; gap: 4px; color: var(--dash-fg-muted); font-size: 11px; }
+.sky-dashboard .header-location svg { width: 10px; height: 10px; fill: none; stroke: var(--dash-accent); stroke-width: 2; }
+
+.sky-dashboard .dashboard-main { max-width: 600px; margin: 0 auto; padding: 20px; }
+.sky-dashboard section { scroll-margin-top: 78px; }
+.sky-dashboard .conditions-bar { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 24px; }
+.sky-dashboard .condition-item { padding: 12px 8px; border: 1px solid var(--dash-border); border-radius: var(--dash-radius-sm); background: var(--dash-bg-card); text-align: center; transition: border-color .3s; }
+.sky-dashboard .condition-item:hover { border-color: var(--dash-border-hover); }
+.sky-dashboard .condition-icon { width: 20px; height: 20px; margin: 0 auto 6px; fill: none; stroke: var(--dash-accent); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.sky-dashboard .condition-value { min-height: 20px; color: var(--dash-fg); font-family: var(--dash-font-mono); font-size: 13px; font-weight: 600; }
+.sky-dashboard .condition-label { margin-top: 2px; color: var(--dash-fg-muted); font-size: 10px; letter-spacing: .5px; text-transform: uppercase; }
+
+.sky-dashboard .section-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }
+.sky-dashboard .section-header.spaced { margin-top: 40px; }
+.sky-dashboard .section-title { color: var(--dash-fg); font-family: var(--dash-font-display); font-size: 22px; font-weight: 400; letter-spacing: -.5px; }
+.sky-dashboard .section-sub { color: var(--dash-fg-muted); font-size: 12px; }
+.sky-dashboard .status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border: 1px solid var(--dash-border); border-radius: 100px; background: rgba(124,92,255,.06); color: var(--dash-fg-dim); font-family: var(--dash-font-mono); font-size: 11px; letter-spacing: .5px; text-transform: uppercase; }
+.sky-dashboard button.status-pill { cursor: pointer; }
+.sky-dashboard .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 6px #22c55e; animation: dash-pulse 2.5s ease-in-out infinite; }
+.sky-dashboard .status-pill.loading .dot { background: var(--dash-accent-warm); box-shadow: 0 0 6px var(--dash-accent-warm); }
+@keyframes dash-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.8); } }
+
+.sky-dashboard .camera-guide { position: relative; overflow: hidden; margin-bottom: 32px; padding: 32px 24px; border: 1px solid var(--dash-border); border-radius: var(--dash-radius); background: linear-gradient(180deg,var(--dash-bg-elev) 0%,var(--dash-bg-card) 100%); text-align: center; }
+.sky-dashboard .camera-guide::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 30%,var(--dash-accent-glow) 0%,transparent 60%); }
+.sky-dashboard .camera-guide-inner { position: relative; z-index: 1; }
+.sky-dashboard .camera-icon { display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; margin: 0 auto 20px; border: 1px solid var(--dash-border); border-radius: 50%; background: var(--dash-bg-card); }
+.sky-dashboard .camera-icon svg { width: 28px; height: 28px; fill: none; stroke: var(--dash-accent); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.sky-dashboard .camera-guide h3 { margin-bottom: 8px; font-family: var(--dash-font-display); font-size: 20px; font-weight: 400; }
+.sky-dashboard .camera-guide p { max-width: 300px; margin: 0 auto 24px; color: var(--dash-fg-dim); font-size: 14px; line-height: 1.6; }
+.sky-dashboard .camera-btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; border: 0; border-radius: 100px; background: var(--dash-fg); color: var(--dash-bg); cursor: pointer; font-size: 15px; font-weight: 500; }
+.sky-dashboard .camera-btn:disabled { cursor: wait; opacity: .65; }
+.sky-dashboard .camera-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
+.sky-dashboard .quest-list { display: grid; }
+.sky-dashboard .quest-card { position: relative; overflow: hidden; margin-bottom: 12px; padding: 24px; border: 1px solid var(--dash-border); border-radius: var(--dash-radius); background: var(--dash-bg-card); cursor: pointer; transition: border-color .4s ease, box-shadow .4s ease; }
+.sky-dashboard .quest-card:hover { border-color: var(--dash-accent); box-shadow: 0 0 40px var(--dash-accent-glow); }
+.sky-dashboard .quest-card::before { content: ""; position: absolute; top: 0; right: 0; left: 0; height: 1px; opacity: 0; background: linear-gradient(90deg,transparent,var(--dash-accent),transparent); transition: opacity .4s; }
+.sky-dashboard .quest-card:hover::before { opacity: .6; }
+.sky-dashboard .quest-badge { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px; padding: 4px 10px; border: 1px solid var(--dash-border); border-radius: 100px; font-size: 10px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; }
+.sky-dashboard .quest-badge.now { border-color: rgba(34,197,94,.2); background: rgba(34,197,94,.08); color: #22c55e; }
+.sky-dashboard .quest-badge.soon { border-color: rgba(245,158,11,.2); background: rgba(245,158,11,.08); color: var(--dash-accent-warm); }
+.sky-dashboard .quest-badge .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: dash-pulse 2s ease-in-out infinite; }
+.sky-dashboard .quest-card h3 { margin-bottom: 8px; font-family: var(--dash-font-display); font-size: 20px; font-weight: 400; line-height: 1.3; }
+.sky-dashboard .quest-card p { margin-bottom: 16px; color: var(--dash-fg-dim); font-size: 14px; line-height: 1.6; }
+.sky-dashboard .quest-meta { display: flex; flex-wrap: wrap; gap: 16px; }
+.sky-dashboard .quest-meta-item { display: flex; align-items: center; gap: 6px; color: var(--dash-fg-muted); font-family: var(--dash-font-mono); font-size: 12px; }
+.sky-dashboard .quest-meta-item svg { width: 14px; height: 14px; fill: none; stroke: var(--dash-fg-muted); stroke-width: 1.5; }
+.sky-dashboard .quest-action { display: flex; align-items: center; justify-content: space-between; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--dash-border); }
+.sky-dashboard .quest-hint { color: var(--dash-fg-muted); font-size: 12px; font-style: italic; }
+.sky-dashboard .quest-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border: 0; border-radius: 100px; background: var(--dash-accent); color: white; cursor: pointer; font-size: 13px; font-weight: 500; }
+.sky-dashboard .quest-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.sky-dashboard .upcoming-list { display: flex; flex-direction: column; gap: 8px; }
+.sky-dashboard .upcoming-item { display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid var(--dash-border); border-radius: var(--dash-radius-sm); background: var(--dash-bg-card); transition: border-color .3s, background-color .3s; }
+.sky-dashboard button.upcoming-item { width: 100%; color: inherit; text-align: left; cursor: pointer; }
+.sky-dashboard .upcoming-item:hover { border-color: var(--dash-border-hover); background: var(--dash-bg-elev); }
+.sky-dashboard .upcoming-date { display: flex; flex-direction: column; align-items: center; min-width: 48px; }
+.sky-dashboard .upcoming-date .day { color: var(--dash-fg); font-family: var(--dash-font-mono); font-size: 20px; font-weight: 600; line-height: 1; }
+.sky-dashboard .upcoming-date .month { margin-top: 2px; color: var(--dash-fg-muted); font-size: 10px; letter-spacing: .5px; text-transform: uppercase; }
+.sky-dashboard .upcoming-info { min-width: 0; }
+.sky-dashboard .upcoming-info h4 { margin-bottom: 2px; overflow: hidden; font-size: 15px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.sky-dashboard .upcoming-info p { color: var(--dash-fg-muted); font-size: 13px; }
+.sky-dashboard .upcoming-arrow { width: 16px; height: 16px; margin-left: auto; flex: 0 0 auto; fill: none; stroke: var(--dash-fg-muted); stroke-width: 1.5; }
+
+.sky-dashboard .journal-preview { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; }
+.sky-dashboard .journal-card { padding: 16px; border: 1px solid var(--dash-border); border-radius: var(--dash-radius-sm); background: var(--dash-bg-card); cursor: pointer; transition: border-color .3s; }
+.sky-dashboard .journal-card:hover { border-color: var(--dash-border-hover); }
+.sky-dashboard .journal-card .date { margin-bottom: 8px; color: var(--dash-fg-muted); font-family: var(--dash-font-mono); font-size: 11px; }
+.sky-dashboard .journal-card h4 { margin-bottom: 4px; font-family: var(--dash-font-display); font-size: 15px; font-weight: 400; }
+.sky-dashboard .journal-card p { color: var(--dash-fg-muted); font-size: 12px; line-height: 1.5; }
+.sky-dashboard .journal-card.empty { display: flex; min-height: 100px; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border-style: dashed; color: var(--dash-fg-muted); }
+.sky-dashboard .journal-card.empty svg { width: 20px; height: 20px; fill: none; stroke: var(--dash-fg-muted); stroke-width: 1.5; }
+
+.sky-dashboard .progress-card { padding: 20px; border: 1px solid var(--dash-border); border-radius: var(--dash-radius); background: var(--dash-bg-card); }
+.sky-dashboard .progress-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.sky-dashboard .progress-rank { font-family: var(--dash-font-display); font-size: 19px; }
+.sky-dashboard .progress-xp { color: var(--dash-fg-dim); font-family: var(--dash-font-mono); font-size: 12px; }
+.sky-dashboard .progress-track { height: 5px; margin: 16px 0; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.06); }
+.sky-dashboard .progress-fill { height: 100%; border-radius: inherit; background: var(--dash-accent); box-shadow: 0 0 14px rgba(124,92,255,.35); }
+.sky-dashboard .progress-meta { display: flex; justify-content: space-between; color: var(--dash-fg-muted); font-size: 12px; }
+
+.sky-dashboard .dashboard-notice { margin-bottom: 20px; padding: 12px 14px; border: 1px solid rgba(245,158,11,.2); border-radius: var(--dash-radius-sm); background: rgba(245,158,11,.06); color: #d6b875; font-size: 12px; line-height: 1.5; }
+.sky-dashboard .empty-state { padding: 48px 24px; color: var(--dash-fg-muted); text-align: center; }
+.sky-dashboard .empty-state svg { width: 40px; height: 40px; margin-bottom: 12px; fill: none; stroke: var(--dash-fg-muted); stroke-width: 1; }
+.sky-dashboard .empty-state p { font-size: 14px; }
+
+.sky-dashboard .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 50; padding: 8px 0 calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--dash-border); background: rgba(10,10,11,.92); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); }
+.sky-dashboard .bottom-nav-inner { display: flex; align-items: center; justify-content: space-around; max-width: 600px; margin: 0 auto; }
+.sky-dashboard .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 16px; border: 0; background: none; color: var(--dash-fg-muted); cursor: pointer; font-size: 10px; letter-spacing: .5px; text-transform: uppercase; }
+.sky-dashboard .nav-item.active { color: var(--dash-accent); }
+.sky-dashboard .nav-item svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+.sky-dashboard .dashboard-modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: flex-end; justify-content: center; padding: 12px; background: rgba(3,3,4,.82); backdrop-filter: blur(12px); }
+.sky-dashboard .dashboard-modal-card { width: 100%; max-width: 420px; padding: 24px; border: 1px solid var(--dash-border-hover); border-radius: var(--dash-radius); background: var(--dash-bg-elev); }
+.sky-dashboard .dashboard-modal-card h2 { margin-bottom: 8px; font-family: var(--dash-font-display); font-size: 22px; font-weight: 400; }
+.sky-dashboard .dashboard-modal-card p { margin-bottom: 20px; color: var(--dash-fg-dim); font-size: 14px; line-height: 1.6; }
+.sky-dashboard .modal-actions { display: grid; gap: 8px; }
+.sky-dashboard .modal-secondary { padding: 10px; border: 1px solid var(--dash-border); border-radius: 100px; background: transparent; color: var(--dash-fg-dim); cursor: pointer; }
+
+@media (min-width: 640px) { .sky-dashboard .journal-preview { grid-template-columns: repeat(3,1fr); } .sky-dashboard .conditions-bar { gap: 12px; } .sky-dashboard .condition-item { padding: 16px 12px; } .sky-dashboard .dashboard-modal { align-items: center; } }
+@media (max-width: 380px) { .sky-dashboard .conditions-bar { grid-template-columns: repeat(2,1fr); } .sky-dashboard .section-title { font-size: 20px; } .sky-dashboard .quest-card { padding: 20px; } .sky-dashboard .quest-card h3 { font-size: 18px; } .sky-dashboard .journal-preview { grid-template-columns: 1fr; } .sky-dashboard .nav-item { padding-inline: 10px; } }
