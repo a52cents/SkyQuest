@@ -17,6 +17,7 @@ Le projet privilégie un parcours simple — **Maintenant → quoi regarder → 
 - journal, XP, rangs, séries et accomplissements stockés localement ;
 - mode nuit, retours haptiques, onboarding et prise en compte de la réduction des animations ;
 - manifest PWA et cache hors ligne simple de la coquille applicative.
+- alertes Web Push optionnelles, personnalisables et limitées à une par jour.
 
 La racine `/` affiche la page de présentation dans un navigateur classique et le tableau de bord lorsque l'application est lancée en mode installé (`standalone`).
 
@@ -28,10 +29,11 @@ La racine `/` affiche la page de présentation dans un navigateur classique et l
 - Framer Motion
 - `astronomy-engine`
 - Open-Meteo
+- Supabase/Postgres pour les subscriptions Web Push
 - API N2YO facultative pour l'ISS
 - `localStorage` pour les données utilisateur
 
-Il n'y a ni compte, ni base de données, ni authentification. La seule route serveur métier est le proxy optionnel utilisé pour interroger N2YO sans exposer sa clé API.
+Il n'y a ni compte utilisateur ni authentification. Supabase sert uniquement à persister les subscriptions Web Push côté serveur ; le journal et la progression restent locaux.
 
 ## Installation
 
@@ -49,11 +51,23 @@ soutien volontaire :
 ```dotenv
 N2YO_API_KEY=votre_cle_n2yo
 NEXT_PUBLIC_SUPPORT_URL=https://votre-prestataire.example/soutenir
+
+# Notifications push facultatives
+NEXT_PUBLIC_SUPABASE_URL=https://votre-projet.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=votre_cle_publique_supabase
+SUPABASE_SERVICE_ROLE_KEY=votre_cle_service_role
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=votre_cle_publique
+VAPID_PRIVATE_KEY=votre_cle_privee
+VAPID_SUBJECT=mailto:contact@skyquest.app
+CRON_SECRET=un_secret_aleatoire
+PUSH_TEST_SECRET=un_autre_secret_aleatoire
 ```
 
 Sans ces variables, l'application continue normalement : elle omet les passages ISS et indique
-simplement que le soutien financier n'est pas encore disponible. L'URL de soutien doit utiliser
-HTTPS et n'est ouverte qu'après une action volontaire depuis la page de soutien.
+simplement que le soutien financier ou les alertes ne sont pas encore configurés. L'URL de soutien
+doit utiliser HTTPS et n'est ouverte qu'après une action volontaire depuis la page de soutien. La
+configuration complète des alertes et le SQL Supabase sont décrits dans
+[`docs/push-notifications.md`](./docs/push-notifications.md).
 
 Lancez le serveur de développement :
 
@@ -136,6 +150,7 @@ Les fonctions de calcul sont regroupées dans `lib/`. Les composants client sont
 - [`docs/ai-rules.md`](./docs/ai-rules.md) : repères de contribution pour les agents IA ;
 - [`docs/camera-guide.md`](./docs/camera-guide.md) : fonctionnement et fallbacks du guidage ;
 - [`docs/pwa-ios-limitations.md`](./docs/pwa-ios-limitations.md) : contraintes PWA, Safari et iOS ;
+- [`docs/push-notifications.md`](./docs/push-notifications.md) : clés VAPID, endpoints, cron et tests push ;
 - [`docs/design-principles.md`](./docs/design-principles.md) : principes d'interface ;
 - [`docs/roadmap.md`](./docs/roadmap.md) : évolutions envisagées.
 
@@ -147,6 +162,7 @@ Les fonctions de calcul sont regroupées dans `lib/`. Les composants client sont
 - **Caméra et orientation** : demandées au lancement du guidage. Les pistes caméra sont arrêtées au démontage du composant.
 - **Photos** : redimensionnées et stockées sous forme de données locales ; elles ne sont ni analysées ni téléversées par SkyQuest.
 - **Journal et progression** : conservés dans `localStorage`, limités aux 50 observations les plus récentes et effaçables depuis l'interface.
+- **Alertes** : consentement explicite, thèmes choisis par l’utilisateur et position arrondie à un chiffre après la virgule côté serveur.
 - **Publicité** : après consentement explicite, l'analyse peut ouvrir une page publicitaire externe. Un délai de dix minutes est mémorisé localement entre deux ouvertures.
 
 En production, servez obligatoirement l'application en HTTPS pour rendre disponibles la géolocalisation, la caméra, les capteurs d'orientation et l'installation PWA.
@@ -178,7 +194,8 @@ npm run build
 - une visibilité calculée reste une estimation et ne garantit jamais l'observation ;
 - le fonctionnement hors ligne est limité aux ressources déjà mises en cache ;
 - les données sont propres au navigateur et ne sont pas synchronisées entre appareils ;
-- aucune reconnaissance automatique de photo, notification push ou carte du ciel complète n'est incluse.
+- les subscriptions push nécessitent un projet Supabase configuré et des clés VAPID valides ;
+- aucune reconnaissance automatique de photo ou carte du ciel complète n'est incluse.
 
 ## Design
 

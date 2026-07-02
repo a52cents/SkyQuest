@@ -20,6 +20,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 import { AppHeader } from "@/components/AppHeader";
 import { Onboarding } from "@/components/Onboarding";
+import { PushPermissionCard } from "@/components/PushPermissionCard";
 import { getCurrentPosition, type GeoPosition } from "@/lib/browser-support";
 import { getUpcomingCelestialEvents, type CelestialEventType } from "@/lib/celestial-events";
 import { haptic } from "@/lib/haptics";
@@ -643,6 +644,10 @@ export function Dashboard() {
                   : "Maintenant"}
             </motion.button>
           </div>
+        </MotionBlock>
+
+        <MotionBlock>
+          <PushPermissionCard />
         </MotionBlock>
 
         <MotionBlock className="section-header">

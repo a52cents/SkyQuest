@@ -1,4 +1,4 @@
-const SW_VERSION = "v3";
+const SW_VERSION = "v4";
 const STATIC_CACHE = `skyquest-static-${SW_VERSION}`;
 const PAGE_CACHE = `skyquest-pages-${SW_VERSION}`;
 const RUNTIME_CACHE = `skyquest-runtime-${SW_VERSION}`;
@@ -179,4 +179,60 @@ self.addEventListener("fetch", (event) => {
   if (request.destination === "image") {
     event.respondWith(cacheFirstImage(request));
   }
+});
+
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = { body: event.data?.text() };
+  }
+
+  const title = typeof payload.title === "string" ? payload.title : "SkyQuest";
+  const payloadData =
+    payload.data && typeof payload.data === "object" && !Array.isArray(payload.data)
+      ? payload.data
+      : {};
+  const options = {
+    body:
+      typeof payload.body === "string" ? payload.body : "Une nouvelle alerte ciel est disponible.",
+    icon: typeof payload.icon === "string" ? payload.icon : "/icon-192.png",
+    badge: typeof payload.badge === "string" ? payload.badge : "/icon-192.png",
+    tag: typeof payload.tag === "string" ? payload.tag : "skyquest-alert",
+    data: {
+      ...payloadData,
+      url: typeof payload.url === "string" ? payload.url : "/",
+    },
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  let destination = new URL("/", self.location.origin);
+  try {
+    const requested = new URL(event.notification.data?.url || "/", self.location.origin);
+    if (requested.origin === self.location.origin) destination = requested;
+  } catch {
+    // Malformed or external URLs fall back to the application root.
+  }
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then(async (clientList) => {
+        for (const client of clientList) {
+          if ("focus" in client) {
+            await client.focus();
+            if ("navigate" in client) await client.navigate(destination.href);
+            return;
+          }
+        }
+
+        if (self.clients.openWindow) return self.clients.openWindow(destination.href);
+      }),
+  );
 });

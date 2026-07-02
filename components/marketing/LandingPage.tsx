@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
+import { PushPermissionCard } from "@/components/PushPermissionCard";
 
 const HERO_IMAGE = "/HERO_IMAGE.webp";
 const OBSERVATION_IMAGE = "/OBSERVATION_IMAGE.webp";
@@ -248,7 +249,7 @@ export function LandingPage() {
         </motion.div>
         <motion.div className="stat" variants={heroItemVariants}>
           <div className="stat-num">100%</div>
-          <div className="stat-label">Local</div>
+          <div className="stat-label">Journal local</div>
         </motion.div>
         <motion.div className="stat" variants={heroItemVariants}>
           <div className="stat-num">24/7</div>
@@ -417,8 +418,9 @@ export function LandingPage() {
                 tes données
               </h2>
               <p className="section-desc">
-                SkyQuest ne collecte rien. Pas de comptes, pas de serveurs, pas de télémétrie. Ta
-                position et ton journal restent sur ton appareil — point final.
+                Pas de compte ni de télémétrie. Ton journal et tes photos restent sur ton appareil.
+                Si tu actives les alertes, seule une position approximative est conservée pour les
+                contextualiser.
               </p>
               <div className="privacy-points">
                 <div className="privacy-point">
@@ -432,7 +434,7 @@ export function LandingPage() {
                     <h3>Local par défaut</h3>
                     <p>
                       {
-                        "Position et journal d'observation restent sur ton appareil. Aucune donnée n'est envoyée ailleurs."
+                        "Le journal et les photos restent sur ton appareil. La position approximative n'est envoyée qu'après activation volontaire des alertes."
                       }
                     </p>
                   </div>
@@ -480,7 +482,7 @@ export function LandingPage() {
           <Reveal>
             <div className="section-label">Permissions</div>
             <h2 className="section-title">
-              Trois accès,
+              Quatre accès,
               <br />
               rien de plus
             </h2>
@@ -533,7 +535,21 @@ export function LandingPage() {
               </p>
               <span className="tag">À la demande</span>
             </Reveal>
+            <Reveal className="access-card">
+              <div className="access-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                  <path d="M10 21h4" />
+                </svg>
+              </div>
+              <h3>Notifications</h3>
+              <p>Pour te prévenir rarement lorsqu’une occasion d’observer semble intéressante.</p>
+              <span className="tag">Facultatif</span>
+            </Reveal>
           </div>
+          <Reveal>
+            <PushPermissionCard />
+          </Reveal>
         </div>
       </section>
 

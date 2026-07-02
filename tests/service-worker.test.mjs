@@ -12,6 +12,9 @@ function createWorker() {
   let fetchImplementation = async () => {
     throw new TypeError("offline");
   };
+  const notifications = [];
+  const openedWindows = [];
+  let windowClients = [];
 
   function requestKey(request) {
     const value = typeof request === "string" ? request : request.url;
@@ -56,7 +59,18 @@ function createWorker() {
 
   const self = {
     location: { origin: ORIGIN },
-    clients: { claim: async () => undefined },
+    registration: {
+      async showNotification(title, options) {
+        notifications.push({ title, options });
+      },
+    },
+    clients: {
+      claim: async () => undefined,
+      matchAll: async () => windowClients,
+      async openWindow(url) {
+        openedWindows.push(url);
+      },
+    },
     skipWaiting: async () => undefined,
     addEventListener(type, handler) {
       handlers.set(type, handler);
@@ -84,6 +98,8 @@ function createWorker() {
 
   return {
     caches,
+    notifications,
+    openedWindows,
     dispatchFetch,
     async dispatchLifecycle(type) {
       let lifecyclePromise;
@@ -93,6 +109,37 @@ function createWorker() {
         },
       });
       await lifecyclePromise;
+    },
+    async dispatchPush(payload) {
+      let promise;
+      handlers.get("push")({
+        data:
+          payload === undefined ? undefined : { json: () => payload, text: () => String(payload) },
+        waitUntil(value) {
+          promise = Promise.resolve(value);
+        },
+      });
+      await promise;
+    },
+    async dispatchNotificationClick(data) {
+      let promise;
+      let closed = false;
+      handlers.get("notificationclick")({
+        notification: {
+          data,
+          close() {
+            closed = true;
+          },
+        },
+        waitUntil(value) {
+          promise = Promise.resolve(value);
+        },
+      });
+      await promise;
+      return { closed };
+    },
+    setWindowClients(clients) {
+      windowClients = clients;
     },
     setFetch(implementation) {
       fetchImplementation = implementation;
@@ -133,7 +180,7 @@ test("offline images and static assets fail without an HTML substitution", async
 
 test("offline navigation falls back to the dedicated cached page", async () => {
   const worker = createWorker();
-  const pageCache = await worker.caches.open("skyquest-pages-v3");
+  const pageCache = await worker.caches.open("skyquest-pages-v4");
   await pageCache.put(
     "/offline",
     new Response("<h1>Tu es hors ligne</h1>", {
@@ -148,14 +195,58 @@ test("offline navigation falls back to the dedicated cached page", async () => {
 
 test("activation removes old SkyQuest caches only", async () => {
   const worker = createWorker();
-  await worker.caches.open("skyquest-pages-v2");
   await worker.caches.open("skyquest-pages-v3");
+  await worker.caches.open("skyquest-pages-v4");
   await worker.caches.open("another-app-cache");
 
   await worker.dispatchLifecycle("activate");
 
   const keys = await worker.caches.keys();
-  assert.equal(keys.includes("skyquest-pages-v2"), false);
-  assert.equal(keys.includes("skyquest-pages-v3"), true);
+  assert.equal(keys.includes("skyquest-pages-v3"), false);
+  assert.equal(keys.includes("skyquest-pages-v4"), true);
   assert.equal(keys.includes("another-app-cache"), true);
+});
+
+test("push events display a contextual notification with safe defaults", async () => {
+  const worker = createWorker();
+  await worker.dispatchPush({
+    title: "Vénus est tentable ce soir",
+    body: "Une mission simple est disponible.",
+    url: "/#objects",
+    tag: "planet-visible-venus",
+    data: { type: "planet_visible" },
+  });
+
+  assert.equal(worker.notifications.length, 1);
+  assert.equal(worker.notifications[0].title, "Vénus est tentable ce soir");
+  assert.equal(worker.notifications[0].options.data.url, "/#objects");
+  assert.equal(worker.notifications[0].options.data.type, "planet_visible");
+  assert.equal(worker.notifications[0].options.icon, "/icon-192.png");
+});
+
+test("notification clicks focus an existing client and navigate to a same-origin URL", async () => {
+  const worker = createWorker();
+  const calls = [];
+  worker.setWindowClients([
+    {
+      async focus() {
+        calls.push("focus");
+      },
+      async navigate(url) {
+        calls.push(url);
+      },
+    },
+  ]);
+
+  const result = await worker.dispatchNotificationClick({ url: "/journal" });
+
+  assert.equal(result.closed, true);
+  assert.deepEqual(calls, ["focus", `${ORIGIN}/journal`]);
+  assert.deepEqual(worker.openedWindows, []);
+});
+
+test("notification clicks never open an external payload URL", async () => {
+  const worker = createWorker();
+  await worker.dispatchNotificationClick({ url: "https://example.com/phishing" });
+  assert.deepEqual(worker.openedWindows, [`${ORIGIN}/`]);
 });
