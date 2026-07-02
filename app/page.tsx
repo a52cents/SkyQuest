@@ -26,6 +26,8 @@ import type { ProgressReward, SkyQuest } from "@/lib/types";
 import { getFallbackWeather, fetchWeatherNow } from "@/lib/weather";
 import { isOnboardingCompleted, setOnboardingCompleted } from "@/lib/onboarding";
 import {InstallButton} from "@/components/InstallButton";
+import { LandingPage } from "@/components/marketing/LandingPage";
+import { useDisplayMode } from "@/lib/use-display-mode";
 
 type LoadState = "idle" | "loading" | "ready";
 type FutureState = "idle" | "loading" | "ready";
@@ -116,7 +118,7 @@ function AdConsentModal({
   );
 }
 
-export default function HomePage() {
+function StandaloneHomePage() {
   const router = useRouter();
   const [state, setState] = useState<LoadState>("idle");
   const [futureState, setFutureState] = useState<FutureState>("idle");
@@ -494,4 +496,10 @@ export default function HomePage() {
       </PageShell>
     </>
   );
+}
+
+export default function HomePage() {
+  const displayMode = useDisplayMode();
+
+  return displayMode === "standalone" ? <StandaloneHomePage /> : <LandingPage />;
 }

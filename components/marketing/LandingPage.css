@@ -1,0 +1,194 @@
+.marketing-landing {
+  --bg: #0a0a0b;
+  --bg-elev: #131316;
+  --bg-card: #161619;
+  --fg: #f4f4f5;
+  --fg-dim: #a1a1aa;
+  --fg-muted: #52525b;
+  --accent: #6366f1;
+  --accent-glow: rgba(99, 102, 241, 0.15);
+  --accent-warm: #f59e0b;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.14);
+  --radius: 16px;
+  --max-w: 1200px;
+  --font-display: Georgia, "Times New Roman", serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.marketing-landing::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.marketing-landing *,
+.marketing-landing *::before,
+.marketing-landing *::after { box-sizing: border-box; }
+.marketing-landing * { margin: 0; padding: 0; }
+.marketing-landing ::selection { background: var(--accent); color: white; }
+.marketing-landing a { color: inherit; text-decoration: none; }
+.marketing-landing .container { max-width: var(--max-w); margin: 0 auto; padding: 0 24px; }
+
+.marketing-landing nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 18px 0;
+  background: rgba(10, 10, 11, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--border);
+  transition: all 0.4s ease;
+}
+.marketing-landing .nav-inner { display: flex; align-items: center; justify-content: space-between; max-width: var(--max-w); margin: 0 auto; padding: 0 24px; }
+.marketing-landing .logo { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: 22px; font-weight: 400; letter-spacing: -0.5px; cursor: pointer; }
+.marketing-landing .logo-mark { width: 28px; height: 28px; position: relative; flex-shrink: 0; }
+.marketing-landing .logo-mark svg { width: 100%; height: 100%; }
+.marketing-landing .logo-mark .star { fill: var(--fg); animation: marketing-twinkle 3s ease-in-out infinite; }
+.marketing-landing .logo-mark .star:nth-child(2) { animation-delay: 0.5s; }
+.marketing-landing .logo-mark .star:nth-child(3) { animation-delay: 1s; }
+@keyframes marketing-twinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.marketing-landing .nav-links { display: flex; gap: 36px; align-items: center; }
+.marketing-landing .nav-links a { font-size: 14px; color: var(--fg-dim); transition: color 0.2s; position: relative; }
+.marketing-landing .nav-links a:hover { color: var(--fg); }
+.marketing-landing .nav-links a::after { content: ""; position: absolute; bottom: -4px; left: 0; width: 0; height: 1px; background: var(--accent); transition: width 0.3s ease; }
+.marketing-landing .nav-links a:hover::after { width: 100%; }
+.marketing-landing .nav-cta { padding: 8px 18px; border: 1px solid var(--border-hover); border-radius: 100px; font-size: 13px; color: var(--fg) !important; transition: all 0.3s; }
+.marketing-landing .nav-cta::after { display: none; }
+.marketing-landing .nav-cta:hover { background: var(--fg); color: var(--bg) !important; }
+
+.marketing-landing .hero { position: relative; min-height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 120px 0 80px; }
+.marketing-landing .hero-bg { position: absolute; inset: 0; z-index: 0; }
+.marketing-landing .hero-bg img { width: 100%; height: 100%; object-fit: cover; opacity: 0.4; filter: contrast(1.1) brightness(0.7); }
+.marketing-landing .hero-bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.marketing-landing .hero-bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, var(--bg) 0%, transparent 30%, transparent 50%, var(--bg) 100%); }
+.marketing-landing .hero-content { position: relative; z-index: 1; text-align: center; max-width: 720px; padding: 0 24px; }
+.marketing-landing .hero-eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; border: 1px solid var(--border); border-radius: 100px; font-size: 12px; color: var(--fg-dim); margin-bottom: 32px; background: rgba(255, 255, 255, 0.02); }
+.marketing-landing .hero-eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: marketing-pulse 2s ease-in-out infinite; }
+@keyframes marketing-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.8); } }
+.marketing-landing .hero h1 { font-family: var(--font-display); font-size: clamp(36px, 6vw, 68px); font-weight: 400; line-height: 1.15; letter-spacing: -1.5px; margin-bottom: 24px; }
+.marketing-landing .hero h1 .accent { font-style: italic; color: var(--accent); }
+.marketing-landing .hero p { font-size: 18px; color: var(--fg-dim); max-width: 520px; margin: 0 auto 40px; line-height: 1.7; }
+.marketing-landing .hero-cta { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.marketing-landing .btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; border-radius: 100px; font-family: inherit; font-size: 15px; font-weight: 500; line-height: 1.6; transition: all 0.3s ease; cursor: pointer; border: none; }
+.marketing-landing .btn-primary { background: var(--fg); color: var(--bg); }
+.marketing-landing .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(255, 255, 255, 0.15); }
+.marketing-landing .btn-secondary { background: transparent; color: var(--fg); border: 1px solid var(--border-hover); }
+.marketing-landing .btn-secondary:hover { background: var(--bg-elev); border-color: var(--fg-dim); }
+.marketing-landing .btn .arrow { transition: transform 0.3s; }
+.marketing-landing .btn:hover .arrow { transform: translateX(4px); }
+
+.marketing-landing .stats-bar { display: flex; justify-content: center; gap: 64px; padding: 48px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); position: relative; z-index: 1; background: var(--bg); }
+.marketing-landing .stat { text-align: center; }
+.marketing-landing .stat-num { font-family: var(--font-display); font-size: 36px; font-weight: 400; color: var(--fg); }
+.marketing-landing .stat-label { font-size: 12px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 1.5px; margin-top: 4px; }
+
+.marketing-landing section { padding: 100px 0; position: relative; }
+.marketing-landing .section-label { font-size: 12px; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; font-weight: 600; margin-bottom: 16px; }
+.marketing-landing .section-title { font-family: var(--font-display); font-size: clamp(28px, 4vw, 44px); font-weight: 400; line-height: 1.2; letter-spacing: -1px; margin-bottom: 16px; }
+.marketing-landing .section-desc { font-size: 16px; color: var(--fg-dim); max-width: 560px; line-height: 1.7; }
+
+.marketing-landing .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 56px; }
+.marketing-landing .feature-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 36px 28px; transition: all 0.4s ease; position: relative; overflow: hidden; }
+.marketing-landing .feature-card:hover { border-color: var(--border-hover); }
+.marketing-landing .feature-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0; transition: opacity 0.4s; }
+.marketing-landing .feature-card:hover::before { opacity: 1; }
+.marketing-landing .feature-icon { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: var(--bg-elev); border: 1px solid var(--border); margin-bottom: 20px; }
+.marketing-landing .feature-icon svg { width: 22px; height: 22px; stroke: var(--fg); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.marketing-landing .feature-card h3 { font-family: var(--font-display); font-size: 20px; font-weight: 400; margin-bottom: 8px; }
+.marketing-landing .feature-card p { font-size: 14px; color: var(--fg-dim); line-height: 1.6; }
+
+.marketing-landing .observation-section { padding-top: 40px; }
+.marketing-landing .showcase { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+.marketing-landing .showcase-image { position: relative; border-radius: var(--radius); overflow: hidden; aspect-ratio: 4/3; }
+.marketing-landing .showcase-image img { width: 100%; height: 100%; object-fit: cover; filter: contrast(1.05); }
+.marketing-landing .showcase-image::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius); border: 1px solid var(--border); pointer-events: none; }
+.marketing-landing .showcase-content .section-title { margin-bottom: 24px; }
+.marketing-landing .showcase-features { list-style: none; margin-top: 28px; }
+.marketing-landing .showcase-features li { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 15px; color: var(--fg-dim); }
+.marketing-landing .showcase-features li:last-child { border-bottom: none; }
+.marketing-landing .showcase-features .check { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+.marketing-landing .showcase-features .check::after { content: ""; width: 8px; height: 4px; border-left: 1.5px solid var(--accent); border-bottom: 1.5px solid var(--accent); transform: rotate(-45deg); margin-top: -2px; }
+
+.marketing-landing .privacy { background: var(--bg-elev); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.marketing-landing .privacy-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+.marketing-landing .privacy-visual { position: relative; border-radius: var(--radius); overflow: hidden; aspect-ratio: 7/9; }
+.marketing-landing .privacy-visual img { width: 100%; height: 100%; object-fit: cover; filter: contrast(1.1) brightness(0.85); }
+.marketing-landing .privacy-badge { position: absolute; top: 24px; left: 24px; display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: rgba(10, 10, 11, 0.8); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 100px; font-size: 13px; font-family: var(--font-mono); }
+.marketing-landing .privacy-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+.marketing-landing .privacy-points { display: flex; flex-direction: column; gap: 20px; margin-top: 32px; }
+.marketing-landing .privacy-point { display: flex; gap: 16px; align-items: flex-start; }
+.marketing-landing .privacy-point-icon { width: 40px; height: 40px; flex-shrink: 0; border-radius: 10px; background: var(--bg-card); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; }
+.marketing-landing .privacy-point-icon svg { width: 20px; height: 20px; stroke: var(--accent); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.marketing-landing .privacy-point h4 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.marketing-landing .privacy-point p { font-size: 13px; color: var(--fg-muted); line-height: 1.5; }
+
+.marketing-landing .access-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 56px; }
+.marketing-landing .access-card { text-align: center; padding: 40px 24px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card); transition: all 0.3s; }
+.marketing-landing .access-card:hover { border-color: var(--border-hover); background: var(--bg-elev); }
+.marketing-landing .access-icon { width: 56px; height: 56px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg-elev); border: 1px solid var(--border); }
+.marketing-landing .access-icon svg { width: 26px; height: 26px; stroke: var(--fg); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.marketing-landing .access-card h3 { font-family: var(--font-display); font-size: 18px; font-weight: 400; margin-bottom: 8px; }
+.marketing-landing .access-card p { font-size: 13px; color: var(--fg-dim); }
+.marketing-landing .access-card .tag { display: inline-block; margin-top: 16px; padding: 4px 12px; border-radius: 100px; background: var(--accent-glow); color: var(--accent); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+
+.marketing-landing .cta-section { text-align: center; padding: 120px 0; position: relative; overflow: hidden; }
+.marketing-landing .cta-section::before { content: ""; position: absolute; top: 50%; left: 50%; width: 600px; height: 600px; transform: translate(-50%, -50%); background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%); pointer-events: none; }
+.marketing-landing .cta-content { position: relative; z-index: 1; }
+.marketing-landing .cta-content h2 { font-family: var(--font-display); font-size: clamp(32px, 5vw, 56px); font-weight: 400; line-height: 1.2; letter-spacing: -1.5px; margin-bottom: 20px; }
+.marketing-landing .cta-content h2 .accent { font-style: italic; color: var(--accent); }
+.marketing-landing .cta-content p { font-size: 17px; color: var(--fg-dim); max-width: 480px; margin: 0 auto 40px; }
+
+.marketing-landing footer { border-top: 1px solid var(--border); padding: 60px 0 40px; background: var(--bg); }
+.marketing-landing .footer-inner { display: flex; justify-content: space-between; align-items: flex-start; gap: 40px; flex-wrap: wrap; }
+.marketing-landing .footer-brand { max-width: 300px; }
+.marketing-landing .footer-brand .logo { margin-bottom: 16px; }
+.marketing-landing .footer-brand p { font-size: 13px; color: var(--fg-muted); line-height: 1.6; }
+.marketing-landing .footer-links { display: flex; gap: 60px; flex-wrap: wrap; }
+.marketing-landing .footer-col h5 { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--fg-muted); margin-bottom: 16px; font-weight: 600; }
+.marketing-landing .footer-col a { display: block; font-size: 14px; color: var(--fg-dim); margin-bottom: 10px; transition: color 0.2s; }
+.marketing-landing .footer-col a:hover { color: var(--fg); }
+.marketing-landing .footer-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 12px; color: var(--fg-muted); }
+.marketing-landing .footer-bottom .sky-state { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); }
+.marketing-landing .sky-state .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: marketing-pulse 2s ease-in-out infinite; }
+.marketing-landing .sky-state .status-visible,
+.marketing-landing .sky-state .status-hidden { transition: opacity 0.3s ease; }
+.marketing-landing .sky-state .status-visible { opacity: 1; }
+.marketing-landing .sky-state .status-hidden { opacity: 0; }
+
+@media (max-width: 900px) {
+  .marketing-landing .features-grid { grid-template-columns: 1fr; }
+  .marketing-landing .showcase,
+  .marketing-landing .privacy-grid { grid-template-columns: 1fr; gap: 32px; }
+  .marketing-landing .access-grid { grid-template-columns: 1fr; }
+  .marketing-landing .stats-bar { gap: 32px; flex-wrap: wrap; }
+  .marketing-landing .nav-links { display: none; }
+  .marketing-landing .footer-inner { flex-direction: column; }
+  .marketing-landing .footer-links { gap: 32px; }
+}
+
+@media (max-width: 600px) {
+  .marketing-landing section { padding: 64px 0; }
+  .marketing-landing .hero { padding: 100px 0 60px; }
+  .marketing-landing .stats-bar { gap: 20px; }
+  .marketing-landing .stat-num { font-size: 28px; }
+  .marketing-landing .cta-section { padding: 80px 0; }
+  .marketing-landing .observation-section { padding-top: 40px; }
+}

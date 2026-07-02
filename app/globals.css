@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "../system/variables.dark.css";
+@import "../components/marketing/LandingPage.css";
 
 @custom-variant night-mode (&:where(.night-mode, .night-mode *));
 

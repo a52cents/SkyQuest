@@ -7,6 +7,10 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
+type NavigatorWithStandalone = Navigator & {
+  standalone?: boolean;
+};
+
 export function useInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
@@ -16,7 +20,7 @@ export function useInstallPrompt() {
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       // iOS Safari
-      (window.navigator as any).standalone === true;
+      (window.navigator as NavigatorWithStandalone).standalone === true;
     setInstalled(isStandalone);
 
     const onBeforeInstall = (e: Event) => {

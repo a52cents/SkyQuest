@@ -25,14 +25,14 @@ export function InstallButton() {
   return (
     <>
       <button onClick={handleClick} className="install-btn">
-        ⬇ Ajouter à l'écran d'accueil
+        ⬇ Ajouter à l’écran d’accueil
       </button>
 
       {showIosHint && (
         <div className="ios-modal" onClick={() => setShowIosHint(false)}>
           <div className="ios-modal-content">
             <p>1. Appuie sur le bouton <strong>Partager</strong> ⬆️</p>
-            <p>2. Choisis <strong>« Sur l'écran d'accueil »</strong></p>
+            <p>2. Choisis <strong>« Sur l’écran d’accueil »</strong></p>
             <p>3. Appuie sur <strong>Ajouter</strong></p>
           </div>
         </div>
