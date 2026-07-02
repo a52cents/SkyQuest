@@ -53,15 +53,6 @@ html.night-mode .sky-dashboard .analysis-banner {
   background: var(--dash-bg-elev);
 }
 
-html.night-mode .sky-dashboard .dashboard-modal {
-  background: rgba(3, 0, 0, 0.82);
-}
-
-html.night-mode .sky-dashboard .dashboard-modal-card {
-  border-color: var(--dash-border-hover);
-  background: var(--dash-bg-elev);
-}
-
 .sky-dashboard::before {
   content: "";
   position: fixed;
@@ -764,50 +755,6 @@ html.night-mode .sky-dashboard .dashboard-modal-card {
   font-size: 14px;
 }
 
-.sky-dashboard .dashboard-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding: 12px;
-  background: rgba(3, 3, 4, 0.82);
-  backdrop-filter: blur(12px);
-}
-.sky-dashboard .dashboard-modal-card {
-  width: 100%;
-  max-width: 420px;
-  padding: 24px;
-  border: 1px solid var(--dash-border-hover);
-  border-radius: var(--dash-radius);
-  background: var(--dash-bg-elev);
-}
-.sky-dashboard .dashboard-modal-card h2 {
-  margin-bottom: 8px;
-  font-family: var(--dash-font-display);
-  font-size: 22px;
-  font-weight: 400;
-}
-.sky-dashboard .dashboard-modal-card p {
-  margin-bottom: 20px;
-  color: var(--dash-fg-dim);
-  font-size: 14px;
-  line-height: 1.6;
-}
-.sky-dashboard .modal-actions {
-  display: grid;
-  gap: 8px;
-}
-.sky-dashboard .modal-secondary {
-  padding: 10px;
-  border: 1px solid var(--dash-border);
-  border-radius: 100px;
-  background: transparent;
-  color: var(--dash-fg-dim);
-  cursor: pointer;
-}
-
 @media (min-width: 640px) {
   .sky-dashboard .journal-preview {
     grid-template-columns: repeat(3, 1fr);
@@ -817,9 +764,6 @@ html.night-mode .sky-dashboard .dashboard-modal-card {
   }
   .sky-dashboard .condition-item {
     padding: 16px 12px;
-  }
-  .sky-dashboard .dashboard-modal {
-    align-items: center;
   }
 }
 @media (max-width: 380px) {

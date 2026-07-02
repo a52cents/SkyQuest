@@ -10,12 +10,14 @@
  * - arrondir les coordonnées avant toute persistance ;
  * - limiter le journal aux 50 observations les plus récentes ;
  * - tolérer les données corrompues ou issues d'une ancienne version sans faire planter l'UI ;
- * - les photos éventuelles restent des Data URL locales et facultatives.
+ * - les photos restent locales dans IndexedDB ; localStorage ne garde que leurs identifiants.
  */
+import { deletePhoto, savePhotoFromDataUrl } from "@/lib/photo-db";
 import { applyQuestReward, createEmptyProgressProfile } from "@/lib/progression";
 import type {
   AchievementId,
   Observation,
+  ObservationPhotoDraft,
   ProgressProfile,
   ProgressReward,
   QuestTargetType,
@@ -36,6 +38,7 @@ let memoryObservations: Observation[] = [];
 let memoryProfile = createEmptyProgressProfile();
 let memoryActiveQuest: SkyQuest | null = null;
 let memoryLastLocation: StoredLocation | null = null;
+let legacyMigrationPromise: Promise<Observation[]> | null = null;
 const failedStorageKeys = new Set<string>();
 
 function canUseStorage(): boolean {
@@ -142,13 +145,18 @@ export function saveProgressProfile(profile: ProgressProfile): ProgressProfile {
   return profile;
 }
 
-export function getObservations(): Observation[] {
+type LegacyObservation = Observation & {
+  photoDataUrl?: unknown;
+  photoThumbnailDataUrl?: unknown;
+};
+
+function readValidObservations(): LegacyObservation[] {
   const stored = readJson<unknown>(OBSERVATIONS_KEY, memoryObservations);
   if (!Array.isArray(stored)) {
     return [];
   }
 
-  const observations = stored.filter((item): item is Observation => {
+  return stored.filter((item): item is LegacyObservation => {
     if (!item || typeof item !== "object") {
       return false;
     }
@@ -162,8 +170,54 @@ export function getObservations(): Observation[] {
       typeof value.visibilityScore === "number"
     );
   });
-  memoryObservations = observations;
-  return observations;
+}
+
+async function migrateLegacyObservation(observation: LegacyObservation): Promise<Observation> {
+  const { photoDataUrl, photoThumbnailDataUrl, ...cleanObservation } = observation;
+  const migrated: Observation = { ...cleanObservation };
+
+  if (typeof migrated.photoId !== "string") delete migrated.photoId;
+  if (typeof migrated.photoThumbnailId !== "string") delete migrated.photoThumbnailId;
+
+  if (!migrated.photoId && typeof photoDataUrl === "string") {
+    migrated.photoId = await savePhotoFromDataUrl(photoDataUrl).catch(() => undefined);
+  }
+  if (!migrated.photoThumbnailId && typeof photoThumbnailDataUrl === "string") {
+    migrated.photoThumbnailId = await savePhotoFromDataUrl(photoThumbnailDataUrl).catch(
+      () => undefined,
+    );
+  }
+
+  return migrated;
+}
+
+export async function getObservations(): Promise<Observation[]> {
+  const stored = readValidObservations();
+  const needsMigration = stored.some(
+    (observation) =>
+      Object.prototype.hasOwnProperty.call(observation, "photoDataUrl") ||
+      Object.prototype.hasOwnProperty.call(observation, "photoThumbnailDataUrl"),
+  );
+  if (needsMigration) {
+    if (!legacyMigrationPromise) {
+      legacyMigrationPromise = Promise.all(stored.map(migrateLegacyObservation)).then(
+        (observations) => {
+          memoryObservations = observations;
+          writeJson(OBSERVATIONS_KEY, observations);
+          return observations;
+        },
+      );
+    }
+
+    try {
+      return await legacyMigrationPromise;
+    } finally {
+      legacyMigrationPromise = null;
+    }
+  }
+
+  memoryObservations = stored;
+  return stored;
 }
 
 function isTargetType(value: unknown): value is QuestTargetType {
@@ -226,19 +280,27 @@ export function resetProgressProfile(): ProgressProfile {
   return saveProgressProfile(profile);
 }
 
-export function addObservation(
+export async function addObservation(
   quest: SkyQuest,
   status: Observation["status"],
   location?: { latitude: number; longitude: number },
-  photo?: Pick<Observation, "photoDataUrl" | "photoThumbnailDataUrl">,
+  photo?: ObservationPhotoDraft,
   now = new Date(),
-): {
+): Promise<{
   observation: Observation;
   profile: ProgressProfile;
   reward: ProgressReward;
   persisted: boolean;
-} {
+}> {
   const { profile, reward } = applyQuestReward(getProgressProfile(), quest, status, now);
+  const [photoId, photoThumbnailId] = await Promise.all([
+    photo?.photoDataUrl
+      ? savePhotoFromDataUrl(photo.photoDataUrl).catch(() => undefined)
+      : Promise.resolve(undefined),
+    photo?.photoThumbnailDataUrl
+      ? savePhotoFromDataUrl(photo.photoThumbnailDataUrl).catch(() => undefined)
+      : Promise.resolve(undefined),
+  ]);
   const observation: Observation = {
     id: `${quest.id}-${status}-${Date.now()}`,
     createdAt: now.toISOString(),
@@ -253,20 +315,37 @@ export function addObservation(
     unlockedAchievements: reward.unlockedAchievements,
     latitude: location ? roundCoordinate(location.latitude) : undefined,
     longitude: location ? roundCoordinate(location.longitude) : undefined,
-    photoDataUrl: photo?.photoDataUrl,
-    photoThumbnailDataUrl: photo?.photoThumbnailDataUrl,
+    photoId,
+    photoThumbnailId,
   };
 
-  const next = [observation, ...getObservations()].slice(0, 50);
+  const previous = await getObservations();
+  const next = [observation, ...previous].slice(0, 50);
+  const discarded = previous.slice(49);
   saveProgressProfile(profile);
   memoryObservations = next;
   const observationPersisted = writeJson(OBSERVATIONS_KEY, next);
+  await Promise.allSettled(
+    discarded.flatMap((item) =>
+      [item.photoId, item.photoThumbnailId]
+        .filter((id): id is string => typeof id === "string")
+        .map(deletePhoto),
+    ),
+  );
   return { observation, profile, reward, persisted: observationPersisted };
 }
 
-export function clearObservations(): void {
+export async function clearObservations(): Promise<void> {
+  const observations = await getObservations();
   memoryObservations = [];
   writeJson(OBSERVATIONS_KEY, []);
+  await Promise.allSettled(
+    observations.flatMap((observation) =>
+      [observation.photoId, observation.photoThumbnailId]
+        .filter((id): id is string => typeof id === "string")
+        .map(deletePhoto),
+    ),
+  );
 }
 
 export function saveActiveQuest(quest: SkyQuest): void {

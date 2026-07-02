@@ -43,13 +43,17 @@ cd SkyQuest
 npm install
 ```
 
-Créez éventuellement un fichier `.env.local` pour activer les quêtes ISS :
+Créez éventuellement un fichier `.env.local` pour activer les quêtes ISS ou le lien de
+soutien volontaire :
 
 ```dotenv
 N2YO_API_KEY=votre_cle_n2yo
+NEXT_PUBLIC_SUPPORT_URL=https://votre-prestataire.example/soutenir
 ```
 
-Sans cette variable, l'application continue normalement et omet simplement les passages ISS.
+Sans ces variables, l'application continue normalement : elle omet les passages ISS et indique
+simplement que le soutien financier n'est pas encore disponible. L'URL de soutien doit utiliser
+HTTPS et n'est ouverte qu'après une action volontaire depuis la page de soutien.
 
 Lancez le serveur de développement :
 
@@ -101,6 +105,7 @@ app/
 ├── journal/page.tsx         # observations locales
 ├── explore/page.tsx         # catalogue du ciel
 ├── profile/page.tsx         # progression locale
+├── support/page.tsx         # soutien volontaire, hors du parcours principal
 └── api/iss-pass/route.ts    # proxy N2YO optionnel
 components/
 ├── dashboard/               # écran principal installé

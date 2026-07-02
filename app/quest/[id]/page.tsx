@@ -11,7 +11,7 @@ import { ProgressFeedback } from "@/components/ProgressFeedback";
 import { addObservation, getActiveQuest, getLastLocation, getProgressProfile } from "@/lib/storage";
 import { getRankProgress } from "@/lib/progression";
 import { haptic } from "@/lib/haptics";
-import type { Observation, ProgressReward, SkyQuest } from "@/lib/types";
+import type { ObservationPhotoDraft, ProgressReward, SkyQuest } from "@/lib/types";
 
 export default function QuestGuidePage() {
   const params = useParams<{ id: string }>();
@@ -29,16 +29,13 @@ export default function QuestGuidePage() {
     }
   }, [params.id]);
 
-  function logAndReturn(
-    status: "seen" | "missed",
-    photo?: Pick<Observation, "photoDataUrl" | "photoThumbnailDataUrl">,
-  ) {
+  async function logAndReturn(status: "seen" | "missed", photo?: ObservationPhotoDraft) {
     if (!quest || isLoggingRef.current) {
       return;
     }
     isLoggingRef.current = true;
     const previousRankName = getRankProgress(getProgressProfile().totalXp).current.name;
-    const result = addObservation(quest, status, getLastLocation() ?? undefined, photo);
+    const result = await addObservation(quest, status, getLastLocation() ?? undefined, photo);
     haptic(status === "seen" ? "success" : "missed");
     setReward({ reward: result.reward, previousRankName });
   }

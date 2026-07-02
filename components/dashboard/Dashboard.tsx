@@ -25,7 +25,6 @@ import { haptic } from "@/lib/haptics";
 import { fetchNextIssVisiblePass } from "@/lib/iss";
 import { isOnboardingCompleted, setOnboardingCompleted } from "@/lib/onboarding";
 import { meteorShowers } from "@/lib/meteor-showers";
-import { isPopunderAdOnCooldown, triggerPopunderAd } from "@/lib/popunder-ad";
 import { getAchievementProgress, getRankProgress } from "@/lib/progression";
 import {
   generateFutureQuestSuggestions,
@@ -324,10 +323,7 @@ export function Dashboard() {
   const [now, setNow] = useState<Date | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isOnboardingReady, setIsOnboardingReady] = useState(false);
-  const [showAdConsent, setShowAdConsent] = useState(false);
-  const [isAdLoading, setIsAdLoading] = useState(false);
   const [isLocationLoading, setIsLocationLoading] = useState(false);
-  const [pendingAdPosition, setPendingAdPosition] = useState<GeoPosition | null>(null);
   const [analysisSavedAt, setAnalysisSavedAt] = useState<number | null>(null);
   const [isGuidanceUnlocked, setIsGuidanceUnlocked] = useState(false);
   const [showAllQuests, setShowAllQuests] = useState(false);
@@ -411,11 +407,14 @@ export function Dashboard() {
   }, []);
 
   useEffect(() => {
+    let isActive = true;
     const currentDate = new Date();
     setNow(currentDate);
     setEventTimeline(createEventTimeline(currentDate));
     setProfile(getProgressProfile());
-    setObservations(getObservations());
+    void getObservations().then((storedObservations) => {
+      if (isActive) setObservations(storedObservations);
+    });
     setShowOnboarding(!isOnboardingCompleted());
     setIsOnboardingReady(true);
 
@@ -431,11 +430,14 @@ export function Dashboard() {
     }
 
     const timer = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(timer);
+    return () => {
+      isActive = false;
+      window.clearInterval(timer);
+    };
   }, [loadDashboard]);
 
   async function handleRefreshRequest() {
-    if (isLocationLoading || isAdLoading) return;
+    if (isLocationLoading) return;
 
     haptic("select");
     setIsGuidanceUnlocked(false);
@@ -446,14 +448,7 @@ export function Dashboard() {
       const coords = await getCurrentPosition();
       saveLastLocation(coords);
       setPosition(coords);
-
-      if (isPopunderAdOnCooldown()) {
-        await loadDashboard(coords);
-        return;
-      }
-
-      setPendingAdPosition(coords);
-      setShowAdConsent(true);
+      await loadDashboard(coords);
     } catch (error) {
       const fallbackQuests = generateQuests({
         latitude: null,
@@ -471,26 +466,6 @@ export function Dashboard() {
     } finally {
       setIsLocationLoading(false);
     }
-  }
-
-  function dismissAdConsent() {
-    const coords = pendingAdPosition;
-    setShowAdConsent(false);
-    setPendingAdPosition(null);
-    if (coords) {
-      void loadDashboard(coords);
-    }
-  }
-
-  async function handleAdConfirm() {
-    if (isAdLoading || !pendingAdPosition) return;
-    const coords = pendingAdPosition;
-    setIsAdLoading(true);
-    await triggerPopunderAd();
-    setIsAdLoading(false);
-    setShowAdConsent(false);
-    setPendingAdPosition(null);
-    await loadDashboard(coords);
   }
 
   function handleStart(quest: SkyQuest) {
@@ -551,52 +526,6 @@ export function Dashboard() {
           }}
         />
       ) : null}
-
-      <AnimatePresence>
-        {showAdConsent ? (
-          <motion.div
-            className="dashboard-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="dashboard-ad-title"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="dashboard-modal-card"
-              initial={{ opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 24 }}
-            >
-              <h2 id="dashboard-ad-title">Avant de lire le ciel</h2>
-              <p>
-                {
-                  "Ta position est prête. Tu peux soutenir SkyQuest en ouvrant une publicité, ou continuer directement vers l'analyse du ciel."
-                }
-              </p>
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  className="camera-btn"
-                  onClick={() => void handleAdConfirm()}
-                  disabled={isAdLoading}
-                >
-                  {isAdLoading ? "Ouverture…" : "Soutenir et continuer"}
-                </button>
-                <button
-                  type="button"
-                  className="modal-secondary"
-                  onClick={dismissAdConsent}
-                  disabled={isAdLoading}
-                >
-                  Continuer sans publicité
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
 
       <motion.header
         id="dashboard-top"
@@ -743,7 +672,7 @@ export function Dashboard() {
               type="button"
               className="camera-btn"
               onClick={() => void handleRefreshRequest()}
-              disabled={loadState === "loading" || isLocationLoading || isAdLoading}
+              disabled={loadState === "loading" || isLocationLoading}
               whileHover={prefersReducedMotion ? undefined : { y: -2 }}
               whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
             >

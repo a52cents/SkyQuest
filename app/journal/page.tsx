@@ -15,7 +15,13 @@ export default function JournalPage() {
   const [confirmation, setConfirmation] = useState<"journal" | "progress" | null>(null);
 
   useEffect(() => {
-    setObservations(getObservations());
+    let isActive = true;
+    void getObservations().then((storedObservations) => {
+      if (isActive) setObservations(storedObservations);
+    });
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   function handleClear() {
@@ -26,9 +32,9 @@ export default function JournalPage() {
     setConfirmation("progress");
   }
 
-  function confirmDestructiveAction() {
+  async function confirmDestructiveAction() {
     if (confirmation === "journal") {
-      clearObservations();
+      await clearObservations();
       setObservations([]);
     } else if (confirmation === "progress") {
       resetProgressProfile();

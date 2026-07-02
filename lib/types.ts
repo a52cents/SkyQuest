@@ -72,6 +72,11 @@ export type Observation = {
   unlockedAchievements?: AchievementId[];
   latitude?: number;
   longitude?: number;
+  photoId?: string;
+  photoThumbnailId?: string;
+};
+
+export type ObservationPhotoDraft = {
   photoDataUrl?: string;
   photoThumbnailDataUrl?: string;
 };

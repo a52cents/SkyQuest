@@ -36,7 +36,7 @@ import {
 import { getInsecureContextMessage, isSecureBrowserContext } from "@/lib/browser-support";
 import { recalculateQuestPosition } from "@/lib/quest-generator";
 import { getLastLocation } from "@/lib/storage";
-import type { Observation, SkyQuest } from "@/lib/types";
+import type { ObservationPhotoDraft, SkyQuest } from "@/lib/types";
 
 const SHOW_CAMERA_DEBUG = false;
 const PHOTO_MAX_WIDTH = 1280;
@@ -47,7 +47,7 @@ const ALTITUDE_ALIGNMENT_THRESHOLD_DEGREES = 10;
 
 type CameraGuideProps = {
   quest: SkyQuest;
-  onSeen: (photo?: Pick<Observation, "photoDataUrl" | "photoThumbnailDataUrl">) => void;
+  onSeen: (photo?: ObservationPhotoDraft) => void;
   onMissed: () => void;
 };
 
