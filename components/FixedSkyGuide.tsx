@@ -56,10 +56,10 @@ export function FixedSkyGuide({ targetId, hasPrecisePoint, aligned }: FixedSkyGu
     return (
       <div
         aria-label="Viseur céleste fixe"
-        className={`relative flex h-28 w-28 items-center justify-center rounded-full border bg-current/10 ${aligned ? "border-success/80 text-success" : "border-accent-cyan/70 text-accent-cyan"}`}
+        className={`relative flex h-28 w-28 items-center justify-center rounded-full border opacity-[0.1] ${aligned ? "border-success text-success" : "border-accent-cyan text-accent-cyan"}`}
       >
-        <div className="absolute h-px w-24 bg-white/28" />
-        <div className="absolute h-24 w-px bg-white/28" />
+        <div className="absolute h-px w-24 bg-current" />
+        <div className="absolute h-24 w-px bg-current" />
         {hasPrecisePoint ? <div className="h-3 w-3 rounded-full bg-current" /> : null}
       </div>
     );
@@ -70,7 +70,7 @@ export function FixedSkyGuide({ targetId, hasPrecisePoint, aligned }: FixedSkyGu
     <div
       role="img"
       aria-label={`Repère fixe de ${figure.name}`}
-      className={`h-40 w-52 rounded-[28px] border bg-[#0a0a0b]/55 p-3 shadow-[0_0_55px_color-mix(in_srgb,var(--accent-cyan)_18%,transparent)] backdrop-blur-sm ${aligned ? "border-success/70" : "border-accent-cyan/55"}`}
+      className="h-40 w-52 opacity-[0.1]"
     >
       <svg viewBox="0 0 100 100" className={`h-full w-full ${tone}`} aria-hidden="true">
         {figure.segments.map(([fromId, toId]) => {
