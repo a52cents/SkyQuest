@@ -105,6 +105,7 @@
 .sky-dashboard .upcoming-info h4 { margin-bottom: 2px; overflow: hidden; font-size: 15px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 .sky-dashboard .upcoming-info p { color: var(--dash-fg-muted); font-size: 13px; }
 .sky-dashboard .upcoming-arrow { width: 16px; height: 16px; margin-left: auto; flex: 0 0 auto; fill: none; stroke: var(--dash-fg-muted); stroke-width: 1.5; }
+.sky-dashboard .upcoming-arrow.event-star { stroke: var(--dash-accent); }
 
 .sky-dashboard .journal-preview { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; }
 .sky-dashboard .journal-card { padding: 16px; border: 1px solid var(--dash-border); border-radius: var(--dash-radius-sm); background: var(--dash-bg-card); cursor: pointer; transition: border-color .3s; }

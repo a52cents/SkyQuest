@@ -7,9 +7,11 @@ import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer
 import { Onboarding } from "@/components/Onboarding";
 import { equatorialToHorizontal, getSkyObjects, getSunAltitude } from "@/lib/astro";
 import { getCurrentPosition, type GeoPosition } from "@/lib/browser-support";
+import { getUpcomingCelestialEvents, type CelestialEventType } from "@/lib/celestial-events";
 import { haptic } from "@/lib/haptics";
 import { fetchNextIssVisiblePass } from "@/lib/iss";
 import { isOnboardingCompleted, setOnboardingCompleted } from "@/lib/onboarding";
+import { meteorShowers } from "@/lib/meteor-showers";
 import { azimuthToCardinal } from "@/lib/orientation";
 import { isPopunderAdOnCooldown, triggerPopunderAd } from "@/lib/popunder-ad";
 import { getAchievementProgress, getRankProgress } from "@/lib/progression";
@@ -30,6 +32,18 @@ type ObservableEntry = {
   azimuth: number;
   score: number;
 };
+
+type TimelineEvent = {
+  id: string;
+  type: CelestialEventType | "meteor_shower";
+  title: string;
+  date: Date;
+  description: string;
+  timeLabel: "instant" | "peak" | "approximate_peak";
+};
+
+const CELESTIAL_EVENT_WINDOW_DAYS = 60;
+const DAY_MS = 86_400_000;
 
 const PLANET_LABELS: Record<SkyObjectName, string> = {
   Moon: "Lune",
@@ -58,6 +72,46 @@ const itemVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: "easeOut" } },
 };
+
+function getMeteorShowerTimelineEvents(startDate: Date, limitDays: number): TimelineEvent[] {
+  const endDate = new Date(startDate.getTime() + limitDays * DAY_MS);
+  const events: TimelineEvent[] = [];
+
+  for (let year = startDate.getUTCFullYear(); year <= endDate.getUTCFullYear(); year += 1) {
+    meteorShowers.forEach((shower) => {
+      const [month, day] = shower.peakDate.split("-").map(Number);
+      // The source provides a calendar day but no exact peak hour. Noon UTC keeps
+      // the same displayed date in Europe/Paris without claiming false precision.
+      const peakDate = new Date(Date.UTC(year, month - 1, day, 12));
+      if (peakDate < startDate || peakDate > endDate) return;
+
+      events.push({
+        id: `meteor-shower-${shower.id}-${year}`,
+        type: "meteor_shower",
+        title: `Pic des ${shower.name}`,
+        date: peakDate,
+        description: `Radiant : ${shower.radiantName} · ${shower.recommendedViewingTip}`,
+        timeLabel: "approximate_peak",
+      });
+    });
+  }
+
+  return events;
+}
+
+function createEventTimeline(startDate: Date): TimelineEvent[] {
+  const celestialEvents = getUpcomingCelestialEvents(startDate, CELESTIAL_EVENT_WINDOW_DAYS).map<TimelineEvent>((event) => ({
+    id: event.id,
+    type: event.type,
+    title: event.title,
+    date: event.date,
+    description: event.description,
+    timeLabel: event.type === "lunar_eclipse" || event.type === "solar_eclipse" ? "peak" : "instant",
+  }));
+
+  return [...celestialEvents, ...getMeteorShowerTimelineEvents(startDate, CELESTIAL_EVENT_WINDOW_DAYS)]
+    .sort((left, right) => left.date.getTime() - right.date.getTime());
+}
 
 function computeObservableEntries(position: GeoPosition, weather: WeatherNow, now: Date): ObservableEntry[] {
   const sunAltitude = getSunAltitude(position.latitude, position.longitude, now);
@@ -203,6 +257,7 @@ export function Dashboard() {
   const [weather, setWeather] = useState<WeatherNow | null>(null);
   const [quests, setQuests] = useState<SkyQuest[]>([]);
   const [futureSuggestions, setFutureSuggestions] = useState<FutureQuestSuggestion[]>([]);
+  const [eventTimeline, setEventTimeline] = useState<TimelineEvent[]>([]);
   const [observableEntries, setObservableEntries] = useState<ObservableEntry[]>([]);
   const [profile, setProfile] = useState<ProgressProfile | null>(null);
   const [observations, setObservations] = useState<Observation[]>([]);
@@ -267,7 +322,9 @@ export function Dashboard() {
   }, []);
 
   useEffect(() => {
-    setNow(new Date());
+    const currentDate = new Date();
+    setNow(currentDate);
+    setEventTimeline(createEventTimeline(currentDate));
     setProfile(getProgressProfile());
     setObservations(getObservations());
     setShowOnboarding(!isOnboardingCompleted());
@@ -458,7 +515,31 @@ export function Dashboard() {
         </section>
 
         <section id="upcoming">
-          <MotionBlock className="section-header spaced"><h2 className="section-title">À venir</h2><span className="section-sub">Prochaines fenêtres</span></MotionBlock>
+          <MotionBlock className="section-header spaced"><h2 className="section-title">Prochains événements</h2><span className="section-sub">Dans les 60 jours</span></MotionBlock>
+          <motion.div className="upcoming-list" variants={rootVariants} initial="hidden" animate="visible">
+            {eventTimeline.map((event) => {
+              const localDate = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: "Europe/Paris" }).format(event.date);
+              const [day, ...monthParts] = localDate.replace(".", "").split(" ");
+              const localTime = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" }).format(event.date);
+              const timing = event.timeLabel === "approximate_peak"
+                ? "Pic approximatif"
+                : event.timeLabel === "peak"
+                  ? `Pic à ${localTime}`
+                  : `À ${localTime}`;
+
+              return (
+                <motion.article key={event.id} className="upcoming-item" variants={itemVariants} whileHover={prefersReducedMotion ? undefined : { scale: 1.02 }}>
+                  <div className="upcoming-date"><div className="day">{day}</div><div className="month">{monthParts.join(" ")}</div></div>
+                  <div className="upcoming-info"><h4>{event.title}</h4><p>{timing} · {event.description}</p></div>
+                  <svg className="upcoming-arrow event-star" viewBox="0 0 24 24"><path d="M12 2l1.7 6.3L20 10l-6.3 1.7L12 18l-1.7-6.3L4 10l6.3-1.7L12 2z" /></svg>
+                </motion.article>
+              );
+            })}
+          </motion.div>
+        </section>
+
+        <section id="observation-windows">
+          <MotionBlock className="section-header spaced"><h2 className="section-title">Fenêtres d&apos;observation</h2><span className="section-sub">Quêtes à venir</span></MotionBlock>
           <motion.div className="upcoming-list" variants={rootVariants}>
             {futureSuggestions.slice(0, 3).map((suggestion) => {
               const date = new Date(suggestion.availableAt);
