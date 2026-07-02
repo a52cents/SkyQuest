@@ -44,44 +44,20 @@ type CameraZoomRange = {
   step: number;
 };
 
-type CameraNumericRange = {
-  min?: number;
-  max?: number;
-  step?: number;
-};
-
 type CameraCapabilities = MediaTrackCapabilities & {
   zoom?: {
     min?: number;
     max?: number;
     step?: number;
   };
-  torch?: boolean;
-  exposureCompensation?: CameraNumericRange;
-  exposureTime?: CameraNumericRange;
-  focusDistance?: CameraNumericRange;
-  exposureMode?: string[];
-  focusMode?: string[];
 };
 
 type CameraSettings = MediaTrackSettings & {
   zoom?: number;
-  torch?: boolean;
-  exposureCompensation?: number;
-  exposureTime?: number;
-  focusDistance?: number;
-  exposureMode?: string;
-  focusMode?: string;
 };
 
 type CameraConstraintSet = MediaTrackConstraintSet & {
   zoom?: number;
-  torch?: boolean;
-  exposureCompensation?: number;
-  exposureTime?: number;
-  focusDistance?: number;
-  exposureMode?: string;
-  focusMode?: string;
 };
 
 type PhotoDraft = {
@@ -184,15 +160,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [zoomRange, setZoomRange] = useState<CameraZoomRange | null>(null);
   const [currentZoom, setCurrentZoom] = useState<number | null>(null);
   const [zoomError, setZoomError] = useState<string | null>(null);
-  const [cameraCapabilities, setCameraCapabilities] = useState<CameraCapabilities | null>(null);
-  const [currentExposureCompensation, setCurrentExposureCompensation] = useState<number | null>(null);
-  const [currentExposureTime, setCurrentExposureTime] = useState<number | null>(null);
-  const [currentFocusDistance, setCurrentFocusDistance] = useState<number | null>(null);
-  const [currentExposureMode, setCurrentExposureMode] = useState<string | null>(null);
-  const [currentFocusMode, setCurrentFocusMode] = useState<string | null>(null);
-  const [torchEnabled, setTorchEnabled] = useState(false);
-  const [cameraSettingsOpen, setCameraSettingsOpen] = useState(false);
-  const [cameraSettingsError, setCameraSettingsError] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [setupModalOpen, setSetupModalOpen] = useState(true);
   const [setupStarting, setSetupStarting] = useState(false);
@@ -280,14 +247,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     setZoomError(null);
     setZoomRange(null);
     setCurrentZoom(null);
-    setCameraCapabilities(null);
-    setCameraSettingsError(null);
-    setCurrentExposureCompensation(null);
-    setCurrentExposureTime(null);
-    setCurrentFocusDistance(null);
-    setCurrentExposureMode(null);
-    setCurrentFocusMode(null);
-    setTorchEnabled(false);
 
     if (!isSecureBrowserContext()) {
       setCameraStatus("error");
@@ -360,51 +319,13 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     const range = capabilities ? readCameraZoomRange(capabilities) : null;
     const settings = track ? getSettings(track) : null;
 
-    setCameraCapabilities(capabilities);
     setZoomRange(range);
     setCurrentZoom(range ? settings?.zoom ?? range.min : null);
-    setTorchEnabled(settings?.torch === true);
-    setCurrentExposureCompensation(settings?.exposureCompensation ?? null);
-    setCurrentExposureTime(settings?.exposureTime ?? null);
-    setCurrentFocusDistance(settings?.focusDistance ?? null);
-    setCurrentExposureMode(settings?.exposureMode ?? null);
-    setCurrentFocusMode(settings?.focusMode ?? null);
     setZoomError(null);
-    setCameraSettingsError(null);
   }
 
   function formatZoom(value: number): string {
     return Number.isInteger(value) ? value.toString() : value.toFixed(1);
-  }
-
-  function getNextZoom(range: CameraZoomRange, current: number | null): number {
-    const stops = [range.min, Math.min(2, range.max), Math.min(4, range.max), range.max]
-      .filter((value, index, values) => values.findIndex((candidate) => Math.abs(candidate - value) < 0.05) === index)
-      .sort((a, b) => a - b);
-    const activeZoom = current ?? range.min;
-    const nextStop = stops.find((stop) => stop > activeZoom + range.step / 2);
-
-    return nextStop ?? range.min;
-  }
-
-  async function toggleCameraZoom() {
-    const track = streamRef.current?.getVideoTracks()[0];
-    if (!track || !zoomRange) {
-      return;
-    }
-
-    const nextZoom = getNextZoom(zoomRange, currentZoom);
-
-    try {
-      await track.applyConstraints({
-        advanced: [{ zoom: nextZoom } as CameraConstraintSet],
-      });
-      const settings = getSettings(track);
-      setCurrentZoom(settings.zoom ?? nextZoom);
-      setZoomError(null);
-    } catch {
-      setZoomError("Zoom indisponible sur cette camera.");
-    }
   }
 
   async function applyCameraSetting(constraints: CameraConstraintSet) {
@@ -417,28 +338,10 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       await track.applyConstraints({ advanced: [constraints] });
       const settings = getSettings(track);
       setCurrentZoom(settings.zoom ?? currentZoom);
-      setTorchEnabled(settings.torch ?? torchEnabled);
-      setCurrentExposureCompensation(settings.exposureCompensation ?? currentExposureCompensation);
-      setCurrentExposureTime(settings.exposureTime ?? currentExposureTime);
-      setCurrentFocusDistance(settings.focusDistance ?? currentFocusDistance);
-      setCurrentExposureMode(settings.exposureMode ?? currentExposureMode);
-      setCurrentFocusMode(settings.focusMode ?? currentFocusMode);
-      setCameraSettingsError(null);
+      setZoomError(null);
     } catch {
-      setCameraSettingsError("Ce reglage n'est pas accepte par cette camera.");
+      setZoomError("Zoom indisponible sur cette camera.");
     }
-  }
-
-  function getRangeValue(range: CameraNumericRange | undefined, fallbackStep: number): CameraZoomRange | null {
-    if (!range || typeof range.min !== "number" || typeof range.max !== "number" || range.max <= range.min) {
-      return null;
-    }
-
-    return {
-      min: range.min,
-      max: range.max,
-      step: typeof range.step === "number" && range.step > 0 ? range.step : fallbackStep,
-    };
   }
 
   function getCameraErrorMessage(error: unknown): string {
@@ -616,20 +519,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         : `Cherche ${liveQuest.target} dans le ciel`;
   const targetAltitudeLabel = liveQuest.altitude !== null ? `${Math.round(liveQuest.altitude)}°` : "Libre";
   const zoomLabel = zoomRange && currentZoom !== null ? `${formatZoom(currentZoom)}x` : "Auto";
-  const exposureCompensationRange = getRangeValue(cameraCapabilities?.exposureCompensation, 0.1);
-  const exposureTimeRange = getRangeValue(cameraCapabilities?.exposureTime, 0.01);
-  const focusDistanceRange = getRangeValue(cameraCapabilities?.focusDistance, 0.1);
-  const exposureModes = cameraCapabilities?.exposureMode ?? [];
-  const focusModes = cameraCapabilities?.focusMode ?? [];
-  const hasCameraSettings = Boolean(
-    zoomRange ||
-      cameraCapabilities?.torch ||
-      exposureCompensationRange ||
-      exposureTimeRange ||
-      focusDistanceRange ||
-      exposureModes.length > 0 ||
-      focusModes.length > 0,
-  );
   const overlaySupported = questSupportsSkyOverlay(liveQuest);
   const overlayReady = Boolean(
     skyOverlayEnabled &&
@@ -673,7 +562,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       };
 
   return (
-    <main className="camera-guide-screen relative h-[100dvh] overflow-hidden bg-[#0a0a0b] text-white">
+    <main className="camera-guide-screen relative h-[100dvh] select-none overflow-hidden bg-[#0a0a0b] text-white">
       <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.30),rgba(0,0,0,0.08)_42%,rgba(0,0,0,0.62))]" aria-hidden="true" />
       <SkyOverlay
@@ -781,7 +670,28 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
           {cameraError ? <p className="mb-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">{cameraError}</p> : null}
           {zoomError ? <p className="mb-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">{zoomError}</p> : null}
 
-          <div className="grid grid-cols-2 gap-2">
+          {cameraStatus === "active" && zoomRange && currentZoom !== null ? (
+            <label className="block rounded-[13px] border border-white/[0.08] bg-white/[0.05] p-3">
+              <span className="flex items-center justify-between gap-3 text-sm font-bold text-white">
+                Zoom <span className="text-accent-cyan">{formatZoom(currentZoom)}x</span>
+              </span>
+              <input
+                type="range"
+                min={zoomRange.min}
+                max={zoomRange.max}
+                step={zoomRange.step}
+                value={currentZoom}
+                onChange={(event) => {
+                  const value = Number(event.target.value);
+                  setCurrentZoom(value);
+                  void applyCameraSetting({ zoom: value });
+                }}
+                className="mt-0 w-full touch-manipulation accent-[var(--accent-cyan)]"
+              />
+            </label>
+          ) : null}
+
+          <div className="mt-2 grid grid-cols-2 gap-2">
             <AppButton variant="success" size="sm" onClick={handleTargetFound} className="min-h-12" disabled={photoCaptureStatus === "capturing"}>
               {photoCaptureStatus === "capturing" ? "Photo..." : "Je l'ai trouvée"}
             </AppButton>
@@ -790,9 +700,9 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             </AppButton>
           </div>
 
-          <div className="mt-2 grid grid-cols-3 gap-2">
+          <div className="mt-2">
             {cameraStatus !== "active" ? (
-              <AppButton variant="secondary" size="sm" onClick={startCamera} disabled={cameraStatus === "starting"} className="min-h-11">
+              <AppButton variant="secondary" onClick={startCamera} disabled={cameraStatus === "starting"} fullWidth className="min-h-12">
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.span
                     key={cameraStatus === "starting" ? "camera-starting" : "camera-idle"}
@@ -802,47 +712,11 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
                     exit="exit"
                     className="inline-flex items-center gap-1 rounded-full px-1 text-sm font-semibold"
                   >
-                    {cameraStatus === "starting" ? "Camera..." : "Camera"}
+                    {cameraStatus === "starting" ? "Ouverture…" : "Ouvrir l'appareil photo"}
                   </motion.span>
                 </AnimatePresence>
               </AppButton>
-            ) : zoomRange ? (
-              <AppButton variant="secondary" size="sm" onClick={toggleCameraZoom} className="min-h-11">
-                Zoom {zoomLabel}
-              </AppButton>
-            ) : (
-              <AppButton variant="secondary" size="sm" onClick={startCamera} className="min-h-11">
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.span
-                    key="camera-active"
-                    variants={statusBadgeVariants}
-                    initial="hidden"
-                    animate="show"
-                    exit="exit"
-                    className="inline-flex items-center gap-1 rounded-full px-1 text-sm font-semibold"
-                  >
-                    Camera active
-                  </motion.span>
-                </AnimatePresence>
-              </AppButton>
-            )}
-            <AppButton variant="secondary" size="sm" onClick={requestOrientation} className="min-h-11">
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.span
-                  key={orientationStatus === "active" ? "orientation-active" : "orientation-idle"}
-                  variants={statusBadgeVariants}
-                  initial="hidden"
-                  animate="show"
-                  exit="exit"
-                  className="inline-flex items-center gap-1 rounded-full px-1 text-sm font-semibold"
-                >
-                  {orientationStatus === "active" ? "Orientation active" : "Orientation"}
-                </motion.span>
-              </AnimatePresence>
-            </AppButton>
-            <AppButton variant="ghost" size="sm" onClick={() => setCameraSettingsOpen(true)} disabled={!hasCameraSettings} className="min-h-11">
-              Reglages
-            </AppButton>
+            ) : null}
           </div>
           {cameraStatus === "active" && observerLocation && overlaySupported ? (
             <button
@@ -861,7 +735,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
       {setupModalOpen ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0a0a0b]/90 p-4 backdrop-blur-xl" role="dialog" aria-modal="true" aria-labelledby="setup-title">
-          <AppCard className="w-full max-w-md" padding="lg">
+          <AppCard className="w-full max-w-md select-text" padding="lg">
             <p className="premium-kicker">Avant de commencer</p>
             <h2 id="setup-title" className="mt-2 font-[Georgia,'Times_New_Roman',serif] text-3xl font-normal tracking-[-0.03em] text-white">
               Prépare ton guidage
@@ -882,7 +756,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             </div>
 
             {cameraError || orientationError ? (
-              <div className="mt-4 rounded-[14px] border border-warning/25 bg-warning/10 px-3 py-3 text-sm leading-5 text-warning">
+              <div className="mt-4 select-text rounded-[14px] border border-warning/25 bg-warning/10 px-3 py-3 text-sm leading-5 text-warning">
                 {orientationError ? <p>{orientationError}</p> : null}
                 {cameraError ? <p>{cameraError}</p> : null}
               </div>
@@ -902,7 +776,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
       {detailsOpen ? (
         <div className="fixed inset-0 z-40 flex items-end bg-black/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="details-title">
-          <AppCard className="mx-auto max-h-[82dvh] w-full max-w-[600px] overflow-y-auto rounded-t-[20px] rounded-b-none pb-[calc(env(safe-area-inset-bottom)+1rem)]" padding="lg">
+          <AppCard className="mx-auto max-h-[82dvh] w-full max-w-[600px] select-text overflow-y-auto rounded-t-[20px] rounded-b-none pb-[calc(env(safe-area-inset-bottom)+1rem)]" padding="lg">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-bold uppercase tracking-[0.18em] text-accent-cyan">Details</p>
@@ -921,10 +795,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               <DetailsRow label="Zoom reel" value={zoomLabel} />
               <DetailsRow label="Orientation" value={orientationStatus === "active" ? "Active" : "Inactive"} />
               <DetailsRow label="Capteur" value={orientationConfidence === "high" ? "Absolu" : orientationConfidence === "medium" ? "Boussole" : "Inclinaison"} />
-              <DetailsRow label="Torche" value={cameraCapabilities?.torch ? (torchEnabled ? "Allumee" : "Eteinte") : "Indispo"} />
-              <DetailsRow label="Expo." value={currentExposureCompensation !== null ? currentExposureCompensation.toFixed(1) : "Auto"} />
-              <DetailsRow label="Focus" value={currentFocusDistance !== null ? currentFocusDistance.toFixed(1) : currentFocusMode ?? "Auto"} />
-              <DetailsRow label="Expo mode" value={currentExposureMode ?? "Auto"} />
             </div>
 
             <div className="mt-4 rounded-brand-lg border border-brand-border bg-white/[0.05] p-4">
@@ -943,179 +813,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
                 Debug actif : direction {DIRECTION_ALIGNMENT_THRESHOLD_DEGREES}°, hauteur {ALTITUDE_ALIGNMENT_THRESHOLD_DEGREES}°.
               </div>
             ) : null}
-          </AppCard>
-        </div>
-      ) : null}
-
-      {cameraSettingsOpen ? (
-        <div className="fixed inset-0 z-40 flex items-end bg-black/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-          <AppCard className="mx-auto max-h-[82dvh] w-full max-w-[600px] overflow-y-auto rounded-t-[20px] rounded-b-none pb-[calc(env(safe-area-inset-bottom)+1rem)]" padding="lg">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-bold uppercase tracking-[0.18em] text-accent-cyan">Camera</p>
-                <h2 id="settings-title" className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal tracking-[-0.02em] text-white">Reglages disponibles</h2>
-              </div>
-              <AppButton variant="ghost" size="sm" onClick={() => setCameraSettingsOpen(false)}>Fermer</AppButton>
-            </div>
-
-            {cameraSettingsError ? (
-              <p className="mt-4 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">{cameraSettingsError}</p>
-            ) : null}
-            {!hasCameraSettings ? (
-              <p className="mt-4 rounded-brand-lg border border-brand-border bg-white/[0.05] p-4 text-sm leading-6 text-muted">
-                Cette camera ne publie pas de reglages avances au navigateur. SkyQuest garde les automatismes.
-              </p>
-            ) : null}
-
-            <div className="mt-5 grid gap-4">
-              {zoomRange && currentZoom !== null ? (
-                <label className="rounded-brand-lg border border-brand-border bg-white/[0.05] p-4">
-                  <span className="flex items-center justify-between gap-3 text-sm font-bold text-white">
-                    Zoom <span className="text-accent-cyan">{zoomLabel}</span>
-                  </span>
-                  <input
-                    type="range"
-                    min={zoomRange.min}
-                    max={zoomRange.max}
-                    step={zoomRange.step}
-                    value={currentZoom}
-                    onChange={(event) => {
-                      const value = Number(event.target.value);
-                      setCurrentZoom(value);
-                      void applyCameraSetting({ zoom: value });
-                    }}
-                    className="mt-4 w-full accent-[var(--accent-cyan)]"
-                  />
-                </label>
-              ) : null}
-
-              {cameraCapabilities?.torch ? (
-                <div className="rounded-brand-lg border border-brand-border bg-white/[0.05] p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-bold text-white">Torche</p>
-                      <p className="mt-1 text-xs leading-5 text-muted">Pour le ciel, evite de ruiner ta vision nocturne.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextTorch = !torchEnabled;
-                        setTorchEnabled(nextTorch);
-                        void applyCameraSetting({ torch: nextTorch });
-                      }}
-                      className={`h-10 rounded-full px-4 text-sm font-black ${torchEnabled ? "bg-success/18 text-success" : "bg-white/[0.08] text-white"}`}
-                    >
-                      {torchEnabled ? "On" : "Off"}
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-
-              {exposureModes.length > 0 ? (
-                <label className="rounded-brand-lg border border-brand-border bg-white/[0.05] p-4">
-                  <span className="text-sm font-bold text-white">Mode exposition</span>
-                  <select
-                    value={currentExposureMode ?? exposureModes[0]}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      setCurrentExposureMode(value);
-                      void applyCameraSetting({ exposureMode: value });
-                    }}
-                    className="mt-3 h-11 w-full rounded-brand border border-brand-border bg-background px-3 text-sm font-bold text-white"
-                  >
-                    {exposureModes.map((mode) => (
-                      <option key={mode} value={mode}>{mode}</option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
-
-              {exposureCompensationRange && currentExposureCompensation !== null ? (
-                <label className="rounded-brand-lg border border-brand-border bg-white/[0.05] p-4">
-                  <span className="flex items-center justify-between gap-3 text-sm font-bold text-white">
-                    Compensation exposition <span className="text-accent-cyan">{currentExposureCompensation.toFixed(1)}</span>
-                  </span>
-                  <input
-                    type="range"
-                    min={exposureCompensationRange.min}
-                    max={exposureCompensationRange.max}
-                    step={exposureCompensationRange.step}
-                    value={currentExposureCompensation}
-                    onChange={(event) => {
-                      const value = Number(event.target.value);
-                      setCurrentExposureCompensation(value);
-                      void applyCameraSetting({ exposureCompensation: value });
-                    }}
-                    className="mt-4 w-full accent-[var(--accent-cyan)]"
-                  />
-                </label>
-              ) : null}
-
-              {exposureTimeRange && currentExposureTime !== null ? (
-                <label className="rounded-brand-lg border border-brand-border bg-white/[0.05] p-4">
-                  <span className="flex items-center justify-between gap-3 text-sm font-bold text-white">
-                    Temps exposition <span className="text-accent-cyan">{currentExposureTime.toFixed(2)}</span>
-                  </span>
-                  <input
-                    type="range"
-                    min={exposureTimeRange.min}
-                    max={exposureTimeRange.max}
-                    step={exposureTimeRange.step}
-                    value={currentExposureTime}
-                    onChange={(event) => {
-                      const value = Number(event.target.value);
-                      setCurrentExposureTime(value);
-                      void applyCameraSetting({ exposureTime: value });
-                    }}
-                    className="mt-4 w-full accent-[var(--accent-cyan)]"
-                  />
-                </label>
-              ) : null}
-
-              {focusModes.length > 0 ? (
-                <label className="rounded-brand-lg border border-brand-border bg-white/[0.05] p-4">
-                  <span className="text-sm font-bold text-white">Mode focus</span>
-                  <select
-                    value={currentFocusMode ?? focusModes[0]}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      setCurrentFocusMode(value);
-                      void applyCameraSetting({ focusMode: value });
-                    }}
-                    className="mt-3 h-11 w-full rounded-brand border border-brand-border bg-background px-3 text-sm font-bold text-white"
-                  >
-                    {focusModes.map((mode) => (
-                      <option key={mode} value={mode}>{mode}</option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
-
-              {focusDistanceRange && currentFocusDistance !== null ? (
-                <label className="rounded-brand-lg border border-brand-border bg-white/[0.05] p-4">
-                  <span className="flex items-center justify-between gap-3 text-sm font-bold text-white">
-                    Distance focus <span className="text-accent-cyan">{currentFocusDistance.toFixed(1)}</span>
-                  </span>
-                  <input
-                    type="range"
-                    min={focusDistanceRange.min}
-                    max={focusDistanceRange.max}
-                    step={focusDistanceRange.step}
-                    value={currentFocusDistance}
-                    onChange={(event) => {
-                      const value = Number(event.target.value);
-                      setCurrentFocusDistance(value);
-                      void applyCameraSetting({ focusDistance: value });
-                    }}
-                    className="mt-4 w-full accent-[var(--accent-cyan)]"
-                  />
-                </label>
-              ) : null}
-            </div>
-
-            <p className="mt-5 text-xs leading-5 text-faint">
-              Ces controles dependent du navigateur et du capteur. Si rien ne s affiche, l appareil garde ses automatismes.
-            </p>
           </AppCard>
         </div>
       ) : null}
