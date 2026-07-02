@@ -78,6 +78,8 @@
 .sky-dashboard .quest-list { display: grid; }
 .sky-dashboard .quest-card { position: relative; overflow: hidden; margin-bottom: 12px; padding: 24px; border: 1px solid var(--dash-border); border-radius: var(--dash-radius); background: var(--dash-bg-card); cursor: pointer; transition: border-color .4s ease, box-shadow .4s ease; }
 .sky-dashboard .quest-card:hover { border-color: var(--dash-accent); box-shadow: 0 0 40px var(--dash-accent-glow); }
+.sky-dashboard .quest-card.locked { cursor: default; opacity: .78; }
+.sky-dashboard .quest-card.locked:hover { border-color: var(--dash-border); box-shadow: none; }
 .sky-dashboard .quest-card::before { content: ""; position: absolute; top: 0; right: 0; left: 0; height: 1px; opacity: 0; background: linear-gradient(90deg,transparent,var(--dash-accent),transparent); transition: opacity .4s; }
 .sky-dashboard .quest-card:hover::before { opacity: .6; }
 .sky-dashboard .quest-badge { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px; padding: 4px 10px; border: 1px solid var(--dash-border); border-radius: 100px; font-size: 10px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; }
@@ -92,11 +94,15 @@
 .sky-dashboard .quest-action { display: flex; align-items: center; justify-content: space-between; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--dash-border); }
 .sky-dashboard .quest-hint { color: var(--dash-fg-muted); font-size: 12px; font-style: italic; }
 .sky-dashboard .quest-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border: 0; border-radius: 100px; background: var(--dash-accent); color: white; cursor: pointer; font-size: 13px; font-weight: 500; }
+.sky-dashboard .quest-btn:disabled { background: var(--dash-fg-muted); cursor: not-allowed; opacity: .72; }
 .sky-dashboard .quest-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sky-dashboard .show-more-btn { width: 100%; padding: 11px 16px; border: 1px solid var(--dash-border); border-radius: 100px; background: transparent; color: var(--dash-fg-dim); cursor: pointer; font-size: 13px; transition: border-color .3s, color .3s; }
+.sky-dashboard .show-more-btn:hover { border-color: var(--dash-border-hover); color: var(--dash-fg); }
 
 .sky-dashboard .upcoming-list { display: flex; flex-direction: column; gap: 8px; }
 .sky-dashboard .upcoming-item { display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid var(--dash-border); border-radius: var(--dash-radius-sm); background: var(--dash-bg-card); transition: border-color .3s, background-color .3s; }
 .sky-dashboard button.upcoming-item { width: 100%; color: inherit; text-align: left; cursor: pointer; }
+.sky-dashboard button.upcoming-item:disabled, .sky-dashboard .upcoming-item.locked { cursor: not-allowed; opacity: .68; }
 .sky-dashboard .upcoming-item:hover { border-color: var(--dash-border-hover); background: var(--dash-bg-elev); }
 .sky-dashboard .upcoming-date { display: flex; flex-direction: column; align-items: center; min-width: 48px; }
 .sky-dashboard .upcoming-date .day { color: var(--dash-fg); font-family: var(--dash-font-mono); font-size: 20px; font-weight: 600; line-height: 1; }
@@ -125,6 +131,14 @@
 .sky-dashboard .progress-meta { display: flex; justify-content: space-between; color: var(--dash-fg-muted); font-size: 12px; }
 
 .sky-dashboard .dashboard-notice { margin-bottom: 20px; padding: 12px 14px; border: 1px solid rgba(245,158,11,.2); border-radius: var(--dash-radius-sm); background: rgba(245,158,11,.06); color: #d6b875; font-size: 12px; line-height: 1.5; }
+.sky-dashboard .analysis-banner { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin: -8px 0 24px; padding: 12px 14px; border: 1px solid var(--dash-border); border-radius: var(--dash-radius-sm); background: var(--dash-bg-elev); }
+.sky-dashboard .analysis-banner > div { display: flex; flex: 0 0 auto; flex-direction: column; gap: 2px; }
+.sky-dashboard .analysis-banner strong { color: var(--dash-fg); font-size: 12px; }
+.sky-dashboard .analysis-banner span, .sky-dashboard .analysis-banner p { color: var(--dash-fg-muted); font-size: 11px; line-height: 1.45; }
+.sky-dashboard .analysis-banner p { max-width: 310px; text-align: right; }
+.sky-dashboard .analysis-banner.stale { border-color: rgba(245,158,11,.2); background: rgba(245,158,11,.05); }
+.sky-dashboard .analysis-banner.stale strong { color: var(--dash-accent-warm); }
+.sky-dashboard .analysis-banner.current strong { color: #22c55e; }
 .sky-dashboard .empty-state { padding: 48px 24px; color: var(--dash-fg-muted); text-align: center; }
 .sky-dashboard .empty-state svg { width: 40px; height: 40px; margin-bottom: 12px; fill: none; stroke: var(--dash-fg-muted); stroke-width: 1; }
 .sky-dashboard .empty-state p { font-size: 14px; }
@@ -143,4 +157,4 @@
 .sky-dashboard .modal-secondary { padding: 10px; border: 1px solid var(--dash-border); border-radius: 100px; background: transparent; color: var(--dash-fg-dim); cursor: pointer; }
 
 @media (min-width: 640px) { .sky-dashboard .journal-preview { grid-template-columns: repeat(3,1fr); } .sky-dashboard .conditions-bar { gap: 12px; } .sky-dashboard .condition-item { padding: 16px 12px; } .sky-dashboard .dashboard-modal { align-items: center; } }
-@media (max-width: 380px) { .sky-dashboard .conditions-bar { grid-template-columns: repeat(2,1fr); } .sky-dashboard .section-title { font-size: 20px; } .sky-dashboard .quest-card { padding: 20px; } .sky-dashboard .quest-card h3 { font-size: 18px; } .sky-dashboard .journal-preview { grid-template-columns: 1fr; } .sky-dashboard .nav-item { padding-inline: 10px; } }
+@media (max-width: 380px) { .sky-dashboard .conditions-bar { grid-template-columns: repeat(2,1fr); } .sky-dashboard .section-title { font-size: 20px; } .sky-dashboard .quest-card { padding: 20px; } .sky-dashboard .quest-card h3 { font-size: 18px; } .sky-dashboard .journal-preview { grid-template-columns: 1fr; } .sky-dashboard .nav-item { padding-inline: 10px; } .sky-dashboard .analysis-banner { flex-direction: column; } .sky-dashboard .analysis-banner p { text-align: left; } }

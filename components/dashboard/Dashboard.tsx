@@ -5,33 +5,20 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 import { Onboarding } from "@/components/Onboarding";
-import { equatorialToHorizontal, getSkyObjects, getSunAltitude } from "@/lib/astro";
 import { getCurrentPosition, type GeoPosition } from "@/lib/browser-support";
 import { getUpcomingCelestialEvents, type CelestialEventType } from "@/lib/celestial-events";
 import { haptic } from "@/lib/haptics";
 import { fetchNextIssVisiblePass } from "@/lib/iss";
 import { isOnboardingCompleted, setOnboardingCompleted } from "@/lib/onboarding";
 import { meteorShowers } from "@/lib/meteor-showers";
-import { azimuthToCardinal } from "@/lib/orientation";
 import { isPopunderAdOnCooldown, triggerPopunderAd } from "@/lib/popunder-ad";
 import { getAchievementProgress, getRankProgress } from "@/lib/progression";
 import { generateFutureQuestSuggestions, generateQuests, type FutureQuestSuggestion } from "@/lib/quest-generator";
-import { catalogSkyObjects, type CatalogObjectType } from "@/lib/sky-catalog";
-import { getLastLocation, getObservations, getProgressProfile, saveActiveQuest, saveLastLocation } from "@/lib/storage";
-import type { Observation, ProgressProfile, SkyObjectName, SkyQuest, WeatherNow } from "@/lib/types";
-import { calculateCatalogVisibilityScore, calculateVisibilityScore } from "@/lib/visibility";
+import { getObservations, getProgressProfile, saveActiveQuest, saveLastLocation } from "@/lib/storage";
+import type { Observation, ProgressProfile, QuestTargetType, SkyQuest, WeatherNow } from "@/lib/types";
 import { fetchWeatherNow, getFallbackWeather } from "@/lib/weather";
 
 type LoadState = "idle" | "loading" | "ready";
-
-type ObservableEntry = {
-  id: string;
-  name: string;
-  type: string;
-  altitude: number;
-  azimuth: number;
-  score: number;
-};
 
 type TimelineEvent = {
   id: string;
@@ -44,16 +31,20 @@ type TimelineEvent = {
 
 const CELESTIAL_EVENT_WINDOW_DAYS = 60;
 const DAY_MS = 86_400_000;
+const DASHBOARD_ANALYSIS_KEY = "skyquest.dashboard-analysis.v1";
+let unlockedAnalysisForRuntime: number | null = null;
 
-const PLANET_LABELS: Record<SkyObjectName, string> = {
-  Moon: "Lune",
-  Venus: "Vénus",
-  Jupiter: "Jupiter",
-  Saturn: "Saturne",
-  Mars: "Mars",
+type DashboardAnalysis = {
+  savedAt: number;
+  position: GeoPosition;
+  weather: WeatherNow;
+  quests: SkyQuest[];
+  futureSuggestions: FutureQuestSuggestion[];
 };
 
-const CATALOG_TYPE_LABELS: Record<CatalogObjectType, string> = {
+const QUEST_TARGET_LABELS: Record<QuestTargetType, string> = {
+  moon: "Lune",
+  planet: "Planète",
   star: "Étoile",
   asterism: "Astérisme",
   constellation: "Constellation",
@@ -61,6 +52,7 @@ const CATALOG_TYPE_LABELS: Record<CatalogObjectType, string> = {
   galaxy: "Galaxie",
   meteor_shower: "Pluie de météores",
   satellite: "Satellite",
+  free_observation: "Observation libre",
 };
 
 const pageVariants: Variants = {
@@ -113,56 +105,41 @@ function createEventTimeline(startDate: Date): TimelineEvent[] {
     .sort((left, right) => left.date.getTime() - right.date.getTime());
 }
 
-function computeObservableEntries(position: GeoPosition, weather: WeatherNow, now: Date): ObservableEntry[] {
-  const sunAltitude = getSunAltitude(position.latitude, position.longitude, now);
-  const planets = getSkyObjects(position.latitude, position.longitude, now)
-    .map((object) => ({
-      id: object.name.toLowerCase(),
-      name: PLANET_LABELS[object.name],
-      type: object.name === "Moon" ? "Lune" : "Planète",
-      altitude: object.altitude,
-      azimuth: object.azimuth,
-      score: calculateVisibilityScore({ object, weather, sunAltitude }),
-    }))
-    .filter((object) => object.altitude >= 0 && object.score >= 50);
-
-  const catalog = catalogSkyObjects.flatMap<ObservableEntry>((object) => {
+function readCachedAnalysis(): DashboardAnalysis | null {
+  try {
+    const raw = window.localStorage.getItem(DASHBOARD_ANALYSIS_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<DashboardAnalysis>;
     if (
-      object.type === "satellite" ||
-      typeof object.rightAscensionHours !== "number" ||
-      typeof object.declinationDegrees !== "number"
+      typeof value.savedAt !== "number" ||
+      !value.position ||
+      !Number.isFinite(value.position.latitude) ||
+      !Number.isFinite(value.position.longitude) ||
+      !value.weather ||
+      !Array.isArray(value.quests) ||
+      !Array.isArray(value.futureSuggestions)
     ) {
-      return [];
+      return null;
     }
+    return value as DashboardAnalysis;
+  } catch {
+    return null;
+  }
+}
 
-    const horizontal = equatorialToHorizontal({
-      rightAscensionHours: object.rightAscensionHours,
-      declinationDegrees: object.declinationDegrees,
-      latitude: position.latitude,
-      longitude: position.longitude,
-      date: now,
-    });
-    const score = calculateCatalogVisibilityScore({
-      object,
-      altitude: horizontal.altitude,
-      weather,
-      sunAltitude,
-      now,
-    });
-
-    return score >= 50
-      ? [{
-          id: object.id,
-          name: object.frenchName,
-          type: CATALOG_TYPE_LABELS[object.type],
-          altitude: horizontal.altitude,
-          azimuth: horizontal.azimuth,
-          score,
-        }]
-      : [];
-  });
-
-  return [...planets, ...catalog].sort((left, right) => right.score - left.score);
+function cacheAnalysis(analysis: DashboardAnalysis) {
+  try {
+    const roundedAnalysis = {
+      ...analysis,
+      position: {
+        latitude: Math.round(analysis.position.latitude * 100) / 100,
+        longitude: Math.round(analysis.position.longitude * 100) / 100,
+      },
+    };
+    window.localStorage.setItem(DASHBOARD_ANALYSIS_KEY, JSON.stringify(roundedAnalysis));
+  } catch {
+    // The current analysis remains usable even when browser storage is unavailable.
+  }
 }
 
 function LogoMark() {
@@ -207,20 +184,20 @@ function MotionBlock({ children, className }: { children: ReactNode; className?:
   );
 }
 
-function QuestCard({ quest, onStart }: { quest: SkyQuest; onStart: (quest: SkyQuest) => void }) {
+function QuestCard({ quest, onStart, locked, stale }: { quest: SkyQuest; onStart: (quest: SkyQuest) => void; locked: boolean; stale: boolean }) {
   const prefersReducedMotion = useReducedMotion() ?? false;
   return (
     <motion.article
       layout
       variants={prefersReducedMotion ? { hidden: { opacity: 1 }, visible: { opacity: 1 } } : itemVariants}
-      whileHover={prefersReducedMotion ? undefined : { scale: 1.02, y: -2 }}
-      whileTap={prefersReducedMotion ? undefined : { scale: 0.99 }}
-      className="quest-card"
-      onClick={() => onStart(quest)}
+      whileHover={prefersReducedMotion || locked ? undefined : { scale: 1.02, y: -2 }}
+      whileTap={prefersReducedMotion || locked ? undefined : { scale: 0.99 }}
+      className={`quest-card ${locked ? "locked" : ""}`}
+      onClick={() => { if (!locked) onStart(quest); }}
     >
       <div className={`quest-badge ${quest.altitude !== null && quest.altitude >= 10 ? "now" : "soon"}`}>
         <span className="dot" />
-        {quest.altitude !== null && quest.altitude >= 10 ? "Visible maintenant" : "Observation prudente"}
+        {locked ? stale ? "Dernière analyse" : "Guidage indisponible" : quest.altitude !== null && quest.altitude >= 10 ? "Visible maintenant" : "Observation prudente"}
       </div>
       <h3>{quest.title}</h3>
       <p>{quest.description}</p>
@@ -240,8 +217,8 @@ function QuestCard({ quest, onStart }: { quest: SkyQuest; onStart: (quest: SkyQu
       </div>
       <div className="quest-action">
         <span className="quest-hint">{quest.tip}</span>
-        <button type="button" className="quest-btn" onClick={(event) => { event.stopPropagation(); onStart(quest); }}>
-          Guider
+        <button type="button" className="quest-btn" disabled={locked} onClick={(event) => { event.stopPropagation(); if (!locked) onStart(quest); }}>
+          {locked ? "Actualise d'abord" : "Guider"}
           <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
         </button>
       </div>
@@ -258,7 +235,6 @@ export function Dashboard() {
   const [quests, setQuests] = useState<SkyQuest[]>([]);
   const [futureSuggestions, setFutureSuggestions] = useState<FutureQuestSuggestion[]>([]);
   const [eventTimeline, setEventTimeline] = useState<TimelineEvent[]>([]);
-  const [observableEntries, setObservableEntries] = useState<ObservableEntry[]>([]);
   const [profile, setProfile] = useState<ProgressProfile | null>(null);
   const [observations, setObservations] = useState<Observation[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
@@ -267,6 +243,9 @@ export function Dashboard() {
   const [isOnboardingReady, setIsOnboardingReady] = useState(false);
   const [showAdConsent, setShowAdConsent] = useState(false);
   const [isAdLoading, setIsAdLoading] = useState(false);
+  const [analysisSavedAt, setAnalysisSavedAt] = useState<number | null>(null);
+  const [isGuidanceUnlocked, setIsGuidanceUnlocked] = useState(false);
+  const [showAllQuests, setShowAllQuests] = useState(false);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -304,6 +283,7 @@ export function Dashboard() {
       weather: currentWeather,
       now: currentDate,
       issPass: currentIssPass,
+      limit: 20,
     });
     const nextFutureSuggestions = generateFutureQuestSuggestions({
       latitude: coords.latitude,
@@ -311,14 +291,23 @@ export function Dashboard() {
       weather: currentWeather,
       now: currentDate,
       issPass: futureIssPass,
+      excludedTargets: new Set(nextQuests.map((quest) => quest.target)),
+      horizonMinutes: 7 * 24 * 60,
     });
+
+    const savedAt = Date.now();
+    const analysis = { savedAt, position: coords, weather: currentWeather, quests: nextQuests, futureSuggestions: nextFutureSuggestions };
 
     setWeather(currentWeather);
     setQuests(nextQuests);
     setFutureSuggestions(nextFutureSuggestions);
-    setObservableEntries(computeObservableEntries(coords, currentWeather, currentDate));
+    setAnalysisSavedAt(savedAt);
+    setIsGuidanceUnlocked(true);
+    unlockedAnalysisForRuntime = savedAt;
+    setShowAllQuests(false);
     setNotice(weatherNotice);
     setLoadState("ready");
+    cacheAnalysis(analysis);
   }, []);
 
   useEffect(() => {
@@ -330,32 +319,32 @@ export function Dashboard() {
     setShowOnboarding(!isOnboardingCompleted());
     setIsOnboardingReady(true);
 
-    const storedPosition = getLastLocation();
-    if (storedPosition) {
-      void loadDashboard(storedPosition);
+    const cachedAnalysis = readCachedAnalysis();
+    if (cachedAnalysis) {
+      setPosition(cachedAnalysis.position);
+      setWeather(cachedAnalysis.weather);
+      setQuests(cachedAnalysis.quests);
+      setFutureSuggestions(cachedAnalysis.futureSuggestions);
+      setAnalysisSavedAt(cachedAnalysis.savedAt);
+      setIsGuidanceUnlocked(unlockedAnalysisForRuntime === cachedAnalysis.savedAt);
+      setLoadState("ready");
     }
 
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, [loadDashboard]);
 
-  useEffect(() => {
-    if (!position || !weather) return;
-    const timer = window.setInterval(() => {
-      setObservableEntries(computeObservableEntries(position, weather, new Date()));
-    }, 60_000);
-    return () => window.clearInterval(timer);
-  }, [position, weather]);
-
   async function requestCurrentSky() {
     haptic("select");
+    setIsGuidanceUnlocked(false);
+    setLoadState("loading");
     try {
       const coords = await getCurrentPosition();
       saveLastLocation(coords);
       await loadDashboard(coords);
     } catch (error) {
       const fallbackQuests = generateQuests({ latitude: null, longitude: null, weather: getFallbackWeather(), now: new Date() });
-      setQuests(fallbackQuests);
+      setQuests((currentQuests) => currentQuests.length > 0 ? currentQuests : fallbackQuests);
       setLoadState("ready");
       setNotice(error instanceof Error ? error.message : "Position indisponible. Une observation libre reste possible.");
     }
@@ -379,18 +368,13 @@ export function Dashboard() {
   }
 
   function handleStart(quest: SkyQuest) {
+    if (!isGuidanceUnlocked) {
+      setNotice("Appuie sur « Maintenant » pour actualiser le ciel avant de lancer un guidage.");
+      return;
+    }
     haptic("select");
     saveActiveQuest(quest);
     router.push(`/quest/${quest.id}`);
-  }
-
-  function handleCameraAction() {
-    const firstGuidedQuest = quests.find((quest) => quest.targetType !== "free_observation");
-    if (firstGuidedQuest) {
-      handleStart(firstGuidedQuest);
-      return;
-    }
-    handleRefreshRequest();
   }
 
   const rank = profile ? getRankProgress(profile.totalXp) : null;
@@ -399,17 +383,24 @@ export function Dashboard() {
   const averageVisibility = quests.length > 0
     ? Math.round(quests.reduce((total, quest) => total + quest.visibilityScore, 0) / quests.length)
     : null;
-  const visibleQuests = quests.slice(0, 3);
-  const visibleObjects = observableEntries.slice(0, 4);
+  const guidableQuests = quests.filter((quest) => quest.targetType !== "free_observation");
+  const visibleQuests = showAllQuests ? quests : quests.slice(0, 3);
+  const currentTargets = new Set(quests.map((quest) => quest.target));
+  const distinctFutureSuggestions = futureSuggestions.filter((suggestion) => !currentTargets.has(suggestion.quest.target));
   const recentObservations = observations.slice(0, 2);
   const locationLabel = position
     ? `${position.latitude.toFixed(2)}°, ${position.longitude.toFixed(2)}°`
     : "Position non chargée";
-  const conditionsLabel = weather?.isDay
-    ? "Ciel de jour"
-    : averageVisibility !== null && averageVisibility >= 70
-      ? "Ciel favorable"
-      : "Ciel à vérifier";
+  const conditionsLabel = analysisSavedAt && !isGuidanceUnlocked
+    ? "Analyse passée"
+    : weather?.isDay
+      ? "Ciel de jour"
+      : averageVisibility !== null && averageVisibility >= 70
+        ? "Ciel favorable"
+        : "Ciel à vérifier";
+  const analysisDateLabel = analysisSavedAt
+    ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(analysisSavedAt))
+    : null;
   const rootVariants = prefersReducedMotion ? { hidden: { opacity: 1 }, visible: { opacity: 1 } } : pageVariants;
 
   return (
@@ -465,10 +456,17 @@ export function Dashboard() {
           </div>
           <div className="condition-item">
             <svg className="condition-icon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" /></svg>
-            <AnimatedValue value={loadState === "ready" ? String(observableEntries.length) : "—"} />
-            <div className="condition-label">Visibles</div>
+            <AnimatedValue value={loadState === "ready" ? String(guidableQuests.length) : "—"} />
+            <div className="condition-label">Cibles</div>
           </div>
         </MotionBlock>
+
+        {analysisDateLabel ? (
+          <MotionBlock className={`analysis-banner ${isGuidanceUnlocked ? "current" : "stale"}`}>
+            <div><strong>{isGuidanceUnlocked ? "Analyse actuelle" : "Dernière analyse"}</strong><span>{analysisDateLabel}</span></div>
+            <p>{isGuidanceUnlocked ? "Les guidages sont disponibles pour cette analyse." : "Ces résultats sont affichés à titre indicatif. Appuie sur « Maintenant » avant tout guidage."}</p>
+          </MotionBlock>
+        ) : null}
 
         <AnimatePresence mode="wait">{notice ? <motion.div key={notice} className="dashboard-notice" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>{notice}</motion.div> : null}</AnimatePresence>
 
@@ -477,41 +475,42 @@ export function Dashboard() {
             <motion.div className="camera-icon" animate={prefersReducedMotion ? undefined : { boxShadow: ["0 0 0 rgba(124,92,255,0)", "0 0 28px rgba(124,92,255,.22)", "0 0 0 rgba(124,92,255,0)"] }} transition={{ duration: 3, repeat: Infinity }}>
               <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
             </motion.div>
-            <h3>{position ? "Le ciel t'attend ce soir" : "Découvre ton ciel maintenant"}</h3>
-            <p>{position ? `${observableEntries.length} objet${observableEntries.length > 1 ? "s" : ""} observable${observableEntries.length > 1 ? "s" : ""} selon ta position et les conditions actuelles.` : "Autorise la position pour calculer les objets réellement visibles et préparer tes quêtes."}</p>
-            <motion.button type="button" className="camera-btn" onClick={handleCameraAction} disabled={loadState === "loading" || isAdLoading} whileHover={prefersReducedMotion ? undefined : { y: -2 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}>
-              <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
-              {loadState === "loading" ? "Lecture du ciel…" : visibleQuests.some((quest) => quest.targetType !== "free_observation") ? "Ouvrir le guidage" : "Lire le ciel"}
+            <h3>{isGuidanceUnlocked ? "Ton ciel est prêt" : analysisSavedAt ? "Actualise avant d'observer" : "Découvre ton ciel maintenant"}</h3>
+            <p>{isGuidanceUnlocked ? `${guidableQuests.length} cible${guidableQuests.length > 1 ? "s" : ""} guidable${guidableQuests.length > 1 ? "s" : ""} selon les conditions actuelles.` : analysisSavedAt ? "Une ancienne analyse est disponible ci-dessous, mais le ciel peut avoir changé depuis." : "Autorise la position pour calculer les objets réellement visibles et préparer tes quêtes."}</p>
+            <motion.button type="button" className="camera-btn" onClick={handleRefreshRequest} disabled={loadState === "loading" || isAdLoading} whileHover={prefersReducedMotion ? undefined : { y: -2 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}>
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2" /></svg>
+              {loadState === "loading" ? "Lecture du ciel…" : "Maintenant"}
             </motion.button>
           </div>
         </MotionBlock>
 
         <MotionBlock className="section-header">
           <h2 className="section-title">Quêtes du soir</h2>
-          <button type="button" className={`status-pill ${loadState === "loading" ? "loading" : ""}`} onClick={handleRefreshRequest} disabled={loadState === "loading"} title="Actualiser les conditions">
+          <span className={`status-pill ${loadState === "loading" ? "loading" : ""}`}>
             <span className="dot" />{loadState === "loading" ? "Calcul…" : conditionsLabel}
-          </button>
+          </span>
         </MotionBlock>
 
         <motion.div className="quest-list" variants={rootVariants}>
           <AnimatePresence mode="popLayout">
-            {visibleQuests.map((quest) => <QuestCard key={quest.id} quest={quest} onStart={handleStart} />)}
+            {visibleQuests.map((quest) => <QuestCard key={quest.id} quest={quest} onStart={handleStart} locked={!isGuidanceUnlocked} stale={analysisSavedAt !== null} />)}
           </AnimatePresence>
         </motion.div>
-        {loadState === "idle" ? <MotionBlock className="empty-state"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" /></svg><p>Appuie sur « Lire le ciel » pour générer tes quêtes.</p></MotionBlock> : null}
+        {quests.length > 3 ? <button type="button" className="show-more-btn" onClick={() => setShowAllQuests((current) => !current)}>{showAllQuests ? "Réduire la liste" : `Voir les ${quests.length - 3} autres quêtes`}</button> : null}
+        {loadState === "idle" ? <MotionBlock className="empty-state"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" /></svg><p>Appuie sur « Maintenant » pour générer tes quêtes.</p></MotionBlock> : null}
 
         <section id="objects">
-          <MotionBlock className="section-header spaced"><h2 className="section-title">Objets observables</h2><span className="section-sub">Planètes et catalogue</span></MotionBlock>
+          <MotionBlock className="section-header spaced"><h2 className="section-title">Objets observables</h2><span className="section-sub">{guidableQuests.length} cible{guidableQuests.length > 1 ? "s" : ""}</span></MotionBlock>
           <motion.div className="upcoming-list" variants={rootVariants}>
-            {visibleObjects.map((object) => (
-              <motion.div key={object.id} className="upcoming-item" variants={itemVariants} whileHover={prefersReducedMotion ? undefined : { scale: 1.02 }}>
-                <div className="upcoming-date"><AnimatePresence mode="wait" initial={false}><motion.div className="day" key={Math.round(object.altitude)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{Math.round(object.altitude)}°</motion.div></AnimatePresence><div className="month">Alt.</div></div>
-                <div className="upcoming-info"><h4>{object.name}</h4><p>{object.type} · {azimuthToCardinal(object.azimuth)} · {object.score}/100</p></div>
+            {guidableQuests.map((quest) => (
+              <motion.button key={quest.id} type="button" disabled={!isGuidanceUnlocked} onClick={() => handleStart(quest)} className={`upcoming-item ${!isGuidanceUnlocked ? "locked" : ""}`} variants={itemVariants} whileHover={prefersReducedMotion || !isGuidanceUnlocked ? undefined : { scale: 1.02 }}>
+                <div className="upcoming-date"><AnimatePresence mode="wait" initial={false}><motion.div className="day" key={Math.round(quest.altitude ?? 0)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{quest.altitude === null ? "—" : `${Math.round(quest.altitude)}°`}</motion.div></AnimatePresence><div className="month">Alt.</div></div>
+                <div className="upcoming-info"><h4>{quest.title}</h4><p>{QUEST_TARGET_LABELS[quest.targetType]} · {quest.cardinalDirection ?? "Zone large"} · {quest.visibilityScore}/100</p></div>
                 <svg className="upcoming-arrow" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" /></svg>
-              </motion.div>
+              </motion.button>
             ))}
           </motion.div>
-          {loadState === "ready" && visibleObjects.length === 0 ? <div className="empty-state"><p>Aucun objet suffisamment fiable maintenant. Une observation libre reste possible.</p></div> : null}
+          {loadState === "ready" && guidableQuests.length === 0 ? <div className="empty-state"><p>Aucun objet suffisamment fiable maintenant. Une observation libre reste possible.</p></div> : null}
         </section>
 
         <section id="upcoming">
@@ -539,19 +538,20 @@ export function Dashboard() {
         </section>
 
         <section id="observation-windows">
-          <MotionBlock className="section-header spaced"><h2 className="section-title">Fenêtres d&apos;observation</h2><span className="section-sub">Quêtes à venir</span></MotionBlock>
+          <MotionBlock className="section-header spaced"><h2 className="section-title">À venir</h2><span className="section-sub">Informatif · non guidable</span></MotionBlock>
           <motion.div className="upcoming-list" variants={rootVariants}>
-            {futureSuggestions.slice(0, 3).map((suggestion) => {
+            {distinctFutureSuggestions.slice(0, 3).map((suggestion) => {
               const date = new Date(suggestion.availableAt);
               return (
-                <motion.button key={`${suggestion.quest.id}-${suggestion.availableAt}`} type="button" className="upcoming-item" variants={itemVariants} whileHover={prefersReducedMotion ? undefined : { scale: 1.02 }} onClick={() => handleStart(suggestion.quest)}>
+                <motion.article key={`${suggestion.quest.id}-${suggestion.availableAt}`} className="upcoming-item future-item" variants={itemVariants}>
                   <div className="upcoming-date"><div className="day">{date.getDate()}</div><div className="month">{new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(date)}</div></div>
-                  <div className="upcoming-info"><h4>{suggestion.quest.title}</h4><p>{new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(date)} · visibilité {suggestion.quest.visibilityScore}/100</p></div>
-                  <svg className="upcoming-arrow" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" /></svg>
-                </motion.button>
+                  <div className="upcoming-info"><h4>{suggestion.quest.title}</h4><p>{new Intl.DateTimeFormat("fr-FR", { weekday: "short", hour: "2-digit", minute: "2-digit" }).format(date)} · conditions à revérifier</p></div>
+                  <svg className="upcoming-arrow" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+                </motion.article>
               );
             })}
           </motion.div>
+          {loadState === "ready" && distinctFutureSuggestions.length === 0 ? <div className="empty-state"><p>Aucune cible différente trouvée dans les sept prochains jours.</p></div> : null}
         </section>
 
         <section id="journal">

@@ -211,14 +211,6 @@ function scoreIssPass(pass: IssVisiblePass, weather: WeatherNow): number {
 }
 
 function shouldSkipDuplicate(candidate: SkyQuest, selected: SkyQuest[]): boolean {
-  if (candidate.target === "vega" && selected.some((quest) => quest.target === "summer-triangle")) {
-    return true;
-  }
-
-  if (candidate.target === "summer-triangle" && selected.some((quest) => quest.target === "vega")) {
-    return true;
-  }
-
   return selected.some(
     (quest) => quest.target === candidate.target || (quest.targetType === "meteor_shower" && candidate.targetType === "meteor_shower"),
   );
@@ -357,17 +349,21 @@ export function generateFutureQuestSuggestions({
   weather,
   now,
   issPass,
+  excludedTargets,
+  horizonMinutes = 24 * 60,
 }: {
   latitude: number;
   longitude: number;
   weather: WeatherNow;
   now: Date;
   issPass?: IssVisiblePass | null;
+  excludedTargets?: ReadonlySet<string>;
+  horizonMinutes?: number;
 }): FutureQuestSuggestion[] {
   const suggestions: FutureQuestSuggestion[] = [];
-  const seenTargets = new Set<string>();
+  const seenTargets = new Set<string>(excludedTargets);
 
-  for (let minutes = 30; minutes <= 24 * 60; minutes += 30) {
+  for (let minutes = 30; minutes <= horizonMinutes; minutes += minutes < 24 * 60 ? 30 : 120) {
     const date = new Date(now.getTime() + minutes * 60000);
     const quests = generateQuests({
       latitude,
