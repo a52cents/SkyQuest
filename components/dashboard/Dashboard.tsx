@@ -243,6 +243,8 @@ export function Dashboard() {
   const [isOnboardingReady, setIsOnboardingReady] = useState(false);
   const [showAdConsent, setShowAdConsent] = useState(false);
   const [isAdLoading, setIsAdLoading] = useState(false);
+  const [isLocationLoading, setIsLocationLoading] = useState(false);
+  const [pendingAdPosition, setPendingAdPosition] = useState<GeoPosition | null>(null);
   const [analysisSavedAt, setAnalysisSavedAt] = useState<number | null>(null);
   const [isGuidanceUnlocked, setIsGuidanceUnlocked] = useState(false);
   const [showAllQuests, setShowAllQuests] = useState(false);
@@ -334,37 +336,50 @@ export function Dashboard() {
     return () => window.clearInterval(timer);
   }, [loadDashboard]);
 
-  async function requestCurrentSky() {
+  async function handleRefreshRequest() {
+    if (isLocationLoading || isAdLoading) return;
+
     haptic("select");
     setIsGuidanceUnlocked(false);
-    setLoadState("loading");
+    setIsLocationLoading(true);
+    setNotice(null);
+
     try {
       const coords = await getCurrentPosition();
       saveLastLocation(coords);
-      await loadDashboard(coords);
+      setPosition(coords);
+
+      if (isPopunderAdOnCooldown()) {
+        await loadDashboard(coords);
+        return;
+      }
+
+      setPendingAdPosition(coords);
+      setShowAdConsent(true);
     } catch (error) {
       const fallbackQuests = generateQuests({ latitude: null, longitude: null, weather: getFallbackWeather(), now: new Date() });
       setQuests((currentQuests) => currentQuests.length > 0 ? currentQuests : fallbackQuests);
       setLoadState("ready");
       setNotice(error instanceof Error ? error.message : "Position indisponible. Une observation libre reste possible.");
+    } finally {
+      setIsLocationLoading(false);
     }
   }
 
-  function handleRefreshRequest() {
-    if (isPopunderAdOnCooldown()) {
-      void requestCurrentSky();
-      return;
-    }
-    setShowAdConsent(true);
+  function dismissAdConsent() {
+    setShowAdConsent(false);
+    setPendingAdPosition(null);
   }
 
   async function handleAdConfirm() {
-    if (isAdLoading) return;
+    if (isAdLoading || !pendingAdPosition) return;
+    const coords = pendingAdPosition;
     setIsAdLoading(true);
     await triggerPopunderAd();
     setIsAdLoading(false);
     setShowAdConsent(false);
-    await requestCurrentSky();
+    setPendingAdPosition(null);
+    await loadDashboard(coords);
   }
 
   function handleStart(quest: SkyQuest) {
@@ -414,10 +429,10 @@ export function Dashboard() {
           <motion.div className="dashboard-modal" role="dialog" aria-modal="true" aria-labelledby="dashboard-ad-title" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.div className="dashboard-modal-card" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}>
               <h2 id="dashboard-ad-title">Avant de lire le ciel</h2>
-              <p>{"Une publicité s'ouvre seulement après ton accord. SkyQuest chargera ensuite les conditions et les quêtes autour de toi."}</p>
+              <p>{"Ta position est prête. Une publicité s'ouvre seulement après ton accord, puis SkyQuest charge les conditions et les quêtes autour de toi."}</p>
               <div className="modal-actions">
                 <button type="button" className="camera-btn" onClick={() => void handleAdConfirm()} disabled={isAdLoading}>{isAdLoading ? "Ouverture…" : "Continuer"}</button>
-                <button type="button" className="modal-secondary" onClick={() => setShowAdConsent(false)} disabled={isAdLoading}>Pas maintenant</button>
+                <button type="button" className="modal-secondary" onClick={dismissAdConsent} disabled={isAdLoading}>Pas maintenant</button>
               </div>
             </motion.div>
           </motion.div>
@@ -477,9 +492,9 @@ export function Dashboard() {
             </motion.div>
             <h3>{isGuidanceUnlocked ? "Ton ciel est prêt" : analysisSavedAt ? "Actualise avant d'observer" : "Découvre ton ciel maintenant"}</h3>
             <p>{isGuidanceUnlocked ? `${guidableQuests.length} cible${guidableQuests.length > 1 ? "s" : ""} guidable${guidableQuests.length > 1 ? "s" : ""} selon les conditions actuelles.` : analysisSavedAt ? "Une ancienne analyse est disponible ci-dessous, mais le ciel peut avoir changé depuis." : "Autorise la position pour calculer les objets réellement visibles et préparer tes quêtes."}</p>
-            <motion.button type="button" className="camera-btn" onClick={handleRefreshRequest} disabled={loadState === "loading" || isAdLoading} whileHover={prefersReducedMotion ? undefined : { y: -2 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}>
+            <motion.button type="button" className="camera-btn" onClick={() => void handleRefreshRequest()} disabled={loadState === "loading" || isLocationLoading || isAdLoading} whileHover={prefersReducedMotion ? undefined : { y: -2 }} whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}>
               <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2" /></svg>
-              {loadState === "loading" ? "Lecture du ciel…" : "Maintenant"}
+              {isLocationLoading ? "Localisation…" : loadState === "loading" ? "Lecture du ciel…" : "Maintenant"}
             </motion.button>
           </div>
         </MotionBlock>
