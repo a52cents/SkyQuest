@@ -4,9 +4,11 @@ import { type RefObject, useEffect, useRef } from "react";
 import { equatorialJ2000ToHorizontal } from "@/lib/astro";
 import { getSkyFigure } from "@/lib/constellation-figures";
 import { meteorShowers } from "@/lib/meteor-showers";
-import type { CameraOrientation3D } from "@/lib/orientation";
+import type { CameraPointing } from "@/lib/orientation";
 import {
+  crossProduct,
   horizontalCoordinatesToVector,
+  normalizeVector,
   projectHorizontalTarget,
   smoothCameraBasis,
   type CameraBasis,
@@ -34,7 +36,7 @@ type OverlayScene = {
 type SkyOverlayProps = {
   quest: SkyQuest;
   location: ObserverLocation | null;
-  orientationRef: RefObject<CameraOrientation3D | null>;
+  orientationRef: RefObject<CameraPointing | null>;
   videoRef: RefObject<HTMLVideoElement | null>;
   zoom: number | null;
   enabled: boolean;
@@ -240,7 +242,6 @@ export function SkyOverlay({ quest, location, orientationRef, videoRef, zoom, en
   const zoomRef = useRef(zoom);
   const enabledRef = useRef(enabled);
   const smoothedBasisRef = useRef<CameraBasis | null>(null);
-  const screenAngleRef = useRef<number | null>(null);
 
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
   useEffect(() => { enabledRef.current = enabled; }, [enabled]);
@@ -282,14 +283,23 @@ export function SkyOverlay({ quest, location, orientationRef, videoRef, zoom, en
     const render = (time: number) => {
       const context = canvas.getContext("2d");
       context?.clearRect(0, 0, width, height);
-      const orientation = orientationRef.current;
+      const pointing = orientationRef.current;
       const scene = sceneRef.current;
-      if (context && enabledRef.current && orientation && orientation.confidence !== "low" && scene) {
-        if (screenAngleRef.current !== orientation.screenAngle) {
-          smoothedBasisRef.current = null;
-          screenAngleRef.current = orientation.screenAngle;
+      if (context && enabledRef.current && pointing && pointing.azimuth !== null && pointing.altitude !== null && scene) {
+        const forward = horizontalCoordinatesToVector(pointing.azimuth, pointing.altitude);
+        const right = normalizeVector(crossProduct(forward, { x: 0, y: 0, z: 1 }));
+        const up = right ? normalizeVector(crossProduct(right, forward)) : null;
+        if (!right || !up) {
+          rafId = window.requestAnimationFrame(render);
+          return;
         }
-        const basis = smoothCameraBasis(smoothedBasisRef.current, orientation);
+        const nextBasis: CameraBasis = {
+          forward,
+          right,
+          up,
+          confidence: pointing.source === "absolute-sensor" ? "high" : "medium",
+        };
+        const basis = smoothCameraBasis(smoothedBasisRef.current, nextBasis);
         smoothedBasisRef.current = basis;
         const video = videoRef.current;
         const projections = new Map<string, ScreenProjection>();

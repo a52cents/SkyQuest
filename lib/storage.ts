@@ -1,17 +1,10 @@
 import { applyQuestReward, createEmptyProgressProfile } from "@/lib/progression";
-import type { PointingCalibration } from "@/lib/orientation";
 import type { AchievementId, Observation, ProgressProfile, ProgressReward, QuestTargetType, SkyQuest } from "@/lib/types";
 
 const OBSERVATIONS_KEY = "skyquest.observations.v0";
 const ACTIVE_QUEST_KEY = "skyquest.activeQuest.v0";
 const LAST_LOCATION_KEY = "skyquest.lastLocation.v0";
 const PROGRESS_PROFILE_KEY = "skyquest.progression.v1";
-const POINTING_CALIBRATION_KEY = "skyquest.pointingCalibration.v1";
-
-export type StoredPointingCalibration = PointingCalibration & {
-  calibratedAt: string;
-  target: string;
-};
 
 type StoredLocation = {
   latitude: number;
@@ -22,7 +15,6 @@ let memoryObservations: Observation[] = [];
 let memoryProfile = createEmptyProgressProfile();
 let memoryActiveQuest: SkyQuest | null = null;
 let memoryLastLocation: StoredLocation | null = null;
-let memoryPointingCalibration: StoredPointingCalibration | null = null;
 const failedStorageKeys = new Set<string>();
 
 function canUseStorage(): boolean {
@@ -217,31 +209,4 @@ export function getLastLocation(): StoredLocation | null {
   const location = readJson<StoredLocation | null>(LAST_LOCATION_KEY, memoryLastLocation);
   memoryLastLocation = location;
   return location;
-}
-
-export function getPointingCalibration(): StoredPointingCalibration | null {
-  const stored = readJson<StoredPointingCalibration | null>(POINTING_CALIBRATION_KEY, memoryPointingCalibration);
-  if (
-    !stored ||
-    !Number.isFinite(stored.azimuthOffset) ||
-    !Number.isFinite(stored.altitudeOffset) ||
-    typeof stored.calibratedAt !== "string" ||
-    typeof stored.target !== "string"
-  ) {
-    return null;
-  }
-
-  memoryPointingCalibration = stored;
-  return stored;
-}
-
-export function savePointingCalibration(
-  calibration: PointingCalibration,
-  target: string,
-  calibratedAt = new Date().toISOString(),
-): StoredPointingCalibration {
-  const stored: StoredPointingCalibration = { ...calibration, target, calibratedAt };
-  memoryPointingCalibration = stored;
-  writeJson(POINTING_CALIBRATION_KEY, stored);
-  return stored;
 }

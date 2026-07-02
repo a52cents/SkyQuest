@@ -110,11 +110,6 @@ function quaternionToVector(q: [number, number, number, number], v: Vector3): Ve
   const [x, y, z, w] = q;
   const [vx, vy, vz] = v;
 
-  // Optimized formula without converting to pure quaternion
-  const tx = 2 * (w * vx + y * vz - z * vy);
-  const ty = 2 * (w * vy + z * vx - x * vz);
-  const tz = 2 * (w * vz + x * vy - y * vx);
-
   return [
     (1 - 2 * (y * y + z * z)) * vx + 2 * (x * y - w * z) * vy + 2 * (x * z + w * y) * vz,
     2 * (x * y + w * z) * vx + (1 - 2 * (x * x + z * z)) * vy + 2 * (y * z - w * x) * vz,

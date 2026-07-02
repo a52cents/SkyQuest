@@ -1,127 +1,126 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getCameraPointing, CameraPointing, DeviceOrientationReading } from "@/lib/orientation";
+import {
+  getCameraPointing,
+  type CameraPointing,
+  type DeviceOrientationReading,
+} from "@/lib/orientation";
 
-export function useDeviceOrientation() {
-  const [pointing, setPointing] = useState<CameraPointing>({
-    azimuth: null,
-    altitude: null,
-    source: "unavailable",
-  });
+type AbsoluteOrientationSensorInstance = EventTarget & {
+  quaternion: readonly number[] | null;
+  start: () => void;
+  stop: () => void;
+};
 
-  // Références pour le lissage (Lerp)
+type AbsoluteOrientationSensorConstructor = new (options?: {
+  frequency?: number;
+  referenceFrame?: "device" | "screen";
+}) => AbsoluteOrientationSensorInstance;
+
+type CompassEvent = DeviceOrientationEvent & {
+  webkitCompassHeading?: number;
+};
+
+const UNAVAILABLE_POINTING: CameraPointing = {
+  azimuth: null,
+  altitude: null,
+  source: "unavailable",
+};
+
+export function useDeviceOrientation(enabled: boolean): CameraPointing {
+  const [pointing, setPointing] = useState<CameraPointing>(UNAVAILABLE_POINTING);
   const smoothedAzimuth = useRef<number | null>(null);
   const smoothedAltitude = useRef<number | null>(null);
 
   useEffect(() => {
-    let absoluteSensor: any = null;
-    let fallbackActive = false;
+    if (!enabled) {
+      return;
+    }
 
-    const lerp = (a: number | null, b: number, t: number) => (a === null ? b : a + (b - a) * t);
+    let sensor: AbsoluteOrientationSensorInstance | null = null;
+    let fallbackStarted = false;
 
     const handleReading = (reading: DeviceOrientationReading) => {
-      const rawPointing = getCameraPointing(reading);
+      const raw = getCameraPointing(reading);
 
-      // Lissage des valeurs (facteur 0.2)
-      if (rawPointing.azimuth !== null) {
-        // Gestion de la boucle 360° pour le lerp
-        if (smoothedAzimuth.current !== null) {
-          let diff = rawPointing.azimuth - smoothedAzimuth.current;
-          if (diff > 180) diff -= 360;
-          if (diff < -180) diff += 360;
-          smoothedAzimuth.current = smoothedAzimuth.current + diff * 0.2;
-          smoothedAzimuth.current = (smoothedAzimuth.current + 360) % 360;
+      if (raw.azimuth !== null) {
+        if (smoothedAzimuth.current === null) {
+          smoothedAzimuth.current = raw.azimuth;
         } else {
-          smoothedAzimuth.current = rawPointing.azimuth;
+          let difference = raw.azimuth - smoothedAzimuth.current;
+          if (difference > 180) difference -= 360;
+          if (difference < -180) difference += 360;
+          smoothedAzimuth.current = (smoothedAzimuth.current + difference * 0.2 + 360) % 360;
         }
       }
 
-      if (rawPointing.altitude !== null) {
-        smoothedAltitude.current = lerp(smoothedAltitude.current, rawPointing.altitude, 0.2);
+      if (raw.altitude !== null) {
+        smoothedAltitude.current = smoothedAltitude.current === null
+          ? raw.altitude
+          : smoothedAltitude.current + (raw.altitude - smoothedAltitude.current) * 0.2;
       }
 
       setPointing({
         azimuth: smoothedAzimuth.current,
         altitude: smoothedAltitude.current,
-        source: rawPointing.source,
+        source: raw.source,
       });
     };
 
-    // PRIORITÉ 1 : AbsoluteOrientationSensor
-    if (typeof window !== "undefined" && "AbsoluteOrientationSensor" in window) {
+    const handleFallback = (event: Event) => {
+      const orientationEvent = event as CompassEvent;
+      handleReading({
+        alpha: orientationEvent.alpha,
+        beta: orientationEvent.beta,
+        gamma: orientationEvent.gamma,
+        webkitCompassHeading: orientationEvent.webkitCompassHeading,
+      });
+    };
+
+    const startFallback = () => {
+      if (fallbackStarted || !("DeviceOrientationEvent" in window)) {
+        return;
+      }
+      fallbackStarted = true;
+      window.addEventListener("deviceorientationabsolute", handleFallback);
+      window.addEventListener("deviceorientation", handleFallback);
+    };
+
+    const SensorConstructor = (window as Window & {
+      AbsoluteOrientationSensor?: AbsoluteOrientationSensorConstructor;
+    }).AbsoluteOrientationSensor;
+
+    if (SensorConstructor) {
       try {
-        absoluteSensor = new (window as any).AbsoluteOrientationSensor({ frequency: 60 });
-        
-        absoluteSensor.addEventListener("reading", () => {
-          const q = absoluteSensor.quaternion; // [x, y, z, w]
-          if (q) {
-            handleReading({
-              alpha: null,
-              beta: null,
-              gamma: null,
-              absoluteQuaternion: [q[0], q[1], q[2], q[3]] as [number, number, number, number],
-            });
+        sensor = new SensorConstructor({ frequency: 30, referenceFrame: "device" });
+        sensor.addEventListener("reading", () => {
+          const quaternion = sensor?.quaternion;
+          if (!quaternion || quaternion.length < 4 || !quaternion.slice(0, 4).every(Number.isFinite)) {
+            return;
           }
+          handleReading({
+            alpha: null,
+            beta: null,
+            gamma: null,
+            absoluteQuaternion: [quaternion[0], quaternion[1], quaternion[2], quaternion[3]],
+          });
         });
-
-        absoluteSensor.addEventListener("error", (event: any) => {
-          if (event.error.name === "NotReadableError") {
-            console.warn("AbsoluteOrientationSensor non lisible, fallback sur deviceorientation.");
-            fallbackActive = true;
-            startFallback();
-          }
-        });
-
-        absoluteSensor.start();
-      } catch (e) {
-        console.warn("AbsoluteOrientationSensor instantiation failed, fallback.", e);
-        fallbackActive = true;
+        sensor.addEventListener("error", startFallback);
+        sensor.start();
+      } catch {
         startFallback();
       }
     } else {
-      fallbackActive = true;
       startFallback();
     }
 
-    // FALLBACK : deviceorientation
-    function startFallback() {
-      const handler = (event: DeviceOrientationEvent & { webkitCompassHeading?: number }) => {
-        handleReading({
-          alpha: event.alpha,
-          beta: event.beta,
-          gamma: event.gamma,
-          webkitCompassHeading: event.webkitCompassHeading,
-        });
-      };
-
-      // iOS 13+ nécessite une demande de permission
-      if (typeof (DeviceOrientationEvent as any).requestPermission === "function") {
-        (DeviceOrientationEvent as any).requestPermission()
-          .then((response: string) => {
-            if (response === "granted") {
-              window.addEventListener("deviceorientation", handler);
-            }
-          })
-          .catch(console.error);
-      } else {
-        window.addEventListener("deviceorientationabsolute", handler as any);
-        window.addEventListener("deviceorientation", handler as any);
-      }
-
-      // Cleanup du fallback
-      return () => {
-        window.removeEventListener("deviceorientationabsolute", handler as any);
-        window.removeEventListener("deviceorientation", handler as any);
-      };
-    }
-
     return () => {
-      if (absoluteSensor) {
-        absoluteSensor.stop();
-      }
+      sensor?.stop();
+      window.removeEventListener("deviceorientationabsolute", handleFallback);
+      window.removeEventListener("deviceorientation", handleFallback);
     };
-  }, []);
+  }, [enabled]);
 
   return pointing;
 }

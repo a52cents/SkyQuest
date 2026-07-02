@@ -7,37 +7,24 @@ import { AppButton, getAppButtonClassName } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
 import { NightModeToggle } from "@/components/NightModeToggle";
 import { SkyOverlay, questSupportsSkyOverlay } from "@/components/SkyOverlay";
+import { useDeviceOrientation } from "@/hooks/useDeviceOrientation";
 import { haptic } from "@/lib/haptics";
 import {
-  ALIGNMENT_TOLERANCE_DEGREES,
   angleDifference,
-  applyPointingCalibration,
-  averagePointingSamples,
   azimuthToCardinal,
-  createPointingCalibration,
-  applyCameraOrientationCalibration,
-  getCameraOrientation3D,
   getAltitudeHint,
-  getCameraPointing,
   getDirectionHint,
-  smoothPointing,
   type CameraPointing,
-  type PointingCalibration,
-  type PointingSample,
-  type CameraOrientation3D,
 } from "@/lib/orientation";
 import { getInsecureContextMessage, isSecureBrowserContext } from "@/lib/browser-support";
 import { recalculateQuestPosition } from "@/lib/quest-generator";
-import { getLastLocation, getPointingCalibration, savePointingCalibration } from "@/lib/storage";
+import { getLastLocation } from "@/lib/storage";
 import type { Observation, SkyQuest } from "@/lib/types";
 
 const SHOW_CAMERA_DEBUG = false;
 const PHOTO_MAX_WIDTH = 1280;
 const THUMBNAIL_MAX_WIDTH = 360;
 const PHOTO_QUALITY = 0.75;
-const CALIBRATION_SAMPLE_COUNT = 18;
-const MIN_CALIBRATION_SAMPLES = 6;
-const MAX_CALIBRATION_MOVEMENT_DEGREES = 3;
 const DIRECTION_ALIGNMENT_THRESHOLD_DEGREES = 15;
 const ALTITUDE_ALIGNMENT_THRESHOLD_DEGREES = 10;
 
@@ -45,10 +32,6 @@ type CameraGuideProps = {
   quest: SkyQuest;
   onSeen: (photo?: Pick<Observation, "photoDataUrl" | "photoThumbnailDataUrl">) => void;
   onMissed: () => void;
-};
-
-type CompassEvent = DeviceOrientationEvent & {
-  webkitCompassHeading?: number;
 };
 
 type OrientationPermissionEvent = typeof DeviceOrientationEvent & {
@@ -104,10 +87,6 @@ type CameraConstraintSet = MediaTrackConstraintSet & {
 type PhotoDraft = {
   photoDataUrl: string;
   photoThumbnailDataUrl: string;
-};
-
-type CalibrationReference = PointingSample & {
-  name: string;
 };
 
 function getDirectionArrow(delta: number | null): string {
@@ -192,22 +171,15 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const pointingSamplesRef = useRef<PointingSample[]>([]);
-  const photoPointingSamplesRef = useRef<PointingSample[]>([]);
-  const calibrationRef = useRef<PointingCalibration | null>(null);
-  const cameraOrientationRef = useRef<CameraOrientation3D | null>(null);
-  const orientationConfidenceRef = useRef<"high" | "medium" | "low">("low");
-  const smoothedPointingRef = useRef<CameraPointing | null>(null);
+  const cameraPointingRef = useRef<CameraPointing | null>(null);
   const [cameraStatus, setCameraStatus] = useState<"idle" | "starting" | "active" | "error">("idle");
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [orientationStatus, setOrientationStatus] = useState<"idle" | "active" | "denied" | "unsupported">("idle");
   const [orientationError, setOrientationError] = useState<string | null>(null);
+  const [orientationEnabled, setOrientationEnabled] = useState(false);
   const [orientationConfidence, setOrientationConfidence] = useState<"high" | "medium" | "low">("low");
   const [currentAzimuth, setCurrentAzimuth] = useState<number | null>(null);
   const [currentAltitude, setCurrentAltitude] = useState<number | null>(null);
-  const [calibration, setCalibration] = useState<PointingCalibration | null>(null);
-  const [calibrationTarget, setCalibrationTarget] = useState<string | null>(null);
-  const [calibrationError, setCalibrationError] = useState<string | null>(null);
   const [liveQuest, setLiveQuest] = useState<SkyQuest>(quest);
   const [zoomRange, setZoomRange] = useState<CameraZoomRange | null>(null);
   const [currentZoom, setCurrentZoom] = useState<number | null>(null);
@@ -226,22 +198,13 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [setupStarting, setSetupStarting] = useState(false);
   const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
   const [photoDraft, setPhotoDraft] = useState<PhotoDraft | null>(null);
-  const [photoSource, setPhotoSource] = useState<"camera" | "file" | null>(null);
   const [photoCaptureStatus, setPhotoCaptureStatus] = useState<"idle" | "capturing" | "ready" | "error">("idle");
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [observerLocation, setObserverLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [skyOverlayEnabled, setSkyOverlayEnabled] = useState(true);
   const wasAlignedRef = useRef(false);
   const prefersReducedMotion = useReducedMotion() ?? false;
-
-  useEffect(() => {
-    const storedCalibration = getPointingCalibration();
-    if (storedCalibration) {
-      calibrationRef.current = storedCalibration;
-      setCalibration(storedCalibration);
-      setCalibrationTarget(storedCalibration.target);
-    }
-  }, []);
+  const sensorPointing = useDeviceOrientation(orientationEnabled);
 
   useEffect(() => {
     return () => {
@@ -250,11 +213,25 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   }, []);
 
   useEffect(() => {
-    return () => {
-      window.removeEventListener("deviceorientation", handleOrientation as EventListener);
-      window.removeEventListener("deviceorientationabsolute", handleOrientation as EventListener);
-    };
-  }, []);
+    if (sensorPointing.source === "unavailable") {
+      return;
+    }
+
+    cameraPointingRef.current = sensorPointing;
+    setOrientationConfidence(
+      sensorPointing.source === "absolute-sensor"
+        ? "high"
+        : sensorPointing.source === "webkit-compass"
+          ? "medium"
+          : "low",
+    );
+    if (sensorPointing.azimuth !== null) {
+      setCurrentAzimuth(sensorPointing.azimuth);
+    }
+    if (sensorPointing.altitude !== null) {
+      setCurrentAltitude(sensorPointing.altitude);
+    }
+  }, [sensorPointing]);
 
   useEffect(() => {
     setLiveQuest(quest);
@@ -291,8 +268,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     }
 
     function resetOrientationAfterScreenRotation() {
-      pointingSamplesRef.current = [];
-      cameraOrientationRef.current = null;
+      cameraPointingRef.current = null;
     }
 
     orientation.addEventListener("change", resetOrientationAfterScreenRotation);
@@ -483,97 +459,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     return "Camera indisponible. Tu peux quand meme suivre la direction indiquee.";
   }
 
-  function handleOrientation(event: CompassEvent) {
-    const reading = {
-      alpha: event.alpha,
-      beta: event.beta,
-      gamma: event.gamma,
-      absolute: event.absolute === true,
-      webkitCompassHeading: event.webkitCompassHeading,
-    };
-    const rawPointing = getCameraPointing(reading);
-    const screenAngle = window.screen.orientation?.angle ?? (window as Window & { orientation?: number }).orientation ?? 0;
-    const cameraOrientation = getCameraOrientation3D(reading, screenAngle);
-    // Chrome can emit a relative `deviceorientation` event immediately after a
-    // useful `deviceorientationabsolute` event. Do not let that second event
-    // erase the reliable 3D basis and make the sky marker jump or disappear.
-    if (cameraOrientation) {
-      cameraOrientationRef.current = applyCameraOrientationCalibration(cameraOrientation, calibrationRef.current);
-      const nextConfidence = cameraOrientation.confidence;
-      if (orientationConfidenceRef.current !== nextConfidence) {
-        orientationConfidenceRef.current = nextConfidence;
-        setOrientationConfidence(nextConfidence);
-      }
-    }
-    if (rawPointing.azimuth !== null && rawPointing.altitude !== null) {
-      pointingSamplesRef.current = [
-        ...pointingSamplesRef.current.slice(-(CALIBRATION_SAMPLE_COUNT - 1)),
-        { azimuth: rawPointing.azimuth, altitude: rawPointing.altitude },
-      ];
-    }
-
-    const smoothed = smoothPointing(rawPointing, smoothedPointingRef.current, 0.2);
-    smoothedPointingRef.current = smoothed;
-    const pointing = applyPointingCalibration(smoothed, calibrationRef.current);
-    if (pointing.azimuth !== null) {
-      setCurrentAzimuth(pointing.azimuth);
-    }
-    if (pointing.altitude !== null) {
-      setCurrentAltitude(pointing.altitude);
-    }
-  }
-
-  function calibrateOnReference(
-    reference: CalibrationReference,
-    capturedSamples?: PointingSample[],
-  ): boolean {
-    const samples = (capturedSamples ?? pointingSamplesRef.current).slice(-CALIBRATION_SAMPLE_COUNT);
-    const measured = averagePointingSamples(samples);
-    if (!measured || samples.length < MIN_CALIBRATION_SAMPLES) {
-      setCalibrationError("Garde le téléphone immobile un instant, puis réessaie.");
-      return false;
-    }
-
-    const isStable = samples.every((sample) =>
-      Math.abs(angleDifference(sample.azimuth, measured.azimuth)) <= MAX_CALIBRATION_MOVEMENT_DEGREES &&
-      Math.abs(sample.altitude - measured.altitude) <= MAX_CALIBRATION_MOVEMENT_DEGREES,
-    );
-    if (!isStable) {
-      pointingSamplesRef.current = [];
-      setCalibrationError(`Le téléphone bouge encore. Recentre ${reference.name} et reste immobile une seconde.`);
-      return false;
-    }
-
-    const nextCalibration = createPointingCalibration(measured, reference);
-    savePointingCalibration(nextCalibration, reference.name);
-    calibrationRef.current = nextCalibration;
-    setCalibration(nextCalibration);
-    setCalibrationTarget(reference.name);
-    setCalibrationError(null);
-
-    const corrected = applyPointingCalibration({
-      azimuth: measured.azimuth,
-      altitude: measured.altitude,
-      source: "absolute",
-    }, nextCalibration);
-    setCurrentAzimuth(corrected.azimuth);
-    setCurrentAltitude(corrected.altitude);
-    return true;
-  }
-
-  function calibrateOnCurrentTarget() {
-    if (liveQuest.azimuth === null || liveQuest.altitude === null) {
-      setCalibrationError("Cette mission n'a pas de position assez précise pour calibrer.");
-      return;
-    }
-
-    calibrateOnReference({
-      name: liveQuest.target,
-      azimuth: liveQuest.azimuth,
-      altitude: liveQuest.altitude,
-    });
-  }
-
   async function requestOrientation(): Promise<boolean> {
     setOrientationError(null);
 
@@ -583,16 +468,20 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       return false;
     }
 
-    if (!("DeviceOrientationEvent" in window)) {
+    const hasAbsoluteSensor = "AbsoluteOrientationSensor" in window;
+    const hasDeviceOrientation = "DeviceOrientationEvent" in window;
+
+    if (!hasAbsoluteSensor && !hasDeviceOrientation) {
       setOrientationStatus("unsupported");
       setOrientationError("L'orientation n'est pas disponible sur ce navigateur.");
       return false;
     }
 
-    const orientationEvent = DeviceOrientationEvent as OrientationPermissionEvent;
-
     try {
-      if (typeof orientationEvent.requestPermission === "function") {
+      const orientationEvent = hasDeviceOrientation
+        ? DeviceOrientationEvent as OrientationPermissionEvent
+        : null;
+      if (typeof orientationEvent?.requestPermission === "function") {
         const permission = await orientationEvent.requestPermission(true);
         if (permission !== "granted") {
           haptic("error");
@@ -602,8 +491,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         }
       }
 
-      window.addEventListener("deviceorientation", handleOrientation as EventListener, true);
-      window.addEventListener("deviceorientationabsolute", handleOrientation as EventListener, true);
+      setOrientationEnabled(true);
       setOrientationStatus("active");
       return true;
     } catch {
@@ -657,7 +545,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     try {
       setPhotoError(null);
       setPhotoDraft(await createPhotoDraftFromFile(file));
-      setPhotoSource("file");
       setPhotoCaptureStatus("ready");
     } catch {
       setPhotoError("Image impossible a lire.");
@@ -666,16 +553,12 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   }
 
   async function handleTargetFound() {
-    photoPointingSamplesRef.current = pointingSamplesRef.current.slice(-CALIBRATION_SAMPLE_COUNT);
     setPhotoDraft(null);
-    setPhotoSource(null);
     setPhotoError(null);
-    setCalibrationError(null);
     setPhotoSheetOpen(true);
     setPhotoCaptureStatus("capturing");
     const draft = await capturePhotoFromVideo();
     setPhotoDraft(draft);
-    setPhotoSource(draft ? "camera" : null);
     setPhotoCaptureStatus(draft ? "ready" : "error");
   }
 
@@ -695,31 +578,11 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     onMissed();
   }
 
-  function calibrateFromPhotoAndSave() {
-    if (!photoDraft || photoSource !== "camera" || liveQuest.azimuth === null || liveQuest.altitude === null) {
-      setPhotoError("Cette photo ne permet pas de calibrer le guidage.");
-      return;
-    }
-
-    const calibrated = calibrateOnReference({
-      name: liveQuest.target,
-      azimuth: liveQuest.azimuth,
-      altitude: liveQuest.altitude,
-    }, photoPointingSamplesRef.current);
-    if (calibrated) {
-      haptic("success");
-      onSeen(photoDraft);
-    }
-  }
-
   function retakeTargetPhoto() {
     setPhotoSheetOpen(false);
     setPhotoDraft(null);
-    setPhotoSource(null);
     setPhotoError(null);
-    setCalibrationError(null);
     setPhotoCaptureStatus("idle");
-    photoPointingSamplesRef.current = [];
   }
 
   const directionHint = liveQuest.azimuth !== null && currentAzimuth !== null
@@ -743,8 +606,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const altitudeArrowLabel = altitudeDelta !== null ? `${altitudeArrow} ${Math.abs(Math.round(altitudeDelta))}°` : "-";
   const currentPhoneDirection = currentAzimuth !== null ? azimuthToCardinal(currentAzimuth) : "Inconnu";
   const hasPrecisePoint = liveQuest.azimuth !== null && liveQuest.altitude !== null;
-  const canCalibratePhoto = photoSource === "camera" && hasPrecisePoint && orientationStatus === "active" &&
-    photoPointingSamplesRef.current.length >= MIN_CALIBRATION_SAMPLES;
   const close = isAligned;
   const mainHint = close
     ? `${liveQuest.target} est près du centre`
@@ -818,7 +679,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       <SkyOverlay
         quest={liveQuest}
         location={observerLocation}
-        orientationRef={cameraOrientationRef}
+        orientationRef={cameraPointingRef}
         videoRef={videoRef}
         zoom={currentZoom}
         enabled={overlayReady}
@@ -983,21 +844,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               Reglages
             </AppButton>
           </div>
-          {hasPrecisePoint ? (
-            <button
-              type="button"
-              onClick={calibrateOnCurrentTarget}
-              disabled={cameraStatus !== "active" || orientationStatus !== "active" || currentAzimuth === null || currentAltitude === null}
-              className={`mt-2 flex min-h-10 w-full items-center justify-center rounded-[13px] border px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45 ${calibration ? "border-success/25 bg-success/10 text-success" : "border-accent-cyan/20 bg-accent-cyan/[0.08] text-accent-cyan"}`}
-            >
-              {calibration ? `Calibration active (${calibrationTarget ?? "cible"}) · Recalibrer sur ${liveQuest.target}` : `Cible centrée · Calibrer sur ${liveQuest.target}`}
-            </button>
-          ) : null}
-          {calibrationError ? (
-            <p className="mt-2 rounded-[13px] border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">
-              {calibrationError}
-            </p>
-          ) : null}
           {cameraStatus === "active" && observerLocation && overlaySupported ? (
             <button
               type="button"
@@ -1074,7 +920,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               <DetailsRow label="Delta hauteur" value={altitudeArrowLabel} />
               <DetailsRow label="Zoom reel" value={zoomLabel} />
               <DetailsRow label="Orientation" value={orientationStatus === "active" ? "Active" : "Inactive"} />
-              <DetailsRow label="Calibration" value={calibration ? `Ajustée sur ${calibrationTarget ?? "une cible"}` : "Standard"} />
+              <DetailsRow label="Capteur" value={orientationConfidence === "high" ? "Absolu" : orientationConfidence === "medium" ? "Boussole" : "Inclinaison"} />
               <DetailsRow label="Torche" value={cameraCapabilities?.torch ? (torchEnabled ? "Allumee" : "Eteinte") : "Indispo"} />
               <DetailsRow label="Expo." value={currentExposureCompensation !== null ? currentExposureCompensation.toFixed(1) : "Auto"} />
               <DetailsRow label="Focus" value={currentFocusDistance !== null ? currentFocusDistance.toFixed(1) : currentFocusMode ?? "Auto"} />
@@ -1094,7 +940,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             </div>
             {SHOW_CAMERA_DEBUG ? (
               <div className="mt-3 rounded-brand-lg border border-warning/25 bg-warning/10 p-4 text-sm text-warning">
-                Debug active : tolerance {ALIGNMENT_TOLERANCE_DEGREES} deg.
+                Debug actif : direction {DIRECTION_ALIGNMENT_THRESHOLD_DEGREES}°, hauteur {ALTITUDE_ALIGNMENT_THRESHOLD_DEGREES}°.
               </div>
             ) : null}
           </AppCard>
@@ -1299,13 +1145,13 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               <h2 id="photo-title" className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-lg font-normal text-white">
                 {photoCaptureStatus === "capturing" ? "Capture en cours..." : `${liveQuest.target} est-elle au centre ?`}
               </h2>
-              <p className="mt-1 text-xs text-muted">Le cercle correspond exactement au centre utilisé pour la calibration.</p>
+              <p className="mt-1 text-xs text-muted">Le cercle indique approximativement le centre du guidage.</p>
             </div>
 
             <div className="rounded-[20px] border border-white/[0.08] bg-[#0a0a0b]/85 p-3 shadow-[0_-12px_44px_rgba(0,0,0,0.34)] backdrop-blur-xl">
-              {photoError || calibrationError ? (
+              {photoError ? (
                 <p className="mb-3 rounded-[13px] border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">
-                  {photoError ?? calibrationError}
+                  {photoError}
                 </p>
               ) : null}
 
@@ -1313,17 +1159,8 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
                 <p className="py-4 text-center text-sm font-semibold text-muted">Un instant, SkyQuest fige l’image et l’orientation.</p>
               ) : photoDraft ? (
                 <div className="grid gap-2">
-                  {canCalibratePhoto ? (
-                    <AppButton variant="success" onClick={calibrateFromPhotoAndSave} fullWidth>
-                      Cible centrée · Calibrer et enregistrer
-                    </AppButton>
-                  ) : (
-                    <p className="rounded-[13px] border border-white/10 bg-white/[0.05] px-3 py-2 text-center text-xs text-muted">
-                      Calibration indisponible pour cette image, mais tu peux la conserver dans le journal.
-                    </p>
-                  )}
-                  <AppButton variant="secondary" onClick={saveSeenWithPhoto} fullWidth>
-                    Enregistrer sans calibrer
+                  <AppButton variant="success" onClick={saveSeenWithPhoto} fullWidth>
+                    Enregistrer l’observation
                   </AppButton>
                   <AppButton variant="ghost" onClick={retakeTargetPhoto} fullWidth>
                     Pas centrée · Reprendre le guidage
