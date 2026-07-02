@@ -16,6 +16,7 @@ export function CameraPhotoPanel(props: CameraPhotoPanelProps) {
   if (!props.open) return null;
   return (
     <div
+      data-camera-control
       className="fixed inset-0 z-50 overflow-hidden bg-[#0a0a0b]"
       role="dialog"
       aria-modal="true"
@@ -39,7 +40,7 @@ export function CameraPhotoPanel(props: CameraPhotoPanelProps) {
         <div className="absolute h-24 w-px bg-white/45" />
         <div className="h-3 w-3 rounded-full bg-accent-cyan" />
       </div>
-      <div className="relative z-20 flex h-[100dvh] flex-col justify-between px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)]">
+      <div className="camera-guide-safe-area relative z-20 flex h-[100dvh] flex-col justify-between">
         <div className="rounded-[18px] border border-white/[0.08] bg-[#0a0a0b]/78 px-4 py-3 text-center backdrop-blur-xl">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent-cyan">
             Vérification
@@ -78,7 +79,7 @@ export function CameraPhotoPanel(props: CameraPhotoPanelProps) {
           ) : (
             <div className="grid gap-2">
               <AppButton onClick={props.onChoosePhoto} fullWidth>
-                Choisir une photo
+                Prendre ou choisir une photo
               </AppButton>
               <AppButton variant="secondary" onClick={props.onSave} fullWidth>
                 Enregistrer sans photo

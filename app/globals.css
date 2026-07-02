@@ -162,6 +162,53 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+body.camera-guide-lock {
+  position: fixed;
+  width: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.camera-guide-root {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+.camera-guide-root,
+.camera-guide-root * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.camera-guide-root .camera-zoom-slider {
+  touch-action: pan-x;
+}
+
+.camera-guide-safe-area {
+  padding-top: calc(env(safe-area-inset-top) + 0.75rem);
+  padding-right: calc(env(safe-area-inset-right) + 1rem);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
+  padding-left: calc(env(safe-area-inset-left) + 1rem);
+}
+
+.camera-guide-modal-safe-area {
+  padding-top: calc(env(safe-area-inset-top) + 1rem);
+  padding-right: calc(env(safe-area-inset-right) + 1rem);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
+  padding-left: calc(env(safe-area-inset-left) + 1rem);
+}
+
+.camera-guide-details-safe-area {
+  padding-right: env(safe-area-inset-right);
+  padding-left: env(safe-area-inset-left);
+}
+
 html.night-mode .glass-card {
   border-color: rgba(192, 57, 43, 0.22);
   background: rgba(18, 0, 0, 0.84);

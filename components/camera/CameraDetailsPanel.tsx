@@ -67,7 +67,8 @@ export function CameraDetailsPanel({
   ];
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end bg-black/55 backdrop-blur-sm"
+      data-camera-control
+      className="camera-guide-details-safe-area fixed inset-0 z-40 flex items-end bg-black/55 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="details-title"

@@ -25,8 +25,11 @@ export function CameraHud({
   return (
     <>
       <CameraDirectionHint targetId={quest.target} title={quest.title} guidance={guidance} />
-      <section className="relative z-10 flex h-[100dvh] flex-col justify-between px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)]">
-        <header className="flex min-h-14 items-center gap-2 rounded-[20px] border border-white/[0.08] bg-[#0a0a0b]/75 px-2 py-2 shadow-[0_12px_40px_rgba(0,0,0,0.22)] backdrop-blur-[24px]">
+      <section className="camera-guide-safe-area relative z-10 flex h-[100dvh] flex-col justify-between">
+        <header
+          data-camera-control
+          className="flex min-h-14 items-center gap-2 rounded-[20px] border border-white/[0.08] bg-[#0a0a0b]/75 px-2 py-2 shadow-[0_12px_40px_rgba(0,0,0,0.22)] backdrop-blur-[24px]"
+        >
           <Link
             href="/"
             aria-label="Quitter"

@@ -15,7 +15,8 @@ export function CameraSetupPanel(props: CameraSetupPanelProps) {
   if (!props.open) return null;
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0a0a0b]/90 p-4 backdrop-blur-xl"
+      data-camera-control
+      className="camera-guide-modal-safe-area fixed inset-0 z-[60] flex items-center justify-center bg-[#0a0a0b]/90 backdrop-blur-xl"
       role="dialog"
       aria-modal="true"
       aria-labelledby="setup-title"

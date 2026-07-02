@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 import { useDeviceOrientation } from "@/hooks/useDeviceOrientation";
 import { getInsecureContextMessage, isSecureBrowserContext } from "@/lib/browser-support";
 import { haptic } from "@/lib/haptics";
@@ -50,6 +50,12 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const wasAlignedRef = useRef(false);
+  const scenePointerRef = useRef<{
+    pointerId: number;
+    clientX: number;
+    clientY: number;
+    startedAt: number;
+  } | null>(null);
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>("idle");
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [orientationStatus, setOrientationStatus] = useState<OrientationStatus>("idle");
@@ -63,6 +69,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [currentZoom, setCurrentZoom] = useState<number | null>(null);
   const [zoomError, setZoomError] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [isHudVisible, setIsHudVisible] = useState(true);
   const [setupModalOpen, setSetupModalOpen] = useState(true);
   const [setupStarting, setSetupStarting] = useState(false);
   const [photoSheetOpen, setPhotoSheetOpen] = useState(false);
@@ -72,6 +79,20 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const sensorPointing = useDeviceOrientation(orientationEnabled);
 
   useEffect(() => () => streamRef.current?.getTracks().forEach((track) => track.stop()), []);
+
+  useEffect(() => {
+    const body = document.body;
+    const scrollY = window.scrollY;
+    const previousTop = body.style.top;
+    body.style.top = `-${scrollY}px`;
+    body.classList.add("camera-guide-lock");
+
+    return () => {
+      body.classList.remove("camera-guide-lock");
+      body.style.top = previousTop;
+      window.scrollTo(0, scrollY);
+    };
+  }, []);
 
   useEffect(() => {
     if (sensorPointing.source === "unavailable") return;
@@ -242,6 +263,14 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+    setPhotoSheetOpen(true);
+    setPhotoDraft(null);
+    setPhotoCaptureStatus("capturing");
+    if (!file.type.startsWith("image/")) {
+      setPhotoError("Le fichier choisi n'est pas une image.");
+      setPhotoCaptureStatus("error");
+      return;
+    }
     try {
       setPhotoError(null);
       setPhotoDraft(await createPhotoDraftFromFile(file));
@@ -250,6 +279,50 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       setPhotoError("Image impossible a lire.");
       setPhotoCaptureStatus("error");
     }
+  }
+
+  function openNativePhotoCapture() {
+    const input = fileInputRef.current;
+    if (!input) {
+      setPhotoError("La capture photo native n'est pas disponible sur cet appareil.");
+      return;
+    }
+    try {
+      setPhotoError(null);
+      input.click();
+    } catch {
+      setPhotoError("La capture photo native n'est pas disponible sur cet appareil.");
+    }
+  }
+
+  function handleScenePointerDown(event: PointerEvent<HTMLElement>) {
+    if (event.button !== 0 || (event.target as HTMLElement).closest("[data-camera-control]")) {
+      scenePointerRef.current = null;
+      return;
+    }
+    scenePointerRef.current = {
+      pointerId: event.pointerId,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      startedAt: performance.now(),
+    };
+  }
+
+  function handleSceneTap(event: PointerEvent<HTMLElement>) {
+    const pointerStart = scenePointerRef.current;
+    scenePointerRef.current = null;
+    if (event.button !== 0 || (event.target as HTMLElement).closest("[data-camera-control]")) {
+      return;
+    }
+    if (
+      !pointerStart ||
+      pointerStart.pointerId !== event.pointerId ||
+      Math.hypot(event.clientX - pointerStart.clientX, event.clientY - pointerStart.clientY) > 10 ||
+      performance.now() - pointerStart.startedAt > 500
+    ) {
+      return;
+    }
+    setIsHudVisible((visible) => !visible);
   }
 
   async function handleTargetFound() {
@@ -340,32 +413,42 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   };
 
   return (
-    <CameraVideoScene videoRef={videoRef} isCameraReady={cameraStatus === "active"}>
-      <CameraHud
-        quest={liveQuest}
-        guidance={guidance}
-        orientation={{ status: orientationStatus, confidence: orientationConfidence }}
-        onOpenDetails={() => setDetailsOpen(true)}
-      >
-        <CameraControls
-          camera={{ status: cameraStatus, error: cameraError }}
-          zoom={{ range: zoomRange, value: currentZoom, error: zoomError }}
-          photoStatus={photoCaptureStatus}
-          onZoomChange={(value) => {
-            setCurrentZoom(value);
-            void applyCameraSetting({ zoom: value });
-          }}
-          onFound={() => void handleTargetFound()}
-          onMissed={handleMissed}
-          onStartCamera={() => void startCamera()}
-        />
-      </CameraHud>
+    <CameraVideoScene
+      videoRef={videoRef}
+      isCameraReady={cameraStatus === "active"}
+      onScenePointerDown={handleScenePointerDown}
+      onScenePointerUp={handleSceneTap}
+    >
+      {isHudVisible ? (
+        <CameraHud
+          quest={liveQuest}
+          guidance={guidance}
+          orientation={{ status: orientationStatus, confidence: orientationConfidence }}
+          onOpenDetails={() => setDetailsOpen(true)}
+        >
+          <CameraControls
+            camera={{ status: cameraStatus, error: cameraError }}
+            zoom={{ range: zoomRange, value: currentZoom, error: zoomError }}
+            photoStatus={photoCaptureStatus}
+            nativePhotoError={!photoSheetOpen ? photoError : null}
+            onZoomChange={(value) => {
+              setCurrentZoom(value);
+              void applyCameraSetting({ zoom: value });
+            }}
+            onFound={() => void handleTargetFound()}
+            onMissed={handleMissed}
+            onNativePhoto={openNativePhotoCapture}
+            onStartCamera={() => void startCamera()}
+          />
+        </CameraHud>
+      ) : null}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
         capture="environment"
         className="hidden"
+        data-camera-control
         onChange={handleFilePhoto}
       />
       <CameraSetupPanel
@@ -390,7 +473,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         error={photoError}
         onSave={saveSeenWithPhoto}
         onRetake={retakeTargetPhoto}
-        onChoosePhoto={() => fileInputRef.current?.click()}
+        onChoosePhoto={openNativePhotoCapture}
       />
     </CameraVideoScene>
   );

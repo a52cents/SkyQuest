@@ -1,14 +1,26 @@
-import type { ReactNode, RefObject } from "react";
+import type { PointerEventHandler, ReactNode, RefObject } from "react";
 
 type CameraVideoSceneProps = {
   videoRef: RefObject<HTMLVideoElement | null>;
   isCameraReady: boolean;
+  onScenePointerDown: PointerEventHandler<HTMLElement>;
+  onScenePointerUp: PointerEventHandler<HTMLElement>;
   children: ReactNode;
 };
 
-export function CameraVideoScene({ videoRef, isCameraReady, children }: CameraVideoSceneProps) {
+export function CameraVideoScene({
+  videoRef,
+  isCameraReady,
+  onScenePointerDown,
+  onScenePointerUp,
+  children,
+}: CameraVideoSceneProps) {
   return (
-    <main className="camera-guide-screen relative h-[100dvh] select-none overflow-hidden bg-[#0a0a0b] text-white">
+    <main
+      className="camera-guide-root bg-[#0a0a0b] text-white"
+      onPointerDown={onScenePointerDown}
+      onPointerUp={onScenePointerUp}
+    >
       <video
         ref={videoRef}
         autoPlay
