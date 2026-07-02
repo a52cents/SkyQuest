@@ -121,17 +121,6 @@ function getOrientationRotation(alpha: number, beta: number, gamma: number): num
   ];
 }
 
-function getBackCameraHorizontal(reading: FullOrientationReading): {
-  camera: { azimuth: number; altitude: number } | null;
-  top: { azimuth: number; altitude: number } | null;
-} {
-  const rotation = getOrientationRotation(reading.alpha, reading.beta, reading.gamma);
-  return {
-    camera: vectorToHorizontal(deviceToEarthVector(rotation, [0, 0, -1])),
-    top: vectorToHorizontal(deviceToEarthVector(rotation, [0, 1, 0])),
-  };
-}
-
 function tupleToVector(vector: Vector3): ProjectionVector3 {
   return { x: vector[0], y: vector[1], z: vector[2] };
 }
@@ -144,12 +133,21 @@ function getBackCameraBasis(reading: FullOrientationReading, confidence: CameraC
   return forward && right && up ? { forward, right, up, confidence } : null;
 }
 
-function getWebkitCameraHeading(compassHeading: number, beta: number | null): number {
-  // When the phone is tilted far past vertical, Safari reports the opposite
-  // end of the device as its heading. Keep the compass tied to the back camera.
-  return beta !== null && beta >= 135
-    ? normalizeAngle(compassHeading + 180)
-    : compassHeading;
+/**
+ * Computes the back-camera forward vector [east, north, up] in the ENU
+ * local tangent frame from the deviceorientation Euler angles (Z-X'-Y'').
+ */
+function computeCameraForwardENU(alphaDeg: number, betaDeg: number, gammaDeg: number): Vector3 {
+  const rotation = getOrientationRotation(alphaDeg, betaDeg, gammaDeg);
+  return deviceToEarthVector(rotation, [0, 0, -1]);
+}
+
+/**
+ * Converts an ENU direction vector to azimuth (0-360° from North) and
+ * altitude (-90° to +90°).
+ */
+function forwardToPointing(forward: Vector3): { azimuth: number; altitude: number } | null {
+  return vectorToHorizontal(forward);
 }
 
 function rotateBasisAroundEarthUp(basis: CameraBasis, degrees: number): CameraBasis {
@@ -165,6 +163,9 @@ function rotateBasisAroundEarthUp(basis: CameraBasis, degrees: number): CameraBa
 /**
  * Returns the complete back-camera basis in the local east/north/up frame.
  * iOS alpha is used only to recover tilt/roll: webkitCompassHeading supplies north.
+ *
+ * Uses the raw webkitCompassHeading directly (no β threshold) — the rotation
+ * matrix approach handles the camera direction continuously for all tilt angles.
  */
 export function getCameraOrientation3D(
   reading: DeviceOrientationReading,
@@ -176,7 +177,7 @@ export function getCameraOrientation3D(
 
   const hasAlpha = typeof reading.alpha === "number";
   const compassHeading = typeof reading.webkitCompassHeading === "number"
-    ? getWebkitCameraHeading(normalizeAngle(reading.webkitCompassHeading), reading.beta)
+    ? normalizeAngle(reading.webkitCompassHeading)
     : null;
   let basis: CameraBasis | null = null;
 
@@ -240,44 +241,45 @@ export function applyCameraOrientationCalibration(
 }
 
 export function getCameraPointing(reading: DeviceOrientationReading): CameraPointing {
-  const compassHeading =
-    typeof reading.webkitCompassHeading === "number"
-      ? normalizeAngle(reading.webkitCompassHeading)
-      : null;
+  const hasBeta = typeof reading.beta === "number";
+  const hasGamma = typeof reading.gamma === "number";
+  const hasAlpha = typeof reading.alpha === "number";
 
-  // 1) iOS : webkitCompassHeading est la boussole native.
-  if (compassHeading !== null) {
-    const azimuth = getWebkitCameraHeading(compassHeading, reading.beta);
-
-    const altitude = typeof reading.beta === "number" ? betaToCameraAltitude(reading.beta) : null;
-    return {
-      azimuth,
-      altitude,
-      source: "webkit-compass",
-    };
+  // 1) iOS : webkitCompassHeading + full rotation matrix 3D.
+  //    On utilise -webkitCompassHeading comme alpha dans la matrice de rotation,
+  //    ce qui donne un azimut caméra continu et correct pour tout β, sans
+  //    saut à β=135° (contrairement à l'ancienne approche à seuil).
+  if (typeof reading.webkitCompassHeading === "number" && hasBeta && hasGamma) {
+    const heading = normalizeAngle(reading.webkitCompassHeading);
+    const forward = computeCameraForwardENU(-heading, reading.beta as number, reading.gamma as number);
+    const pointing = forwardToPointing(forward);
+    if (pointing) {
+      return {
+        azimuth: pointing.azimuth,
+        altitude: pointing.altitude,
+        source: "webkit-compass",
+      };
+    }
   }
 
-  // 2) Android / Chrome : deviceorientationabsolute fournit un alpha vrai par rapport au Nord.
-  if (reading.absolute && typeof reading.alpha === "number" && typeof reading.beta === "number" && typeof reading.gamma === "number") {
-    const horizontal = getBackCameraHorizontal({
-      alpha: reading.alpha,
-      beta: reading.beta,
-      gamma: reading.gamma,
-    });
-    if (horizontal.camera) {
+  // 2) Android / Chrome : deviceorientationabsolute fournit un alpha vrai.
+  if (reading.absolute && hasAlpha && hasBeta && hasGamma) {
+    const forward = computeCameraForwardENU(reading.alpha as number, reading.beta as number, reading.gamma as number);
+    const pointing = forwardToPointing(forward);
+    if (pointing) {
       return {
-        azimuth: horizontal.camera.azimuth,
-        altitude: horizontal.camera.altitude,
+        azimuth: pointing.azimuth,
+        altitude: pointing.altitude,
         source: "absolute",
       };
     }
   }
 
-  // 3) Fallback : on n'a pas de boussole fiable, juste l'inclinaison (beta)
-  if (typeof reading.beta === "number") {
+  // 3) Fallback : inclinaison seule
+  if (hasBeta) {
     return {
       azimuth: null,
-      altitude: betaToCameraAltitude(reading.beta),
+      altitude: betaToCameraAltitude(reading.beta as number),
       source: "tilt-only",
     };
   }
@@ -286,6 +288,33 @@ export function getCameraPointing(reading: DeviceOrientationReading): CameraPoin
     azimuth: null,
     altitude: null,
     source: "unavailable",
+  };
+}
+
+/**
+ * Low-pass filter (exponential moving average) pour lisser les valeurs
+ * d'azimut et d'altitude et éviter le tremblement.
+ *
+ * @param raw    Nouvelle lecture brute
+ * @param prev   Lecture précédente filtrée (null = première lecture)
+ * @param factor Coefficient de lissage (0 = pas de changement, 1 = aucune
+ *               atténuation). Une valeur typique est 0.15 – 0.3.
+ */
+export function smoothPointing(
+  raw: CameraPointing,
+  prev: CameraPointing | null,
+  factor: number,
+): CameraPointing {
+  if (raw.azimuth === null || raw.altitude === null) {
+    return raw;
+  }
+  if (prev === null || prev.azimuth === null || prev.altitude === null) {
+    return raw;
+  }
+  return {
+    azimuth: normalizeAngle(prev.azimuth + factor * angleDifference(prev.azimuth, raw.azimuth)),
+    altitude: prev.altitude + factor * (raw.altitude - prev.altitude),
+    source: raw.source,
   };
 }
 

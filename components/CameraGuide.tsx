@@ -20,6 +20,8 @@ import {
   getAltitudeHint,
   getCameraPointing,
   getDirectionHint,
+  smoothPointing,
+  type CameraPointing,
   type PointingCalibration,
   type PointingSample,
   type CameraOrientation3D,
@@ -195,6 +197,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const calibrationRef = useRef<PointingCalibration | null>(null);
   const cameraOrientationRef = useRef<CameraOrientation3D | null>(null);
   const orientationConfidenceRef = useRef<"high" | "medium" | "low">("low");
+  const smoothedPointingRef = useRef<CameraPointing | null>(null);
   const [cameraStatus, setCameraStatus] = useState<"idle" | "starting" | "active" | "error">("idle");
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [orientationStatus, setOrientationStatus] = useState<"idle" | "active" | "denied" | "unsupported">("idle");
@@ -509,7 +512,9 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       ];
     }
 
-    const pointing = applyPointingCalibration(rawPointing, calibrationRef.current);
+    const smoothed = smoothPointing(rawPointing, smoothedPointingRef.current, 0.2);
+    smoothedPointingRef.current = smoothed;
+    const pointing = applyPointingCalibration(smoothed, calibrationRef.current);
     if (pointing.azimuth !== null) {
       setCurrentAzimuth(pointing.azimuth);
     }
