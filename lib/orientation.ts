@@ -178,9 +178,10 @@ export function getCameraPointing(reading: DeviceOrientationReading): CameraPoin
       const isQuasiVertical = reading.beta > 45 && reading.beta < 135;
 
       if (compassHeading !== null && isQuasiVertical) {
-        // La caméra arrière pointe à l'opposé du haut du téléphone
+        // Safari fournit déjà le cap réel de l'appareil par rapport au nord magnétique.
+        // Ajouter 180° inverserait entièrement le guidage Est/Ouest.
         return {
-          azimuth: normalizeAngle(compassHeading + 180),
+          azimuth: compassHeading,
           altitude: horizontal.camera.altitude,
           source: "webkit-compass",
         };
