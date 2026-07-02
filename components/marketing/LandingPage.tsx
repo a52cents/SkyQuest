@@ -278,15 +278,15 @@ export function LandingPage() {
               <div className="privacy-points">
                 <div className="privacy-point">
                   <div className="privacy-point-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></div>
-                  <div><h4>Local par défaut</h4><p>{"Position et journal d'observation restent sur ton appareil. Aucune donnée n'est envoyée ailleurs."}</p></div>
+                  <div><h3>Local par défaut</h3><p>{"Position et journal d'observation restent sur ton appareil. Aucune donnée n'est envoyée ailleurs."}</p></div>
                 </div>
                 <div className="privacy-point">
                   <div className="privacy-point-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M12 8v4l3 3" /></svg></div>
-                  <div><h4>Accès à la demande</h4><p>{"Rien en arrière-plan. Les capteurs s'activent uniquement quand tu ouvres l'app — et se ferment quand tu la quittes."}</p></div>
+                  <div><h3>Accès à la demande</h3><p>{"Rien en arrière-plan. Les capteurs s'activent uniquement quand tu ouvres l'app — et se ferment quand tu la quittes."}</p></div>
                 </div>
                 <div className="privacy-point">
                   <div className="privacy-point-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="M22 4L12 14.01l-3-3" /></svg></div>
-                  <div><h4>Aucun compte requis</h4><p>{"Pas d'inscription, pas d'email, pas de mot de passe. Ouvre SkyQuest et commence à observer immédiatement."}</p></div>
+                  <div><h3>Aucun compte requis</h3><p>{"Pas d'inscription, pas d'email, pas de mot de passe. Ouvre SkyQuest et commence à observer immédiatement."}</p></div>
                 </div>
               </div>
             </Reveal>
@@ -336,9 +336,9 @@ export function LandingPage() {
           <div className="footer-inner">
             <div className="footer-brand"><Logo /><p>{"Ton compagnon d'observation du ciel. Simple, privé, gratuit. Le ciel a quelque chose à te montrer — il suffit de lever les yeux."}</p></div>
             <div className="footer-links">
-              <div className="footer-col"><h5>App</h5><a href="#features">Fonctionnalités</a><a href="#observation">Observation</a><a href="#access">Permissions</a></div>
-              <div className="footer-col"><h5>Vie privée</h5><a href="#privacy">Confidentialité</a><a href="#">Données locales</a><a href="#">Aucun tracking</a></div>
-              <div className="footer-col"><h5>Ressources</h5><a href="#">{"Guide d'observation"}</a><a href="#">FAQ</a><a href="#">Contact</a></div>
+              <div className="footer-col"><h2>App</h2><a href="#features">Fonctionnalités</a><a href="#observation">Observation</a><a href="#access">Permissions</a></div>
+              <div className="footer-col"><h2>Vie privée</h2><a href="#privacy">Confidentialité</a><a href="#">Données locales</a><a href="#">Aucun tracking</a></div>
+              <div className="footer-col"><h2>Ressources</h2><a href="#">{"Guide d'observation"}</a><a href="#">FAQ</a><a href="#">Contact</a></div>
             </div>
           </div>
           <div className="footer-bottom">
