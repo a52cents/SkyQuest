@@ -45,7 +45,7 @@ export function BottomNavigation() {
               <Link href={item.href} className={`app-bottom-nav-item ${active ? "active" : ""}`} aria-current={active ? "page" : undefined}>
                 <span className="app-bottom-nav-icon">
                   <svg viewBox="0 0 24 24" aria-hidden="true">{item.icon}</svg>
-                  {active ? <motion.span className="app-bottom-nav-indicator" layoutId="activeIndicator" transition={{ type: "spring", stiffness: 420, damping: 34 }} /> : null}
+                  {active ? <motion.span className="app-bottom-nav-indicator" initial={{ opacity: 0, scaleX: 0.65 }} animate={{ opacity: 1, scaleX: 1 }} transition={{ duration: 0.18, ease: "easeOut" }} /> : null}
                 </span>
                 <span>{item.label}</span>
               </Link>

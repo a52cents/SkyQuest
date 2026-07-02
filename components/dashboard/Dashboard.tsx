@@ -513,6 +513,23 @@ export function Dashboard() {
           {loadState === "ready" && guidableQuests.length === 0 ? <div className="empty-state"><p>Aucun objet suffisamment fiable maintenant. Une observation libre reste possible.</p></div> : null}
         </section>
 
+        <section id="observation-windows">
+          <MotionBlock className="section-header spaced"><h2 className="section-title">À venir</h2><span className="section-sub">Informatif · non guidable</span></MotionBlock>
+          <motion.div className="upcoming-list" variants={rootVariants}>
+            {distinctFutureSuggestions.slice(0, 3).map((suggestion) => {
+              const date = new Date(suggestion.availableAt);
+              return (
+                <motion.article key={`${suggestion.quest.id}-${suggestion.availableAt}`} className="upcoming-item future-item" variants={itemVariants}>
+                  <div className="upcoming-date"><div className="day">{date.getDate()}</div><div className="month">{new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(date)}</div></div>
+                  <div className="upcoming-info"><h4>{suggestion.quest.title}</h4><p>{new Intl.DateTimeFormat("fr-FR", { weekday: "short", hour: "2-digit", minute: "2-digit" }).format(date)} · conditions à revérifier</p></div>
+                  <svg className="upcoming-arrow" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+                </motion.article>
+              );
+            })}
+          </motion.div>
+          {loadState === "ready" && distinctFutureSuggestions.length === 0 ? <div className="empty-state"><p>Aucune cible différente trouvée dans les sept prochains jours.</p></div> : null}
+        </section>
+
         <section id="upcoming">
           <MotionBlock className="section-header spaced"><h2 className="section-title">Prochains événements</h2><span className="section-sub">Dans les 60 jours</span></MotionBlock>
           <motion.div className="upcoming-list" variants={rootVariants} initial="hidden" animate="visible">
@@ -535,23 +552,6 @@ export function Dashboard() {
               );
             })}
           </motion.div>
-        </section>
-
-        <section id="observation-windows">
-          <MotionBlock className="section-header spaced"><h2 className="section-title">À venir</h2><span className="section-sub">Informatif · non guidable</span></MotionBlock>
-          <motion.div className="upcoming-list" variants={rootVariants}>
-            {distinctFutureSuggestions.slice(0, 3).map((suggestion) => {
-              const date = new Date(suggestion.availableAt);
-              return (
-                <motion.article key={`${suggestion.quest.id}-${suggestion.availableAt}`} className="upcoming-item future-item" variants={itemVariants}>
-                  <div className="upcoming-date"><div className="day">{date.getDate()}</div><div className="month">{new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(date)}</div></div>
-                  <div className="upcoming-info"><h4>{suggestion.quest.title}</h4><p>{new Intl.DateTimeFormat("fr-FR", { weekday: "short", hour: "2-digit", minute: "2-digit" }).format(date)} · conditions à revérifier</p></div>
-                  <svg className="upcoming-arrow" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-                </motion.article>
-              );
-            })}
-          </motion.div>
-          {loadState === "ready" && distinctFutureSuggestions.length === 0 ? <div className="empty-state"><p>Aucune cible différente trouvée dans les sept prochains jours.</p></div> : null}
         </section>
 
         <section id="journal">
