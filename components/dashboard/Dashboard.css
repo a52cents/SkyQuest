@@ -17,7 +17,7 @@
   --dash-font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --dash-font-mono: "SF Mono", "Fira Code", monospace;
   min-height: 100vh;
-  padding-bottom: 100px;
+  padding-bottom: 0;
   overflow-x: hidden;
   background: var(--dash-bg);
   color: var(--dash-fg);
@@ -143,11 +143,6 @@
 .sky-dashboard .empty-state svg { width: 40px; height: 40px; margin-bottom: 12px; fill: none; stroke: var(--dash-fg-muted); stroke-width: 1; }
 .sky-dashboard .empty-state p { font-size: 14px; }
 
-.sky-dashboard .bottom-nav { position: fixed; right: 0; bottom: 0; left: 0; z-index: 50; padding: 8px 0 calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--dash-border); background: rgba(10,10,11,.92); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); }
-.sky-dashboard .bottom-nav-inner { display: flex; align-items: center; justify-content: space-around; max-width: 600px; margin: 0 auto; }
-.sky-dashboard .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 16px; border: 0; background: none; color: var(--dash-fg-muted); cursor: pointer; font-size: 10px; letter-spacing: .5px; text-transform: uppercase; }
-.sky-dashboard .nav-item.active { color: var(--dash-accent); }
-.sky-dashboard .nav-item svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 
 .sky-dashboard .dashboard-modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: flex-end; justify-content: center; padding: 12px; background: rgba(3,3,4,.82); backdrop-filter: blur(12px); }
 .sky-dashboard .dashboard-modal-card { width: 100%; max-width: 420px; padding: 24px; border: 1px solid var(--dash-border-hover); border-radius: var(--dash-radius); background: var(--dash-bg-elev); }
@@ -157,4 +152,4 @@
 .sky-dashboard .modal-secondary { padding: 10px; border: 1px solid var(--dash-border); border-radius: 100px; background: transparent; color: var(--dash-fg-dim); cursor: pointer; }
 
 @media (min-width: 640px) { .sky-dashboard .journal-preview { grid-template-columns: repeat(3,1fr); } .sky-dashboard .conditions-bar { gap: 12px; } .sky-dashboard .condition-item { padding: 16px 12px; } .sky-dashboard .dashboard-modal { align-items: center; } }
-@media (max-width: 380px) { .sky-dashboard .conditions-bar { grid-template-columns: repeat(2,1fr); } .sky-dashboard .section-title { font-size: 20px; } .sky-dashboard .quest-card { padding: 20px; } .sky-dashboard .quest-card h3 { font-size: 18px; } .sky-dashboard .journal-preview { grid-template-columns: 1fr; } .sky-dashboard .nav-item { padding-inline: 10px; } .sky-dashboard .analysis-banner { flex-direction: column; } .sky-dashboard .analysis-banner p { text-align: left; } }
+@media (max-width: 380px) { .sky-dashboard .conditions-bar { grid-template-columns: repeat(2,1fr); } .sky-dashboard .section-title { font-size: 20px; } .sky-dashboard .quest-card { padding: 20px; } .sky-dashboard .quest-card h3 { font-size: 18px; } .sky-dashboard .journal-preview { grid-template-columns: 1fr; } .sky-dashboard .analysis-banner { flex-direction: column; } .sky-dashboard .analysis-banner p { text-align: left; } }

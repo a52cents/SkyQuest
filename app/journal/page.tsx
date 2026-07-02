@@ -1,64 +1,75 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getAppButtonClassName } from "@/components/AppButton";
+import { AnimatePresence, motion } from "framer-motion";
+import { AppButton } from "@/components/AppButton";
+import { AppCard } from "@/components/AppCard";
 import { EmptyState } from "@/components/EmptyState";
 import { JournalList } from "@/components/JournalList";
 import { PageShell } from "@/components/PageShell";
-import { ProgressDashboard } from "@/components/ProgressDashboard";
-import { createEmptyProgressProfile } from "@/lib/progression";
-import { clearObservations, getObservations, getProgressProfile, resetProgressProfile } from "@/lib/storage";
-import type { Observation, ProgressProfile } from "@/lib/types";
+import { clearObservations, getObservations, resetProgressProfile } from "@/lib/storage";
+import type { Observation } from "@/lib/types";
 
 export default function JournalPage() {
   const [observations, setObservations] = useState<Observation[]>([]);
-  const [profile, setProfile] = useState<ProgressProfile>(() => createEmptyProgressProfile());
+  const [confirmation, setConfirmation] = useState<"journal" | "progress" | null>(null);
 
   useEffect(() => {
     setObservations(getObservations());
-    setProfile(getProgressProfile());
   }, []);
 
   function handleClear() {
-    if (!window.confirm("Vider uniquement l’historique du journal ? Ta progression et tes Éclats seront conservés.")) {
-      return;
-    }
-    clearObservations();
-    setObservations([]);
+    setConfirmation("journal");
   }
 
   function handleResetProgress() {
-    if (!window.confirm("Réinitialiser tous les Éclats, rangs, découvertes et accomplissements ? Le journal sera conservé.")) {
-      return;
+    setConfirmation("progress");
+  }
+
+  function confirmDestructiveAction() {
+    if (confirmation === "journal") {
+      clearObservations();
+      setObservations([]);
+    } else if (confirmation === "progress") {
+      resetProgressProfile();
     }
-    setProfile(resetProgressProfile());
+    setConfirmation(null);
   }
 
   return (
     <PageShell
       eyebrow="Mémoire locale"
-      title="Observations"
-      action={(
-        <Link href="/" className={getAppButtonClassName({ variant: "ghost", size: "sm" })}>
-          Accueil
-        </Link>
-      )}
-      contentClassName="mt-4 sm:mt-6"
+      title="Journal"
+      contentClassName="pb-4"
     >
+      <AnimatePresence>
+        {confirmation ? (
+          <motion.div className="fixed inset-0 z-[70] flex items-end justify-center bg-[#0a0a0b]/85 p-3 backdrop-blur-xl sm:items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="dialog" aria-modal="true" aria-labelledby="confirmation-title">
+            <motion.div className="w-full max-w-md" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}>
+              <AppCard padding="lg">
+                <p className="premium-kicker">Action locale</p>
+                <h2 id="confirmation-title" className="mt-2 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal text-text">{confirmation === "journal" ? "Vider le journal ?" : "Réinitialiser la progression ?"}</h2>
+                <p className="mt-3 text-sm leading-6 text-muted">{confirmation === "journal" ? "Les observations seront supprimées de cet appareil. La progression sera conservée." : "Les rangs, découvertes et accomplissements seront remis à zéro. Le journal sera conservé."}</p>
+                <div className="mt-6 grid gap-2">
+                  <AppButton variant="danger" onClick={confirmDestructiveAction} fullWidth>Confirmer</AppButton>
+                  <AppButton variant="ghost" onClick={() => setConfirmation(null)} fullWidth>Annuler</AppButton>
+                </div>
+              </AppCard>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
       <div className="grid gap-5">
-        <ProgressDashboard profile={profile} />
         {observations.length > 0 ? (
           <JournalList observations={observations} onClear={handleClear} />
         ) : (
           <EmptyState title="Journal vide" message="Marque une quête comme vue ou pas trouvée pour garder une trace locale." />
         )}
-        <div className="border-t border-white/[0.08] pt-4">
-          <button type="button" onClick={handleResetProgress} className="min-h-11 text-sm font-semibold text-danger underline decoration-danger/40 underline-offset-4">
-            Réinitialiser la progression
-          </button>
-          <p className="mt-1 text-xs text-faint">Cette action ne supprime pas les observations du journal.</p>
-        </div>
+        <AppCard variant="subtle" padding="sm">
+          <p className="font-[Georgia,'Times_New_Roman',serif] text-lg text-text">Données locales</p>
+          <p className="mt-1 text-xs leading-5 text-faint">{"Cette action ne supprime pas les observations du journal."}</p>
+          <AppButton type="button" variant="danger" size="sm" onClick={handleResetProgress} className="mt-4">Réinitialiser la progression</AppButton>
+        </AppCard>
       </div>
     </PageShell>
   );

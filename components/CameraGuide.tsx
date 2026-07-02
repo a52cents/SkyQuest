@@ -807,7 +807,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       };
 
   return (
-    <main className="relative h-[100dvh] overflow-hidden bg-background text-white">
+    <main className="camera-guide-screen relative h-[100dvh] overflow-hidden bg-[#0a0a0b] text-white">
       <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-cover" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.30),rgba(0,0,0,0.08)_42%,rgba(0,0,0,0.62))]" aria-hidden="true" />
       <SkyOverlay
@@ -865,11 +865,11 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       </div>
 
       <section className="relative z-10 flex h-[100dvh] flex-col justify-between px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)]">
-        <header className="flex min-h-14 items-center gap-2 rounded-[18px] border border-white/10 bg-[#080b14]/65 px-2 py-2 shadow-[0_12px_40px_rgba(0,0,0,0.22)] backdrop-blur-xl">
+        <header className="flex min-h-14 items-center gap-2 rounded-[20px] border border-white/[0.08] bg-[#0a0a0b]/75 px-2 py-2 shadow-[0_12px_40px_rgba(0,0,0,0.22)] backdrop-blur-[24px]">
           <Link href="/" aria-label="Quitter" className={getAppButtonClassName({ variant: "ghost", size: "sm", className: "min-h-0 h-10 w-10 px-0 text-lg" })}>
             ←
           </Link>
-          <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-[-0.025em] text-white">{liveQuest.title}</h1>
+          <h1 className="min-w-0 flex-1 truncate font-[Georgia,'Times_New_Roman',serif] text-base font-normal tracking-[-0.02em] text-white">{liveQuest.title}</h1>
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
@@ -883,17 +883,17 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         </header>
 
         <div className="pointer-events-none absolute left-4 right-4 top-[calc(env(safe-area-inset-top)+5rem)] flex flex-col items-center gap-3">
-          <p className="rounded-[16px] border border-white/10 bg-[#080b14]/65 px-5 py-3 text-center text-lg font-semibold shadow-[0_12px_42px_rgba(0,0,0,0.25)] backdrop-blur-xl">
+          <p className="rounded-[16px] border border-white/[0.08] bg-[#0a0a0b]/75 px-5 py-3 text-center font-[Georgia,'Times_New_Roman',serif] text-lg font-normal shadow-[0_12px_42px_rgba(0,0,0,0.25)] backdrop-blur-[24px]">
             {mainHint}
           </p>
 
           {overlayReady ? (
-            <p className="rounded-full border border-accent-cyan/20 bg-[#080b14]/65 px-3 py-2 text-center text-xs font-semibold text-accent-cyan backdrop-blur-xl">
+            <p className="rounded-full border border-accent/20 bg-[#0a0a0b]/75 px-3 py-2 text-center text-xs font-semibold text-accent backdrop-blur-xl">
               Repère approximatif — aligne-le avec le vrai ciel.
             </p>
           ) : null}
           {orientationStatus === "active" && orientationConfidence === "medium" ? (
-            <p className="rounded-full border border-warning/20 bg-[#080b14]/65 px-3 py-2 text-center text-xs font-semibold text-warning backdrop-blur-xl">
+            <p className="rounded-full border border-warning/20 bg-[#0a0a0b]/75 px-3 py-2 text-center text-xs font-semibold text-warning backdrop-blur-xl">
               Boussole imprécise — utilise surtout la direction indiquée.
             </p>
           ) : null}
@@ -911,13 +911,13 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
           </div>
         </div>
 
-        <div className="rounded-[20px] border border-white/10 bg-[#080b14]/72 p-3 shadow-[0_-12px_44px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+        <div className="rounded-[20px] border border-white/[0.08] bg-[#0a0a0b]/80 p-3 shadow-[0_-12px_44px_rgba(0,0,0,0.28)] backdrop-blur-[24px]">
           {cameraError ? <p className="mb-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">{cameraError}</p> : null}
           {zoomError ? <p className="mb-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">{zoomError}</p> : null}
 
           <div className="grid grid-cols-2 gap-2">
             <AppButton variant="success" size="sm" onClick={handleTargetFound} className="min-h-12" disabled={photoCaptureStatus === "capturing"}>
-              {photoCaptureStatus === "capturing" ? "Photo..." : "Je l&apos;ai trouvée"}
+              {photoCaptureStatus === "capturing" ? "Photo..." : "Je l'ai trouvée"}
             </AppButton>
             <AppButton variant="ghost" size="sm" onClick={handleMissed} className="min-h-12">
               Pas trouve
@@ -1009,14 +1009,14 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFilePhoto} />
 
       {setupModalOpen ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#050711]/88 p-4 backdrop-blur-xl" role="dialog" aria-modal="true" aria-labelledby="setup-title">
-          <AppCard className="w-full max-w-md rounded-[28px]" padding="lg">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0a0a0b]/90 p-4 backdrop-blur-xl" role="dialog" aria-modal="true" aria-labelledby="setup-title">
+          <AppCard className="w-full max-w-md" padding="lg">
             <p className="premium-kicker">Avant de commencer</p>
-            <h2 id="setup-title" className="mt-2 text-3xl font-black tracking-[-0.04em] text-white">
+            <h2 id="setup-title" className="mt-2 font-[Georgia,'Times_New_Roman',serif] text-3xl font-normal tracking-[-0.03em] text-white">
               Prépare ton guidage
             </h2>
             <p className="mt-3 text-sm leading-6 text-muted">
-              La caméra montre le ciel devant toi. L&apos;orientation aide SkyQuest à placer la cible. Aucune photo n&apos;est envoyée.
+              {"La caméra montre le ciel devant toi. L'orientation aide SkyQuest à placer la cible. Aucune photo n'est envoyée."}
             </p>
 
             <div className="mt-5 grid gap-3">
@@ -1051,11 +1051,11 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
       {detailsOpen ? (
         <div className="fixed inset-0 z-40 flex items-end bg-black/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="details-title">
-          <AppCard className="max-h-[82dvh] w-full overflow-y-auto rounded-t-[28px] rounded-b-none pb-[calc(env(safe-area-inset-bottom)+1rem)]" padding="lg">
+          <AppCard className="mx-auto max-h-[82dvh] w-full max-w-[600px] overflow-y-auto rounded-t-[20px] rounded-b-none pb-[calc(env(safe-area-inset-bottom)+1rem)]" padding="lg">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-bold uppercase tracking-[0.18em] text-accent-cyan">Details</p>
-                <h2 id="details-title" className="mt-1 text-2xl font-black tracking-[-0.03em] text-white">{liveQuest.title}</h2>
+                <h2 id="details-title" className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal tracking-[-0.02em] text-white">{liveQuest.title}</h2>
               </div>
               <AppButton variant="ghost" size="sm" onClick={() => setDetailsOpen(false)}>Fermer</AppButton>
             </div>
@@ -1098,11 +1098,11 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
 
       {cameraSettingsOpen ? (
         <div className="fixed inset-0 z-40 flex items-end bg-black/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-          <AppCard className="max-h-[82dvh] w-full overflow-y-auto rounded-t-[28px] rounded-b-none pb-[calc(env(safe-area-inset-bottom)+1rem)]" padding="lg">
+          <AppCard className="mx-auto max-h-[82dvh] w-full max-w-[600px] overflow-y-auto rounded-t-[20px] rounded-b-none pb-[calc(env(safe-area-inset-bottom)+1rem)]" padding="lg">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-bold uppercase tracking-[0.18em] text-accent-cyan">Camera</p>
-                <h2 id="settings-title" className="mt-1 text-2xl font-black tracking-[-0.03em] text-white">Reglages disponibles</h2>
+                <h2 id="settings-title" className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal tracking-[-0.02em] text-white">Reglages disponibles</h2>
               </div>
               <AppButton variant="ghost" size="sm" onClick={() => setCameraSettingsOpen(false)}>Fermer</AppButton>
             </div>
@@ -1270,7 +1270,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       ) : null}
 
       {photoSheetOpen ? (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-[#050711]" role="dialog" aria-modal="true" aria-labelledby="photo-title">
+        <div className="fixed inset-0 z-50 overflow-hidden bg-[#0a0a0b]" role="dialog" aria-modal="true" aria-labelledby="photo-title">
           {photoDraft ? (
             <div
               aria-label="Aperçu de la photo"
@@ -1289,15 +1289,15 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
           </div>
 
           <div className="relative z-20 flex h-[100dvh] flex-col justify-between px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)]">
-            <div className="rounded-[18px] border border-white/10 bg-[#080b14]/72 px-4 py-3 text-center backdrop-blur-xl">
+            <div className="rounded-[18px] border border-white/[0.08] bg-[#0a0a0b]/78 px-4 py-3 text-center backdrop-blur-xl">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-accent-cyan">Vérification</p>
-              <h2 id="photo-title" className="mt-1 text-lg font-black text-white">
+              <h2 id="photo-title" className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-lg font-normal text-white">
                 {photoCaptureStatus === "capturing" ? "Capture en cours..." : `${liveQuest.target} est-elle au centre ?`}
               </h2>
               <p className="mt-1 text-xs text-muted">Le cercle correspond exactement au centre utilisé pour la calibration.</p>
             </div>
 
-            <div className="rounded-[22px] border border-white/10 bg-[#080b14]/82 p-3 shadow-[0_-12px_44px_rgba(0,0,0,0.34)] backdrop-blur-xl">
+            <div className="rounded-[20px] border border-white/[0.08] bg-[#0a0a0b]/85 p-3 shadow-[0_-12px_44px_rgba(0,0,0,0.34)] backdrop-blur-xl">
               {photoError || calibrationError ? (
                 <p className="mb-3 rounded-[13px] border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">
                   {photoError ?? calibrationError}

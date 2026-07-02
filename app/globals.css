@@ -7,32 +7,33 @@
 
 :root {
   color-scheme: dark;
-  --brand-font-family: var(--font-inter), system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  --background: #070911;
-  --surface: #0c101b;
-  --surface-strong: #111624;
-  --text: #f4f5fb;
-  --muted: #a9b1c5;
-  --faint: #727b91;
-  --accent: #7568ee;
-  --accent-cyan: #73c9eb;
-  --success: #75c9a1;
-  --warning: #e0b86a;
-  --danger: #e48484;
-  --brand-color-primary: #7568ee;
-  --brand-color-primary-hover: #8579f4;
-  --brand-color-link: #73c9eb;
-  --brand-color-text: #f4f5fb;
-  --brand-color-text-secondary: #a9b1c5;
-  --brand-color-text-tertiary: #727b91;
-  --brand-color-bg-layout: #070911;
-  --brand-color-bg-container: #0c101b;
-  --brand-color-bg-elevated: #111624;
-  --brand-color-fill-quaternary: #090d17;
-  --brand-color-border: #262d40;
-  --brand-color-border-secondary: #1b2232;
-  --brand-border-radius: 14px;
-  --brand-border-radius-lg: 22px;
+  --brand-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --brand-display-font-family: Georgia, "Times New Roman", serif;
+  --background: #0a0a0b;
+  --surface: #131316;
+  --surface-strong: #161619;
+  --text: #f4f4f5;
+  --muted: #a1a1aa;
+  --faint: #52525b;
+  --accent: #7c5cff;
+  --accent-cyan: #38bdf8;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --brand-color-primary: #7c5cff;
+  --brand-color-primary-hover: #8b70ff;
+  --brand-color-link: #38bdf8;
+  --brand-color-text: #f4f4f5;
+  --brand-color-text-secondary: #a1a1aa;
+  --brand-color-text-tertiary: #52525b;
+  --brand-color-bg-layout: #0a0a0b;
+  --brand-color-bg-container: #131316;
+  --brand-color-bg-elevated: #161619;
+  --brand-color-fill-quaternary: #101012;
+  --brand-color-border: rgba(255, 255, 255, 0.14);
+  --brand-color-border-secondary: rgba(255, 255, 255, 0.06);
+  --brand-border-radius: 12px;
+  --brand-border-radius-lg: 20px;
 }
 
 @theme inline {
@@ -132,9 +133,7 @@ html.night-mode body {
 body {
   min-height: 100dvh;
   margin: 0;
-  background:
-    radial-gradient(ellipse 70% 38% at 50% -8%, rgba(117, 104, 238, 0.18), transparent 70%),
-    linear-gradient(180deg, #080b14 0%, var(--background) 54%, #090d16 100%);
+  background: var(--background);
   color: var(--text);
   font-family: var(--brand-font-family);
   text-rendering: optimizeLegibility;
@@ -188,13 +187,11 @@ a:focus-visible {
 }
 
 .glass-card {
-  border: 1px solid rgba(154, 166, 199, 0.16);
-  background: rgba(15, 20, 34, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #161619;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.035),
-    0 18px 48px rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(20px) saturate(115%);
-  -webkit-backdrop-filter: blur(20px) saturate(115%);
+    inset 0 1px 0 rgba(255, 255, 255, 0.025),
+    0 16px 40px rgba(0, 0, 0, 0.16);
 }
 
 .star-field {
@@ -212,11 +209,90 @@ a:focus-visible {
 }
 
 .premium-kicker {
-  color: var(--accent-cyan);
+  color: var(--accent);
   font-size: 0.72rem;
   font-weight: 750;
   letter-spacing: 0.16em;
   text-transform: uppercase;
+}
+
+.app-route-content {
+  min-height: 100dvh;
+}
+
+.app-route-content.with-bottom-nav {
+  padding-bottom: calc(76px + env(safe-area-inset-bottom));
+}
+
+.app-bottom-nav {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 50;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(10, 10, 11, 0.92);
+  padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+.app-bottom-nav-inner {
+  display: flex;
+  max-width: 600px;
+  align-items: center;
+  justify-content: space-around;
+  margin: 0 auto;
+}
+
+.app-bottom-nav-slot {
+  flex: 1;
+}
+
+.app-bottom-nav-item {
+  display: flex;
+  min-height: 48px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--faint);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  transition: color 200ms ease;
+}
+
+.app-bottom-nav-item.active {
+  color: var(--accent);
+}
+
+.app-bottom-nav-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-bottom-nav-icon svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-bottom-nav-indicator {
+  position: absolute;
+  bottom: -5px;
+  left: calc(50% - 7px);
+  width: 14px;
+  height: 2px;
+  border-radius: 99px;
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(124, 92, 255, 0.7);
 }
 
 .hairline {

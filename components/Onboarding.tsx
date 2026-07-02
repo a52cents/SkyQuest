@@ -67,11 +67,11 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
     if (currentStep === 1) {
       return (
         <div className="flex flex-col items-start gap-6">
-          <div className="rounded-[28px] border border-accent-cyan/20 bg-accent-cyan/[0.07] p-4">
+          <div className="rounded-[20px] border border-accent/20 bg-accent/[0.07] p-4">
             <TelescopeIcon />
           </div>
           <div className="max-w-md">
-            <h1 className="text-[2.35rem] font-semibold leading-[0.96] tracking-[-0.06em] text-white sm:text-[3.1rem]">Le ciel a une quête pour toi</h1>
+            <h1 className="font-[Georgia,'Times_New_Roman',serif] text-[2.35rem] font-normal leading-[1.02] tracking-[-0.04em] text-white sm:text-[3.1rem]">Le ciel a une quête pour toi</h1>
             <p className="mt-4 text-base leading-7 text-muted sm:text-lg">
               SkyQuest te dit quoi regarder dans le ciel maintenant, selon ta position et la météo.
             </p>
@@ -90,14 +90,14 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
         <div className="flex flex-col gap-6">
           <div className="space-y-3">
             <p className="premium-kicker">Position</p>
-            <h2 className="text-[2rem] font-semibold tracking-[-0.05em] text-white sm:text-[2.35rem]">Trouve ta position</h2>
+            <h2 className="font-[Georgia,'Times_New_Roman',serif] text-[2rem] font-normal tracking-[-0.04em] text-white sm:text-[2.35rem]">Trouve ta position</h2>
             <p className="max-w-md text-base leading-7 text-muted sm:text-lg">
-              Pour te montrer ce qui est visible, j&apos;ai besoin de savoir où tu es.
+              {"Pour te montrer ce qui est visible, j'ai besoin de savoir où tu es."}
             </p>
           </div>
 
-          <div className="rounded-[24px] border border-white/[0.08] bg-white/[0.035] p-4 text-sm leading-6 text-muted">
-            La localisation ne sert qu&apos;à choisir des quêtes réalistes. Tu peux continuer même si tu refuses.
+          <div className="rounded-[20px] border border-white/[0.06] bg-white/[0.025] p-4 text-sm leading-6 text-muted">
+            {"La localisation ne sert qu'à choisir des quêtes réalistes. Tu peux continuer même si tu refuses."}
           </div>
 
           {errorMessage ? (
@@ -123,26 +123,26 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
 
     return (
       <div className="flex flex-col gap-6">
-        <div className="rounded-[28px] border border-success/20 bg-success/[0.08] p-4">
+        <div className="rounded-[20px] border border-success/20 bg-success/[0.08] p-4">
           <div className="flex items-center gap-3">
             <span className="flex h-12 w-12 items-center justify-center rounded-full border border-success/20 bg-success/[0.08] text-2xl text-success" aria-hidden="true">
               ✦
             </span>
             <div>
               <p className="premium-kicker">Prêt à observer</p>
-              <p className="mt-1 text-sm text-muted">Tu es prêt. Regarde le ciel, le bouton Maintenant t&apos;attend.</p>
+              <p className="mt-1 text-sm text-muted">{"Tu es prêt. Regarde le ciel, le bouton Maintenant t'attend."}</p>
             </div>
           </div>
         </div>
 
         <div className="max-w-md">
-          <h2 className="text-[2.1rem] font-semibold tracking-[-0.05em] text-white sm:text-[2.55rem]">C&apos;est parti</h2>
+          <h2 className="font-[Georgia,'Times_New_Roman',serif] text-[2.1rem] font-normal tracking-[-0.04em] text-white sm:text-[2.55rem]">{"C'est parti"}</h2>
           <p className="mt-4 text-base leading-7 text-muted sm:text-lg">Tu peux lancer ta première quête dès que tu fermes cet écran.</p>
         </div>
 
         <div className="mt-auto w-full max-w-sm">
           <AppButton size="lg" fullWidth onClick={onFinish}>
-            C&apos;est parti
+            {"C'est parti"}
           </AppButton>
         </div>
       </div>
@@ -150,8 +150,8 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-background/95 px-5 py-6 backdrop-blur-md sm:px-8">
-      <div className="mx-auto flex h-full w-full max-w-xl flex-col rounded-[32px] border border-white/[0.08] bg-[radial-gradient(circle_at_top,rgba(115,201,235,0.12),transparent_42%),linear-gradient(180deg,rgba(9,12,20,0.96),rgba(11,15,27,0.98))] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.45)] sm:p-8">
+    <div className="fixed inset-0 z-50 bg-[#0a0a0b]/95 px-5 py-6 backdrop-blur-xl sm:px-8">
+      <div className="mx-auto flex h-full w-full max-w-xl flex-col rounded-[20px] border border-white/[0.06] bg-[radial-gradient(circle_at_top,rgba(124,92,255,0.12),transparent_42%),#161619] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.45)] sm:p-8">
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
             <p className="premium-kicker">Première visite</p>
@@ -172,7 +172,7 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
           {dots.map((dot) => (
             <span
               key={dot}
-              className={`h-2.5 rounded-full transition-all duration-300 ease-out ${step === dot ? "w-7 bg-accent-cyan" : "w-2.5 bg-white/25"}`}
+              className={`h-2.5 rounded-full transition-all duration-300 ease-out ${step === dot ? "w-7 bg-accent" : "w-2.5 bg-white/25"}`}
               aria-hidden="true"
             />
           ))}

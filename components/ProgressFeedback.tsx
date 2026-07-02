@@ -64,13 +64,13 @@ export function ProgressFeedback({
         animate={prefersReducedMotion ? { opacity: 1, scale: 1, y: 0 } : { opacity: 1, scale: 1, y: 0, transition: { type: "spring", stiffness: 200, damping: 20 } }}
         exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.15 } }}
       >
-        <AppCard className="border-accent/25 bg-[linear-gradient(145deg,rgba(117,104,238,0.14),rgba(15,20,34,0.9))]" aria-live="polite">
+        <AppCard className="border-accent/25 bg-[radial-gradient(circle_at_100%_0%,rgba(124,92,255,0.14),transparent_48%),#161619]" aria-live="polite">
           <p className="premium-kicker">Progression enregistrée</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">
+          <h2 className="mt-2 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal tracking-[-0.03em] text-white">
             {reward.xpEarned > 0 ? <AnimatedXp value={reward.xpEarned} /> : "Déjà compté cette nuit"}
           </h2>
-          {reward.streakMessage ? <p className="mt-2 text-sm font-semibold text-accent-cyan">{reward.streakMessage}</p> : null}
-          {reward.isFirstDiscovery ? <p className="mt-2 text-sm font-semibold text-accent-cyan">Nouvelle cible dans ton ciel découvert.</p> : null}
+          {reward.streakMessage ? <p className="mt-2 text-sm font-semibold text-accent">{reward.streakMessage}</p> : null}
+          {reward.isFirstDiscovery ? <p className="mt-2 text-sm font-semibold text-accent">Nouvelle cible dans ton ciel découvert.</p> : null}
           {reward.unlockedAchievements.map((id) => (
             <p key={id} className="mt-2 text-sm font-semibold text-success">
               Accomplissement · {ACHIEVEMENTS.find((item) => item.id === id)?.title ?? id}
@@ -83,7 +83,7 @@ export function ProgressFeedback({
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.07]">
               <motion.div
-                className="h-full rounded-full bg-gradient-to-r from-accent to-accent-cyan"
+                className="h-full rounded-full bg-accent shadow-[0_0_14px_rgba(124,92,255,0.35)]"
                 initial={prefersReducedMotion ? false : { width: 0 }}
                 animate={{ width: `${rank.progressPercent}%` }}
                 transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.8, ease: "easeOut" }}

@@ -57,7 +57,7 @@ export default function QuestGuidePage() {
           href="/"
           className={getAppButtonClassName({ className: "mt-4" })}
         >
-          Retour à l&apos;accueil
+          Retour à {"l'accueil"}
         </Link>
       </PageShell>
     );

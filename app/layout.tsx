@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { PwaRegister } from "@/components/PwaRegister";
+import { AppRouteShell } from "@/components/navigation/AppRouteShell";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -25,7 +26,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#070911",
+  themeColor: "#0a0a0b",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -35,13 +36,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "!function(){try{var e=localStorage.getItem('skyquest.night-mode.v1')==='1',t=document.documentElement;t.classList.toggle('night-mode',e);var n=document.querySelector('meta[name=\"theme-color\"]');n&&(n.content=e?'#1a0000':'#070911')}catch(e){}}();",
+              "!function(){try{var e=localStorage.getItem('skyquest.night-mode.v1')==='1',t=document.documentElement;t.classList.toggle('night-mode',e);var n=document.querySelector('meta[name=\"theme-color\"]');n&&(n.content=e?'#1a0000':'#0a0a0b')}catch(e){}}();",
           }}
         />
       </head>
       <body className="antialiased">
         <div className="star-field" aria-hidden="true" />
-        {children}
+        <AppRouteShell>{children}</AppRouteShell>
         <PwaRegister />
       </body>
     </html>

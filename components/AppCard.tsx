@@ -12,8 +12,8 @@ type AppCardProps = HTMLAttributes<HTMLElement> & {
 
 const variantClasses: Record<AppCardVariant, string> = {
   glass: "glass-card",
-  solid: "border border-white/[0.10] bg-surface-strong shadow-[0_16px_40px_rgba(0,0,0,0.18)]",
-  subtle: "border border-white/[0.08] bg-white/[0.035]",
+  solid: "border border-white/[0.06] bg-surface-strong shadow-[0_16px_40px_rgba(0,0,0,0.16)]",
+  subtle: "border border-white/[0.06] bg-surface",
 };
 
 const paddingClasses: Record<AppCardPadding, string> = {
@@ -35,7 +35,7 @@ export function AppCard({
   ...props
 }: AppCardProps) {
   return (
-    <Component className={joinClasses("rounded-brand-lg", variantClasses[variant], paddingClasses[padding], className)} {...props}>
+    <Component className={joinClasses("rounded-[20px]", variantClasses[variant], paddingClasses[padding], className)} {...props}>
       {children}
     </Component>
   );

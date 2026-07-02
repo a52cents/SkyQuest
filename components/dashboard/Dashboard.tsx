@@ -414,7 +414,7 @@ export function Dashboard() {
           <motion.div className="dashboard-modal" role="dialog" aria-modal="true" aria-labelledby="dashboard-ad-title" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.div className="dashboard-modal-card" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}>
               <h2 id="dashboard-ad-title">Avant de lire le ciel</h2>
-              <p>Une publicité s&apos;ouvre seulement après ton accord. SkyQuest chargera ensuite les conditions et les quêtes autour de toi.</p>
+              <p>{"Une publicité s'ouvre seulement après ton accord. SkyQuest chargera ensuite les conditions et les quêtes autour de toi."}</p>
               <div className="modal-actions">
                 <button type="button" className="camera-btn" onClick={() => void handleAdConfirm()} disabled={isAdLoading}>{isAdLoading ? "Ouverture…" : "Continuer"}</button>
                 <button type="button" className="modal-secondary" onClick={() => setShowAdConsent(false)} disabled={isAdLoading}>Pas maintenant</button>
@@ -578,14 +578,6 @@ export function Dashboard() {
         </section>
       </motion.main>
 
-      <nav className="bottom-nav" aria-label="Navigation principale">
-        <div className="bottom-nav-inner">
-          <a className="nav-item active" href="#dashboard-top"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2" /></svg>Maintenant</a>
-          <a className="nav-item" href="#objects"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>Explorer</a>
-          <Link className="nav-item" href="/journal"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" /></svg>Journal</Link>
-          <a className="nav-item" href="#progression"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.18V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 7.18 19.73l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 3.17 14H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.27 7.18l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 2.82 1.18l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 20.83 10H21a2 2 0 0 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15z" /></svg>Profil</a>
-        </div>
-      </nav>
     </div>
   );
 }

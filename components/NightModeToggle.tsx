@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { applyNightModeFromStorage, isNightMode, toggleNightMode } from "@/lib/night-mode";
 
-const DAY_THEME_COLOR = "#070911";
+const DAY_THEME_COLOR = "#0a0a0b";
 const NIGHT_THEME_COLOR = "#1a0000";
 
 function setThemeColorMeta(enabled: boolean): void {

@@ -190,7 +190,7 @@ export function LandingPage() {
           <motion.h1 variants={heroItemVariants}>Le ciel a quelque chose<br />à <span className="accent">te montrer</span></motion.h1>
           <motion.p variants={heroItemVariants}>Des observations choisies selon ta position, la météo et ce qui est réellement visible. Ton compagnon de poche pour explorer la voûte céleste.</motion.p>
           <motion.div className="hero-cta" variants={heroItemVariants}>
-            <a href="#cta" className="btn btn-primary">Ajouter à l&apos;écran d&apos;accueil <ArrowIcon /></a>
+            <a href="#cta" className="btn btn-primary">{"Ajouter à l'écran d'accueil"} <ArrowIcon /></a>
             <a href="#features" className="btn btn-secondary">Découvrir</a>
           </motion.div>
         </motion.div>
@@ -214,17 +214,17 @@ export function LandingPage() {
             <Reveal className="feature-card">
               <div className="feature-icon"><svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg></div>
               <h3>Ciel en temps réel</h3>
-              <p>Voici ce que tu peux voir maintenant, calculé d&apos;après ta position et l&apos;heure exacte. Pas de théorie — uniquement le ciel réel au-dessus de ta tête.</p>
+              <p>{"Voici ce que tu peux voir maintenant, calculé d'après ta position et l'heure exacte. Pas de théorie — uniquement le ciel réel au-dessus de ta tête."}</p>
             </Reveal>
             <Reveal className="feature-card">
               <div className="feature-icon"><svg viewBox="0 0 24 24"><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" /><circle cx="12" cy="12" r="4" /></svg></div>
               <h3>Conseils météo</h3>
-              <p>Cloudiness, humidité, phases lunaires — SkyQuest filtre intelligemment pour ne te montrer que les bonnes fenêtres d&apos;observation.</p>
+              <p>{"Cloudiness, humidité, phases lunaires — SkyQuest filtre intelligemment pour ne te montrer que les bonnes fenêtres d'observation."}</p>
             </Reveal>
             <Reveal className="feature-card">
               <div className="feature-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg></div>
               <h3>Guidage 2D</h3>
-              <p>Pointe ton téléphone vers le ciel. La caméra et les capteurs d&apos;orientation te guident directement vers les objets visibles, pas à pas.</p>
+              <p>{"Pointe ton téléphone vers le ciel. La caméra et les capteurs d'orientation te guident directement vers les objets visibles, pas à pas."}</p>
             </Reveal>
             <Reveal className="feature-card">
               <div className="feature-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></svg></div>
@@ -234,12 +234,12 @@ export function LandingPage() {
             <Reveal className="feature-card">
               <div className="feature-icon"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10" /><path d="M12 6v6l4 2" /></svg></div>
               <h3>Maintenant &amp; futur</h3>
-              <p>Planifie tes soirées d&apos;observation. Regarde ce qui sera visible plus tard ce soir, cette semaine, ou lors du prochain événement céleste.</p>
+              <p>{"Planifie tes soirées d'observation. Regarde ce qui sera visible plus tard ce soir, cette semaine, ou lors du prochain événement céleste."}</p>
             </Reveal>
             <Reveal className="feature-card">
               <div className="feature-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5M2 12l10 5 10-5" /></svg></div>
               <h3>Installable</h3>
-              <p>Ajoute SkyQuest à ton écran d&apos;accueil. Une vraie app, sans store d&apos;applications — légère, instantanée, toujours prête.</p>
+              <p>{"Ajoute SkyQuest à ton écran d'accueil. Une vraie app, sans store d'applications — légère, instantanée, toujours prête."}</p>
             </Reveal>
           </div>
         </div>
@@ -251,13 +251,13 @@ export function LandingPage() {
             <Reveal className="showcase-image"><img src={OBSERVATION_IMAGE} alt="Téléphone affichant une constellation devant le ciel nocturne" /></Reveal>
             <Reveal className="showcase-content">
               <div className="section-label">Observation</div>
-              <h2 className="section-title">Lève les yeux.<br />Le ciel s&apos;illumine.</h2>
+              <h2 className="section-title">Lève les yeux.<br />{"Le ciel s'illumine."}</h2>
               <p className="section-desc">SkyQuest traduit le ciel en quelque chose de simple. Pointe, observe, apprends — sans équipement, sans experience préalable.</p>
               <ul className="showcase-features">
                 <li><span className="check" />Carte du ciel adaptée à ta position GPS</li>
                 <li><span className="check" />Filtrage par conditions météo en temps réel</li>
-                <li><span className="check" />Guidage par caméra et capteurs d&apos;orientation</li>
-                <li><span className="check" />Journal d&apos;observation personnel, stocké localement</li>
+                <li><span className="check" />{"Guidage par caméra et capteurs d'orientation"}</li>
+                <li><span className="check" />{"Journal d'observation personnel, stocké localement"}</li>
               </ul>
             </Reveal>
           </div>
@@ -278,15 +278,15 @@ export function LandingPage() {
               <div className="privacy-points">
                 <div className="privacy-point">
                   <div className="privacy-point-icon"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></div>
-                  <div><h4>Local par défaut</h4><p>Position et journal d&apos;observation restent sur ton appareil. Aucune donnée n&apos;est envoyée ailleurs.</p></div>
+                  <div><h4>Local par défaut</h4><p>{"Position et journal d'observation restent sur ton appareil. Aucune donnée n'est envoyée ailleurs."}</p></div>
                 </div>
                 <div className="privacy-point">
                   <div className="privacy-point-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M12 8v4l3 3" /></svg></div>
-                  <div><h4>Accès à la demande</h4><p>Rien en arrière-plan. Les capteurs s&apos;activent uniquement quand tu ouvres l&apos;app — et se ferment quand tu la quittes.</p></div>
+                  <div><h4>Accès à la demande</h4><p>{"Rien en arrière-plan. Les capteurs s'activent uniquement quand tu ouvres l'app — et se ferment quand tu la quittes."}</p></div>
                 </div>
                 <div className="privacy-point">
                   <div className="privacy-point-icon"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="M22 4L12 14.01l-3-3" /></svg></div>
-                  <div><h4>Aucun compte requis</h4><p>Pas d&apos;inscription, pas d&apos;email, pas de mot de passe. Ouvre SkyQuest et commence à observer immédiatement.</p></div>
+                  <div><h4>Aucun compte requis</h4><p>{"Pas d'inscription, pas d'email, pas de mot de passe. Ouvre SkyQuest et commence à observer immédiatement."}</p></div>
                 </div>
               </div>
             </Reveal>
@@ -321,10 +321,10 @@ export function LandingPage() {
       <section id="cta" className="cta-section">
         <div className="container">
           <Reveal className="cta-content">
-            <h2>Le ciel t&apos;attend<br /><span className="accent">ce soir</span></h2>
-            <p>Aucune installation, aucun compte. Ajoute SkyQuest à ton écran d&apos;accueil et regarde vers le haut.</p>
+            <h2>{"Le ciel t'attend"}<br /><span className="accent">ce soir</span></h2>
+            <p>{"Aucune installation, aucun compte. Ajoute SkyQuest à ton écran d'accueil et regarde vers le haut."}</p>
             <div className="hero-cta">
-              <a href="#" className="btn btn-primary" onClick={showInstallInstructions}>Ajouter à l&apos;écran d&apos;accueil <ArrowIcon /></a>
+              <a href="#" className="btn btn-primary" onClick={showInstallInstructions}>{"Ajouter à l'écran d'accueil"} <ArrowIcon /></a>
               <a href="#features" className="btn btn-secondary">En savoir plus</a>
             </div>
           </Reveal>
@@ -334,11 +334,11 @@ export function LandingPage() {
       <footer>
         <div className="container">
           <div className="footer-inner">
-            <div className="footer-brand"><Logo /><p>Ton compagnon d&apos;observation du ciel. Simple, privé, gratuit. Le ciel a quelque chose à te montrer — il suffit de lever les yeux.</p></div>
+            <div className="footer-brand"><Logo /><p>{"Ton compagnon d'observation du ciel. Simple, privé, gratuit. Le ciel a quelque chose à te montrer — il suffit de lever les yeux."}</p></div>
             <div className="footer-links">
               <div className="footer-col"><h5>App</h5><a href="#features">Fonctionnalités</a><a href="#observation">Observation</a><a href="#access">Permissions</a></div>
               <div className="footer-col"><h5>Vie privée</h5><a href="#privacy">Confidentialité</a><a href="#">Données locales</a><a href="#">Aucun tracking</a></div>
-              <div className="footer-col"><h5>Ressources</h5><a href="#">Guide d&apos;observation</a><a href="#">FAQ</a><a href="#">Contact</a></div>
+              <div className="footer-col"><h5>Ressources</h5><a href="#">{"Guide d'observation"}</a><a href="#">FAQ</a><a href="#">Contact</a></div>
             </div>
           </div>
           <div className="footer-bottom">
