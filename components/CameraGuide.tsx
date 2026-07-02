@@ -22,8 +22,8 @@ import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 import { AppButton, getAppButtonClassName } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
+import { FixedSkyGuide } from "@/components/FixedSkyGuide";
 import { NightModeToggle } from "@/components/NightModeToggle";
-import { SkyOverlay, questSupportsSkyOverlay } from "@/components/SkyOverlay";
 import { useDeviceOrientation } from "@/hooks/useDeviceOrientation";
 import { haptic } from "@/lib/haptics";
 import {
@@ -31,7 +31,6 @@ import {
   azimuthToCardinal,
   getAltitudeHint,
   getDirectionHint,
-  type CameraPointing,
 } from "@/lib/orientation";
 import { getInsecureContextMessage, isSecureBrowserContext } from "@/lib/browser-support";
 import { recalculateQuestPosition } from "@/lib/quest-generator";
@@ -178,7 +177,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const cameraPointingRef = useRef<CameraPointing | null>(null);
   const [cameraStatus, setCameraStatus] = useState<"idle" | "starting" | "active" | "error">(
     "idle",
   );
@@ -206,11 +204,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     "idle" | "capturing" | "ready" | "error"
   >("idle");
   const [photoError, setPhotoError] = useState<string | null>(null);
-  const [observerLocation, setObserverLocation] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
-  const [skyOverlayEnabled, setSkyOverlayEnabled] = useState(true);
   const wasAlignedRef = useRef(false);
   const prefersReducedMotion = useReducedMotion() ?? false;
   const sensorPointing = useDeviceOrientation(orientationEnabled);
@@ -226,7 +219,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       return;
     }
 
-    cameraPointingRef.current = sensorPointing;
     setOrientationConfidence(
       sensorPointing.source === "absolute-sensor"
         ? "high"
@@ -252,8 +244,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       return;
     }
     const lastLocation = location;
-    setObserverLocation({ latitude: lastLocation.latitude, longitude: lastLocation.longitude });
-
     function refreshPosition() {
       const now = new Date();
       setLiveQuest((currentQuest) =>
@@ -270,20 +260,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     const intervalId = window.setInterval(refreshPosition, 30000);
 
     return () => window.clearInterval(intervalId);
-  }, []);
-
-  useEffect(() => {
-    const orientation = window.screen.orientation;
-    if (!orientation?.addEventListener) {
-      return;
-    }
-
-    function resetOrientationAfterScreenRotation() {
-      cameraPointingRef.current = null;
-    }
-
-    orientation.addEventListener("change", resetOrientationAfterScreenRotation);
-    return () => orientation.removeEventListener("change", resetOrientationAfterScreenRotation);
   }, []);
 
   async function startCamera(): Promise<boolean> {
@@ -586,15 +562,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const targetAltitudeLabel =
     liveQuest.altitude !== null ? `${Math.round(liveQuest.altitude)}°` : "Libre";
   const zoomLabel = zoomRange && currentZoom !== null ? `${formatZoom(currentZoom)}x` : "Auto";
-  const overlaySupported = questSupportsSkyOverlay(liveQuest);
-  const overlayReady = Boolean(
-    skyOverlayEnabled &&
-    overlaySupported &&
-    observerLocation &&
-    cameraStatus === "active" &&
-    orientationStatus === "active" &&
-    orientationConfidence !== "low",
-  );
 
   useEffect(() => {
     if (isAligned && !wasAlignedRef.current) {
@@ -646,15 +613,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.30),rgba(0,0,0,0.08)_42%,rgba(0,0,0,0.62))]"
         aria-hidden="true"
       />
-      <SkyOverlay
-        quest={liveQuest}
-        location={observerLocation}
-        orientationRef={cameraPointingRef}
-        videoRef={videoRef}
-        zoom={currentZoom}
-        enabled={overlayReady}
-      />
-
       {cameraStatus !== "active" ? (
         <div
           className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,color-mix(in_srgb,var(--accent-cyan)_16%,transparent),transparent_20rem),var(--background)]"
@@ -663,76 +621,74 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       ) : null}
 
       <div className="pointer-events-none absolute left-1/2 top-1/2 z-[11] -translate-x-1/2 -translate-y-1/2">
-        {hasPrecisePoint ? (
-          <div className="relative flex h-32 w-32 items-center justify-center">
-            <div
-              className={`absolute h-28 w-28 rounded-full border ${directionAligned && altitudeAligned ? "border-success/80 bg-success/10" : "border-accent-cyan/70 bg-accent-cyan/10"} shadow-[0_0_55px_color-mix(in_srgb,var(--accent-cyan)_22%,transparent)]`}
-            />
-            <div className="absolute h-px w-24 bg-white/28" />
-            <div className="absolute h-24 w-px bg-white/28" />
-            <div
-              className={`h-3 w-3 rounded-full ${directionAligned && altitudeAligned ? "bg-success" : "bg-accent-cyan"}`}
-            />
-            <AnimatePresence mode="wait" initial={false}>
-              {directionArrow === "→" ? (
-                <motion.span
-                  key={directionArrow}
-                  variants={arrowVariants}
-                  initial="hidden"
-                  animate="show"
-                  exit="exit"
-                  className="absolute -right-9 text-5xl font-black text-white drop-shadow-xl"
-                >
-                  →
-                </motion.span>
-              ) : null}
-            </AnimatePresence>
-            <AnimatePresence mode="wait" initial={false}>
-              {directionArrow === "←" ? (
-                <motion.span
-                  key={directionArrow}
-                  variants={arrowVariants}
-                  initial="hidden"
-                  animate="show"
-                  exit="exit"
-                  className="absolute -left-9 text-5xl font-black text-white drop-shadow-xl"
-                >
-                  ←
-                </motion.span>
-              ) : null}
-            </AnimatePresence>
-            <AnimatePresence mode="wait" initial={false}>
-              {altitudeArrow === "↑" ? (
-                <motion.span
-                  key={altitudeArrow}
-                  variants={arrowVariants}
-                  initial="hidden"
-                  animate="show"
-                  exit="exit"
-                  className="absolute -top-11 text-4xl font-black text-accent-cyan drop-shadow-xl"
-                >
-                  ↑
-                </motion.span>
-              ) : null}
-            </AnimatePresence>
-            <AnimatePresence mode="wait" initial={false}>
-              {altitudeArrow === "↓" ? (
-                <motion.span
-                  key={altitudeArrow}
-                  variants={arrowVariants}
-                  initial="hidden"
-                  animate="show"
-                  exit="exit"
-                  className="absolute -bottom-11 text-4xl font-black text-accent-cyan drop-shadow-xl"
-                >
-                  ↓
-                </motion.span>
-              ) : null}
-            </AnimatePresence>
-          </div>
-        ) : (
-          <div className="h-28 w-28 rounded-full border border-accent-cyan/60 bg-accent-cyan/10" />
-        )}
+        <div className="relative flex h-40 w-52 items-center justify-center">
+          <FixedSkyGuide
+            targetId={liveQuest.target}
+            hasPrecisePoint={hasPrecisePoint}
+            aligned={isAligned}
+          />
+          <AnimatePresence mode="wait" initial={false}>
+            {directionArrow === "→" ? (
+              <motion.span
+                key={directionArrow}
+                variants={arrowVariants}
+                initial="hidden"
+                animate="show"
+                exit="exit"
+                className="absolute -right-9 text-5xl font-black text-white drop-shadow-xl"
+              >
+                →
+              </motion.span>
+            ) : null}
+          </AnimatePresence>
+          <AnimatePresence mode="wait" initial={false}>
+            {directionArrow === "←" ? (
+              <motion.span
+                key={directionArrow}
+                variants={arrowVariants}
+                initial="hidden"
+                animate="show"
+                exit="exit"
+                className="absolute -left-9 text-5xl font-black text-white drop-shadow-xl"
+              >
+                ←
+              </motion.span>
+            ) : null}
+          </AnimatePresence>
+          <AnimatePresence mode="wait" initial={false}>
+            {altitudeArrow === "↑" ? (
+              <motion.span
+                key={altitudeArrow}
+                variants={arrowVariants}
+                initial="hidden"
+                animate="show"
+                exit="exit"
+                className="absolute -top-11 text-4xl font-black text-accent-cyan drop-shadow-xl"
+              >
+                ↑
+              </motion.span>
+            ) : null}
+          </AnimatePresence>
+          <AnimatePresence mode="wait" initial={false}>
+            {altitudeArrow === "↓" ? (
+              <motion.span
+                key={altitudeArrow}
+                variants={arrowVariants}
+                initial="hidden"
+                animate="show"
+                exit="exit"
+                className="absolute -bottom-11 text-4xl font-black text-accent-cyan drop-shadow-xl"
+              >
+                ↓
+              </motion.span>
+            ) : null}
+          </AnimatePresence>
+        </div>
+        <span
+          className={`absolute left-1/2 top-[calc(100%+0.75rem)] max-w-[76vw] -translate-x-1/2 truncate whitespace-nowrap rounded-full border px-3 py-1.5 text-center text-xs font-bold backdrop-blur-xl ${isAligned ? "border-success/30 bg-success/15 text-success" : "border-accent-cyan/30 bg-[#0a0a0b]/75 text-accent-cyan"}`}
+        >
+          Repère : {liveQuest.title}
+        </span>
       </div>
 
       <section className="relative z-10 flex h-[100dvh] flex-col justify-between px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)]">
@@ -768,11 +724,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             {mainHint}
           </p>
 
-          {overlayReady ? (
-            <p className="rounded-full border border-accent/20 bg-[#0a0a0b]/75 px-3 py-2 text-center text-xs font-semibold text-accent backdrop-blur-xl">
-              Repère approximatif — aligne-le avec le vrai ciel.
-            </p>
-          ) : null}
           {orientationStatus === "active" && orientationConfidence === "medium" ? (
             <p className="rounded-full border border-warning/20 bg-[#0a0a0b]/75 px-3 py-2 text-center text-xs font-semibold text-warning backdrop-blur-xl">
               Boussole imprécise — utilise surtout la direction indiquée.
@@ -864,16 +815,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               </AppButton>
             ) : null}
           </div>
-          {cameraStatus === "active" && observerLocation && overlaySupported ? (
-            <button
-              type="button"
-              onClick={() => setSkyOverlayEnabled((enabled) => !enabled)}
-              className="mt-2 flex min-h-10 w-full items-center justify-center rounded-[13px] border border-white/10 bg-white/[0.05] px-3 text-sm font-semibold text-muted"
-              aria-pressed={skyOverlayEnabled}
-            >
-              Repère céleste : {skyOverlayEnabled ? "activé" : "désactivé"}
-            </button>
-          ) : null}
         </div>
       </section>
 
