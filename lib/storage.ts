@@ -14,6 +14,11 @@
  */
 import { deletePhoto, savePhotoFromDataUrl } from "@/lib/photo-db";
 import { applyQuestReward, createEmptyProgressProfile } from "@/lib/progression";
+export {
+  getOnboardingCompleted,
+  resetOnboardingCompleted,
+  setOnboardingCompleted,
+} from "@/lib/onboarding";
 import type {
   AchievementId,
   Observation,

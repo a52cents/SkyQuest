@@ -24,7 +24,7 @@ import { getCurrentPosition, type GeoPosition } from "@/lib/browser-support";
 import { getUpcomingCelestialEvents, type CelestialEventType } from "@/lib/celestial-events";
 import { haptic } from "@/lib/haptics";
 import { fetchNextIssVisiblePass } from "@/lib/iss";
-import { isOnboardingCompleted, setOnboardingCompleted } from "@/lib/onboarding";
+import { getOnboardingCompleted, setOnboardingCompleted } from "@/lib/storage";
 import { meteorShowers } from "@/lib/meteor-showers";
 import { getAchievementProgress, getRankProgress } from "@/lib/progression";
 import {
@@ -394,7 +394,7 @@ export function Dashboard() {
     void getObservations().then((storedObservations) => {
       if (isActive) setObservations(storedObservations);
     });
-    setShowOnboarding(!isOnboardingCompleted());
+    setShowOnboarding(!getOnboardingCompleted());
     setIsOnboardingReady(true);
 
     const cachedAnalysis = readCachedAnalysis();

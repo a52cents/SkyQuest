@@ -10,7 +10,7 @@ export type GeoPosition = {
 export function getInsecureContextMessage(feature: "position" | "camera" | "orientation"): string {
   const label =
     feature === "position" ? "la position" : feature === "camera" ? "la caméra" : "l'orientation";
-  return `Safari bloque ${label} si l'app n'est pas ouverte en HTTPS. Utilise une URL https, un tunnel HTTPS ou un déploiement.`;
+  return `${label[0].toUpperCase()}${label.slice(1)} nécessite une connexion HTTPS. Tu peux continuer sans cette fonction et réessayer plus tard.`;
 }
 
 export function getCurrentPosition(): Promise<GeoPosition> {
@@ -35,13 +35,17 @@ export function getCurrentPosition(): Promise<GeoPosition> {
       (error) => {
         if (error.code === error.PERMISSION_DENIED) {
           reject(
-            new Error("Position refusée. Vérifie Réglages > Safari > Position, puis réessaie."),
+            new Error("Position refusée. Tu pourras la réautoriser plus tard dans ton navigateur."),
           );
           return;
         }
 
         if (error.code === error.TIMEOUT) {
-          reject(new Error("Position trop longue à obtenir. Essaie dehors, avec le GPS activé."));
+          reject(
+            new Error(
+              "La position a mis trop de temps à répondre. Tu pourras réessayer plus tard.",
+            ),
+          );
           return;
         }
 
