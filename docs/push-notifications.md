@@ -107,13 +107,15 @@ Dans **Project Settings → Environment Variables**, ajouter toutes les variable
 environnements concernés, puis redéployer. Les secrets ne doivent pas être cochés comme exposés au
 navigateur.
 
-`vercel.json` appelle `/api/cron/sky-alerts` chaque heure, car les subscriptions peuvent utiliser des
-fuseaux différents. Vercel envoie automatiquement `Authorization: Bearer <CRON_SECRET>` lorsque la
-variable `CRON_SECRET` existe dans le projet ; l’endpoint reste donc privé.
+`vercel.json` appelle `/api/cron/sky-alerts` une fois par jour à `17:00 UTC`. Cela correspond à
+`18:00` en France métropolitaine l’hiver et `19:00` l’été, donc à la fenêtre locale 17 h–23 h déjà
+contrôlée par le code. Cette fréquence est compatible avec le plan Vercel Hobby et convient au MVP
+France.
 
-Attention : un cron horaire demande actuellement un plan Vercel compatible avec cette fréquence.
-Sur un plan limité à un passage quotidien, utiliser temporairement `0 17 * * *` pour un MVP France,
-ou déclencher la route avec un service capable d’envoyer le même header `Authorization`.
+Vercel envoie automatiquement `Authorization: Bearer <CRON_SECRET>` lorsque la variable
+`CRON_SECRET` existe dans le projet ; l’endpoint reste donc privé. Une future prise en charge
+mondiale des fuseaux nécessitera un cron horaire sur un plan Pro, ou un ordonnanceur externe capable
+d’envoyer le même header `Authorization`.
 
 Test de production :
 
