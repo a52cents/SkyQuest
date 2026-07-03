@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { getAppButtonClassName } from "@/components/AppButton";
+import { AppCard } from "@/components/AppCard";
 import { CameraGuide } from "@/components/CameraGuide";
 import { ErrorState } from "@/components/ErrorState";
 import { PageShell } from "@/components/PageShell";
@@ -24,6 +25,7 @@ export default function QuestGuidePage() {
     reward: ProgressReward;
     previousRankName: string | null;
     observation: Observation;
+    showNotificationInvite: boolean;
   } | null>(null);
   const isLoggingRef = useRef(false);
 
@@ -51,10 +53,16 @@ export default function QuestGuidePage() {
       return;
     }
     isLoggingRef.current = true;
-    const previousRankName = getRankProgress(getProgressProfile().totalXp).current.name;
+    const previousProfile = getProgressProfile();
+    const previousRankName = getRankProgress(previousProfile.totalXp).current.name;
     const result = await addObservation(quest, status, getLastLocation() ?? undefined, photo);
     haptic(status === "seen" ? "success" : "missed");
-    setReward({ reward: result.reward, previousRankName, observation: result.observation });
+    setReward({
+      reward: result.reward,
+      previousRankName,
+      observation: result.observation,
+      showNotificationInvite: status === "seen" && previousProfile.discoveredTargets.length === 0,
+    });
   }
 
   if (reward) {
@@ -73,6 +81,37 @@ export default function QuestGuidePage() {
           previousRankName={reward.previousRankName}
           showJournalLink
         />
+        {reward.showNotificationInvite ? (
+          <AppCard variant="subtle" padding="sm" className="flex items-center gap-3">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/[0.10] text-accent-cyan"
+              aria-hidden="true"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-5 w-5 fill-none stroke-current"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                <path d="M10 21h4" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="m-0 text-sm font-semibold text-text">Reviens au bon moment</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-muted">
+                Tu peux activer des alertes ciel depuis ton profil.
+              </p>
+            </div>
+            <Link
+              href="/profile#notifications"
+              className={getAppButtonClassName({ variant: "secondary", size: "sm" })}
+            >
+              Voir
+            </Link>
+          </AppCard>
+        ) : null}
         <Link href="/" className={getAppButtonClassName({ variant: "ghost", className: "w-full" })}>
           Retour à l’accueil
         </Link>

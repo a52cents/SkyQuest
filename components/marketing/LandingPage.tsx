@@ -4,7 +4,6 @@
 
 import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
-import { PushPermissionCard } from "@/components/PushPermissionCard";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 
 const HERO_IMAGE = "/HERO_IMAGE.webp";
@@ -518,9 +517,6 @@ export function LandingPage() {
               <span className="tag">À la demande</span>
             </Reveal>
           </div>
-          <Reveal>
-            <PushPermissionCard className="my-6" />
-          </Reveal>
         </div>
       </section>
 

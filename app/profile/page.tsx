@@ -20,7 +20,9 @@ export default function ProfilePage() {
     <PageShell eyebrow="Espace local" title="Mon profil" contentClassName="pb-4">
       <div className="grid gap-5">
         <ProgressDashboard profile={profile} />
-        <PushPermissionCard />
+        <div id="notifications" className="scroll-mt-6">
+          <PushPermissionCard />
+        </div>
         <SupportSkyQuest />
       </div>
     </PageShell>
