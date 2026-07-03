@@ -23,7 +23,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { BestSkyWindowCard } from "@/components/BestSkyWindowCard";
 import { Onboarding } from "@/components/Onboarding";
 import { PushPermissionCard } from "@/components/PushPermissionCard";
-import { VisibilityExplanationCard } from "@/components/VisibilityExplanationCard";
+import { VisibilityExplanationContent } from "@/components/VisibilityExplanationCard";
 import { getCurrentPosition, type GeoPosition } from "@/lib/browser-support";
 import { getUpcomingCelestialEvents, type CelestialEventType } from "@/lib/celestial-events";
 import { haptic } from "@/lib/haptics";
@@ -676,43 +676,74 @@ export function Dashboard() {
           </div>
         </MotionBlock>
 
-        <MotionBlock>
-          <VisibilityExplanationCard compact />
-        </MotionBlock>
+        <MotionBlock className="sky-insights-disclosure">
+          <details className="sky-insights-details">
+            <summary>
+              <span className="sky-insights-summary-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" />
+                  <path d="M18 3v3m-1.5-1.5h3" />
+                </svg>
+              </span>
+              <span className="sky-insights-summary-copy">
+                <strong>Comprendre ton ciel</strong>
+                <small>
+                  Indice de visibilité · Qualité du ciel
+                  {lightPollution ? ` · ${lightPollution.label}` : ""}
+                </small>
+              </span>
+              <svg className="sky-insights-chevron" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m7 10 5 5 5-5" />
+              </svg>
+            </summary>
 
-        {lightPollution ? (
-          <MotionBlock className="sky-quality-card">
-            <svg className="sky-quality-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" />
-              <path d="M18 3v3m-1.5-1.5h3M5 5v2M4 6h2" />
-            </svg>
-            <div>
-              <span>Qualité du ciel</span>
-              <strong>{lightPollution.label}</strong>
-              <p>{lightPollution.shortAdvice}</p>
-              <small>
-                Estimation{lightPollution.confidence === "low" ? " prudente" : " locale"}, sans
-                garantie d’observation.
-              </small>
-              {airTransparency ? (
-                <div className="air-quality-detail">
-                  <span>Transparence de l’air</span>
-                  <strong>{airTransparency.label}</strong>
-                  <p>{airTransparency.shortAdvice}</p>
-                  <small>Estimation CAMS via Open-Meteo, pas une mesure locale.</small>
-                </div>
-              ) : null}
-              {lightingPractice ? (
-                <div className="lighting-practice-detail">
-                  <span>Éclairage à {lightingPractice.municipalityName}</span>
-                  <strong>{lightingPractice.label}</strong>
-                  <p>{lightingPractice.shortAdvice}</p>
-                  <small>Signal communal Cerema, pas une mesure du ciel en direct.</small>
-                </div>
-              ) : null}
+            <div className="sky-insights-content">
+              <section className="visibility-explanation-inline">
+                <span>Indice de visibilité</span>
+                <strong>Comment SkyQuest l’estime</strong>
+                <VisibilityExplanationContent />
+              </section>
+
+              {lightPollution ? (
+                <section className="sky-quality-card">
+                  <svg className="sky-quality-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" />
+                    <path d="M18 3v3m-1.5-1.5h3M5 5v2M4 6h2" />
+                  </svg>
+                  <div>
+                    <span>Qualité du ciel</span>
+                    <strong>{lightPollution.label}</strong>
+                    <p>{lightPollution.shortAdvice}</p>
+                    <small>
+                      Estimation{lightPollution.confidence === "low" ? " prudente" : " locale"},
+                      sans garantie d’observation.
+                    </small>
+                    {airTransparency ? (
+                      <div className="air-quality-detail">
+                        <span>Transparence de l’air</span>
+                        <strong>{airTransparency.label}</strong>
+                        <p>{airTransparency.shortAdvice}</p>
+                        <small>Estimation CAMS via Open-Meteo, pas une mesure locale.</small>
+                      </div>
+                    ) : null}
+                    {lightingPractice ? (
+                      <div className="lighting-practice-detail">
+                        <span>Éclairage à {lightingPractice.municipalityName}</span>
+                        <strong>{lightingPractice.label}</strong>
+                        <p>{lightingPractice.shortAdvice}</p>
+                        <small>Signal communal Cerema, pas une mesure du ciel en direct.</small>
+                      </div>
+                    ) : null}
+                  </div>
+                </section>
+              ) : (
+                <p className="sky-quality-placeholder">
+                  Lance « Maintenant » pour estimer la qualité du ciel autour de toi.
+                </p>
+              )}
             </div>
-          </MotionBlock>
-        ) : null}
+          </details>
+        </MotionBlock>
 
         {analysisDateLabel ? (
           <MotionBlock className={`analysis-banner ${isGuidanceUnlocked ? "current" : "stale"}`}>

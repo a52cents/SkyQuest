@@ -91,7 +91,121 @@ html.night-mode .sky-dashboard .analysis-banner {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
-  margin-bottom: 24px;
+  margin-bottom: 8px;
+}
+.sky-dashboard .sky-insights-disclosure {
+  margin-bottom: 20px;
+}
+.sky-dashboard .sky-insights-details {
+  overflow: hidden;
+  border: 1px solid var(--dash-border);
+  border-radius: var(--dash-radius-sm);
+  background: color-mix(in srgb, var(--dash-bg-card) 72%, transparent);
+}
+.sky-dashboard .sky-insights-details > summary {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.sky-dashboard .sky-insights-details > summary::-webkit-details-marker {
+  display: none;
+}
+.sky-dashboard .sky-insights-details > summary:focus-visible {
+  outline: 2px solid var(--dash-accent-cyan);
+  outline-offset: -2px;
+}
+.sky-dashboard .sky-insights-summary-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(124, 92, 255, 0.18);
+  border-radius: 11px;
+  background: rgba(124, 92, 255, 0.07);
+  color: var(--dash-accent);
+}
+.sky-dashboard .sky-insights-summary-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sky-dashboard .sky-insights-summary-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+.sky-dashboard .sky-insights-summary-copy strong {
+  color: var(--dash-fg);
+  font-size: 13px;
+  font-weight: 600;
+}
+.sky-dashboard .sky-insights-summary-copy small {
+  overflow: hidden;
+  color: var(--dash-fg-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sky-dashboard .sky-insights-chevron {
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: var(--dash-fg-muted);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.2s ease;
+}
+.sky-dashboard .sky-insights-details[open] .sky-insights-chevron {
+  transform: rotate(180deg);
+}
+.sky-dashboard .sky-insights-content {
+  display: grid;
+  gap: 10px;
+  padding: 0 10px 10px;
+  border-top: 1px solid var(--dash-border);
+}
+.sky-dashboard .visibility-explanation-inline {
+  padding: 12px 4px 2px;
+}
+.sky-dashboard .visibility-explanation-inline > span {
+  display: block;
+  color: var(--dash-accent-cyan);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+.sky-dashboard .visibility-explanation-inline > strong {
+  display: block;
+  margin: 2px 0 7px;
+  color: var(--dash-fg);
+  font-size: 14px;
+}
+.sky-dashboard .visibility-explanation-inline p {
+  color: var(--dash-fg-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sky-dashboard .sky-quality-placeholder {
+  padding: 12px;
+  border: 1px solid rgba(124, 92, 255, 0.14);
+  border-radius: var(--dash-radius-sm);
+  background: rgba(124, 92, 255, 0.05);
+  color: var(--dash-fg-muted);
+  font-size: 12px;
 }
 .sky-dashboard .condition-item {
   padding: 12px 8px;
@@ -137,6 +251,9 @@ html.night-mode .sky-dashboard .analysis-banner {
   border: 1px solid rgba(124, 92, 255, 0.2);
   border-radius: var(--dash-radius-sm);
   background: linear-gradient(135deg, rgba(124, 92, 255, 0.09), rgba(56, 189, 248, 0.04));
+}
+.sky-dashboard .sky-insights-content .sky-quality-card {
+  margin: 0;
 }
 .sky-dashboard .sky-quality-icon {
   width: 24px;

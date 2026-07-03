@@ -1,5 +1,21 @@
 import { AppCard } from "@/components/AppCard";
 
+export function VisibilityExplanationContent() {
+  return (
+    <div className="text-sm leading-6 text-muted">
+      <p>
+        SkyQuest combine la hauteur de la cible, les nuages et la lumière du jour, du crépuscule ou
+        de la nuit. La Lune et les planètes brillantes sont souvent plus faciles ; les étoiles, amas
+        et galaxies demandent un ciel plus sombre.
+      </p>
+      <p className="mt-2">
+        Si la météo manque, une estimation prudente prend le relais. Le score aide à choisir : ce
+        n’est jamais une garantie d’observation.
+      </p>
+    </div>
+  );
+}
+
 export function VisibilityExplanationCard({ compact = false }: { compact?: boolean }) {
   return (
     <AppCard
@@ -28,16 +44,8 @@ export function VisibilityExplanationCard({ compact = false }: { compact?: boole
             +
           </span>
         </summary>
-        <div className="mt-3 border-t border-white/[0.06] pt-3 text-sm leading-6 text-muted">
-          <p>
-            SkyQuest combine la hauteur de la cible, les nuages et la lumière du jour, du crépuscule
-            ou de la nuit. La Lune et les planètes brillantes sont souvent plus faciles ; les
-            étoiles, amas et galaxies demandent un ciel plus sombre.
-          </p>
-          <p className="mt-2">
-            Si la météo manque, une estimation prudente prend le relais. Le score aide à choisir :
-            ce n’est jamais une garantie d’observation.
-          </p>
+        <div className="mt-3 border-t border-white/[0.06] pt-3">
+          <VisibilityExplanationContent />
         </div>
       </details>
     </AppCard>
