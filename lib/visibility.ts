@@ -14,7 +14,14 @@ import {
   getTargetLightingPracticeAdjustment,
   type LightingPracticeEstimate,
 } from "./lighting-practices.ts";
-import type { QuestTargetType, SkyObject, VisibilityLabel, WeatherNow } from "@/lib/types";
+import { getTargetAirQualityPenalty } from "./air-quality.ts";
+import type {
+  AirQualityNow,
+  QuestTargetType,
+  SkyObject,
+  VisibilityLabel,
+  WeatherNow,
+} from "@/lib/types";
 import type { CatalogSkyObject } from "@/lib/sky-catalog";
 
 type VisibilityInput = {
@@ -23,6 +30,7 @@ type VisibilityInput = {
   sunAltitude: number;
   lightPollution?: LightPollutionEstimate;
   lightingPractice?: LightingPracticeEstimate | null;
+  airQuality?: AirQualityNow | null;
 };
 
 export function calculateVisibilityScore({
@@ -31,6 +39,7 @@ export function calculateVisibilityScore({
   sunAltitude,
   lightPollution,
   lightingPractice,
+  airQuality,
 }: VisibilityInput): number {
   if (object.altitude < 5) {
     return 5;
@@ -98,6 +107,9 @@ export function calculateVisibilityScore({
       object.name === "Moon" ? "moon" : "planet",
       lightingPractice,
     );
+  }
+  if (airQuality) {
+    score -= getTargetAirQualityPenalty(object.name === "Moon" ? "moon" : "planet", airQuality);
   }
 
   return Math.max(0, Math.min(100, Math.round(score)));
@@ -169,6 +181,7 @@ export function calculateCatalogVisibilityScore({
   now,
   lightPollution,
   lightingPractice,
+  airQuality,
 }: {
   object: CatalogSkyObject;
   altitude: number;
@@ -177,6 +190,7 @@ export function calculateCatalogVisibilityScore({
   now: Date;
   lightPollution?: LightPollutionEstimate;
   lightingPractice?: LightingPracticeEstimate | null;
+  airQuality?: AirQualityNow | null;
 }): number {
   if (altitude < 10 || !object.franceFriendly || !isDarkEnoughForStars(weather, sunAltitude)) {
     return 0;
@@ -228,6 +242,9 @@ export function calculateCatalogVisibilityScore({
   if (lightingPractice) {
     score += getTargetLightingPracticeAdjustment(object.type as QuestTargetType, lightingPractice);
   }
+  if (airQuality) {
+    score -= getTargetAirQualityPenalty(object.type as QuestTargetType, airQuality);
+  }
 
   return Math.max(0, Math.min(100, Math.round(score)));
 }
@@ -238,12 +255,14 @@ export function calculateMeteorShowerVisibilityScore({
   nearPeak,
   lightPollution,
   lightingPractice,
+  airQuality,
 }: {
   weather: WeatherNow;
   sunAltitude: number;
   nearPeak: boolean;
   lightPollution?: LightPollutionEstimate;
   lightingPractice?: LightingPracticeEstimate | null;
+  airQuality?: AirQualityNow | null;
 }): number {
   if (!isDarkEnoughForStars(weather, sunAltitude)) {
     return 0;
@@ -256,6 +275,9 @@ export function calculateMeteorShowerVisibilityScore({
   }
   if (lightingPractice) {
     score += getTargetLightingPracticeAdjustment("meteor_shower", lightingPractice);
+  }
+  if (airQuality) {
+    score -= getTargetAirQualityPenalty("meteor_shower", airQuality);
   }
 
   return Math.max(0, Math.min(100, Math.round(score)));

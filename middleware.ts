@@ -11,7 +11,8 @@ export function middleware(request: NextRequest) {
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
     "media-src 'self' data: blob:",
-    "connect-src 'self' https://api.open-meteo.com" + (isDevelopment ? " ws: wss:" : ""),
+    "connect-src 'self' https://api.open-meteo.com https://air-quality-api.open-meteo.com" +
+      (isDevelopment ? " ws: wss:" : ""),
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "object-src 'none'",

@@ -29,7 +29,7 @@ import {
   calculateVisibilityScore,
   getVisibilityLabel,
 } from "@/lib/visibility";
-import type { SkyObject, SkyObjectName, SkyQuest, WeatherNow } from "@/lib/types";
+import type { AirQualityNow, SkyObject, SkyObjectName, SkyQuest, WeatherNow } from "@/lib/types";
 
 type GenerateQuestsInput = {
   latitude: number | null;
@@ -39,6 +39,7 @@ type GenerateQuestsInput = {
   issPass?: IssVisiblePass | null;
   lightPollution?: LightPollutionEstimate;
   lightingPractice?: LightingPracticeEstimate | null;
+  airQuality?: AirQualityNow | null;
   limit?: number;
 };
 
@@ -276,6 +277,7 @@ export function generateQuests({
   issPass,
   lightPollution = getDefaultLightPollutionEstimate(),
   lightingPractice,
+  airQuality,
   limit = 8,
 }: GenerateQuestsInput): SkyQuest[] {
   if (latitude === null || longitude === null) {
@@ -293,6 +295,7 @@ export function generateQuests({
           sunAltitude,
           lightPollution,
           lightingPractice,
+          airQuality,
         });
 
         return {
@@ -328,6 +331,7 @@ export function generateQuests({
           now,
           lightPollution,
           lightingPractice,
+          airQuality,
         });
 
         if (score < 50) {
@@ -357,6 +361,7 @@ export function generateQuests({
           nearPeak: isNearMeteorShowerPeak(shower, now),
           lightPollution,
           lightingPractice,
+          airQuality,
         });
 
         if (score < 50) {

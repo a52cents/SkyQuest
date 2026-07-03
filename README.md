@@ -12,6 +12,7 @@ Le projet privilégie un parcours simple — **Maintenant → quoi regarder → 
 - pluies de météores, événements célestes à venir et passages visibles de l'ISS en option ;
 - score de visibilité et sélection prioritaire des cibles ayant un score d'au moins 50 ;
 - estimation de la qualité du ciel, avec une pénalité adaptée aux cibles faibles ;
+- estimation du voile atmosphérique avec Open-Meteo Air Quality et CAMS ;
 - prise en compte prudente des pratiques communales d'éclairage nocturne en France ;
 - observation libre de secours lorsque les données ou les conditions sont insuffisantes ;
 - guidage caméra 2D avec orientation, indications directionnelles et mode dégradé ;
@@ -201,6 +202,7 @@ python scripts/generate-cerema-lighting-index.py chemin/vers/carte-extinction.gp
 
 - **Position** : demandée après action sur **Maintenant**. La dernière position et l'analyse mise en cache sont arrondies à deux décimales avant stockage local.
 - **Météo** : les coordonnées sont envoyées directement depuis le navigateur à Open-Meteo.
+- **Transparence de l'air** : les coordonnées arrondies à deux décimales sont envoyées à [Open-Meteo Air Quality](https://open-meteo.com/en/docs/air-quality-api). L'épaisseur optique des aérosols et les particules CAMS appliquent au maximum 10 points de pénalité aux objets faibles ; une panne du service n'affecte pas le reste de l'analyse. Données : CAMS ENSEMBLE via Open-Meteo.
 - **ISS** : si `N2YO_API_KEY` est définie, les coordonnées transitent par `/api/iss-pass` puis sont envoyées à N2YO.
 - **Qualité du ciel** : les coordonnées sont arrondies à deux décimales avant `/api/light-pollution`. Si un provider est configuré, il reçoit uniquement cette position approximative. Une mesure réussie est mise en cache 14 jours dans le navigateur et jusqu'à 30 jours côté serveur/CDN ; le fallback expire après un jour et aucun historique de position n'est créé.
 - **Pratiques d'éclairage** : une position arrondie à deux décimales est envoyée côté serveur à l'API Geo pour identifier la commune française. Le signal Cerema est mis en cache 30 jours et aucune adresse ni position précise n'est demandée ou conservée.
@@ -238,6 +240,7 @@ npm run build
 - le guidage caméra est une aide 2D approximative, pas une réalité augmentée certifiée ;
 - une visibilité calculée reste une estimation et ne garantit jamais l'observation ;
 - la qualité du ciel est une estimation à l'échelle du secteur : éclairage local, brume et obstacles peuvent différer sur place ;
+- la transparence de l'air provient des modèles CAMS à environ 11 km en Europe et 45 km ailleurs, pas d'un capteur situé chez l'utilisateur ;
 - le fonctionnement hors ligne est limité aux ressources déjà mises en cache ;
 - les données sont propres au navigateur et ne sont pas synchronisées entre appareils ;
 - les subscriptions push nécessitent un projet Supabase configuré et des clés VAPID valides ;

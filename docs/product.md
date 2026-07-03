@@ -51,6 +51,11 @@ complémentaire. Une extinction ou réduction probable améliore légèrement le
 faibles ; une extension ou reprise d'éclairage le réduit légèrement. Ce signal historique n'est
 jamais présenté comme une mesure du ciel en direct.
 
+La transparence atmosphérique actuelle utilise le voile d'aérosols et les particules modélisés par
+CAMS via Open-Meteo. Elle peut retirer jusqu'à 10 points aux objets faibles, mais beaucoup moins à
+la Lune et aux planètes. Elle n'est pas réutilisée pour les suggestions futures sans prévision
+horaire correspondante.
+
 L’indice de visibilité combine la hauteur de la cible, les nuages et la lumière du jour, du
 crépuscule ou de la nuit. La Lune et les planètes brillantes restent plus accessibles que les
 étoiles et le ciel profond, qui demandent davantage d’obscurité. Si Open-Meteo ne répond pas,

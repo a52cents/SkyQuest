@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
+import { fetchAirQualityNow, getAirTransparencyEstimate } from "@/lib/air-quality";
 import { AppHeader } from "@/components/AppHeader";
 import { BestSkyWindowCard } from "@/components/BestSkyWindowCard";
 import { Onboarding } from "@/components/Onboarding";
@@ -49,6 +50,7 @@ import {
 } from "@/lib/storage";
 import type {
   Observation,
+  AirQualityNow,
   BestSkyWindow,
   ProgressProfile,
   QuestTargetType,
@@ -87,6 +89,7 @@ type DashboardAnalysis = {
   bestSkyWindow?: BestSkyWindow;
   lightPollution?: LightPollutionEstimate;
   lightingPractice?: LightingPracticeEstimate;
+  airQuality?: AirQualityNow;
 };
 
 const QUEST_TARGET_LABELS: Record<QuestTargetType, string> = {
@@ -319,6 +322,7 @@ export function Dashboard() {
   const [bestSkyWindow, setBestSkyWindow] = useState<BestSkyWindow | null>(null);
   const [lightPollution, setLightPollution] = useState<LightPollutionEstimate | null>(null);
   const [lightingPractice, setLightingPractice] = useState<LightingPracticeEstimate | null>(null);
+  const [airQuality, setAirQuality] = useState<AirQualityNow | null>(null);
   const [eventTimeline, setEventTimeline] = useState<TimelineEvent[]>([]);
   const [profile, setProfile] = useState<ProgressProfile | null>(null);
   const [observations, setObservations] = useState<Observation[]>([]);
@@ -358,6 +362,7 @@ export function Dashboard() {
       futureIssPass,
       currentLightPollution,
       currentLightingPractice,
+      currentAirQuality,
     ] = await Promise.all([
       fetchWeatherNow(coords.latitude, coords.longitude).catch(() => {
         currentWeatherFailed = true;
@@ -380,6 +385,7 @@ export function Dashboard() {
       }).catch(() => null),
       fetchLightPollutionEstimate(coords.latitude, coords.longitude),
       fetchLightingPracticeEstimate(coords.latitude, coords.longitude),
+      fetchAirQualityNow(coords.latitude, coords.longitude).catch(() => null),
     ]);
     const weatherNotice =
       currentWeatherFailed && forecastFailed
@@ -398,6 +404,7 @@ export function Dashboard() {
       issPass: currentIssPass,
       lightPollution: currentLightPollution,
       lightingPractice: currentLightingPractice,
+      airQuality: currentAirQuality,
       limit: 20,
     });
     const nextFutureSuggestions = generateFutureQuestSuggestions({
@@ -430,6 +437,7 @@ export function Dashboard() {
       bestSkyWindow: nextBestSkyWindow,
       lightPollution: currentLightPollution,
       lightingPractice: currentLightingPractice ?? undefined,
+      airQuality: currentAirQuality ?? undefined,
     };
 
     setWeather(currentWeather);
@@ -438,6 +446,7 @@ export function Dashboard() {
     setBestSkyWindow(nextBestSkyWindow);
     setLightPollution(currentLightPollution);
     setLightingPractice(currentLightingPractice);
+    setAirQuality(currentAirQuality);
     saveBestSkyWindow(nextBestSkyWindow);
     setAnalysisSavedAt(savedAt);
     setIsGuidanceUnlocked(true);
@@ -467,6 +476,7 @@ export function Dashboard() {
       setBestSkyWindow(cachedAnalysis.bestSkyWindow ?? null);
       setLightPollution(cachedAnalysis.lightPollution ?? null);
       setLightingPractice(cachedAnalysis.lightingPractice ?? null);
+      setAirQuality(cachedAnalysis.airQuality ?? null);
       setAnalysisSavedAt(cachedAnalysis.savedAt);
       setIsGuidanceUnlocked(unlockedAnalysisForRuntime === cachedAnalysis.savedAt);
       setLoadState("ready");
@@ -536,6 +546,7 @@ export function Dashboard() {
     (suggestion) => !currentTargets.has(suggestion.quest.target),
   );
   const recentObservations = observations.slice(0, 2);
+  const airTransparency = airQuality ? getAirTransparencyEstimate(airQuality) : null;
   const conditionsLabel =
     analysisSavedAt && !isGuidanceUnlocked
       ? "Analyse passée"
@@ -643,6 +654,14 @@ export function Dashboard() {
                 Estimation{lightPollution.confidence === "low" ? " prudente" : " locale"}, sans
                 garantie d’observation.
               </small>
+              {airTransparency ? (
+                <div className="air-quality-detail">
+                  <span>Transparence de l’air</span>
+                  <strong>{airTransparency.label}</strong>
+                  <p>{airTransparency.shortAdvice}</p>
+                  <small>Estimation CAMS via Open-Meteo, pas une mesure locale.</small>
+                </div>
+              ) : null}
               {lightingPractice ? (
                 <div className="lighting-practice-detail">
                   <span>Éclairage à {lightingPractice.municipalityName}</span>

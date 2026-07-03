@@ -11,6 +11,7 @@ UI client
   ├─ permissions navigateur : GPS, caméra, orientation
   ├─ calculs locaux : astronomie, scoring, projection, progression
   ├─ Open-Meteo : météo actuelle
+  ├─ Open-Meteo Air Quality / CAMS : voile atmosphérique actuel
   ├─ /api/iss-pass → N2YO : passage ISS facultatif
   ├─ /api/light-pollution → provider optionnel : qualité du ciel
   ├─ /api/lighting-practice → API Geo + index communal Cerema
@@ -34,13 +35,14 @@ UI client
 
 1. `Dashboard` demande la position après un clic.
 2. `weather.ts` interroge Open-Meteo et fournit un fallback prudent en cas d'échec.
-3. Le client interroge `/api/light-pollution` avec des coordonnées arrondies et relit son cache local si possible.
-4. En France, `/api/lighting-practice` associe la position arrondie à une commune via API Geo puis consulte l'index Cerema embarqué.
-5. `astro.ts` calcule le Soleil, la Lune et les planètes.
-6. `quest-generator.ts` rassemble les candidats du catalogue, des météores et de l'ISS.
-7. `visibility.ts` attribue les scores, avec un impact plus fort sur les objets faibles.
-8. Le dashboard conserve l'analyse en cache et affiche les quêtes dans l'ordre de pertinence.
-9. `storage.ts` sauvegarde la quête choisie avant la navigation vers `/quest/[id]`.
+3. `air-quality.ts` récupère l'épaisseur optique des aérosols et les particules actuelles auprès d'Open-Meteo/CAMS.
+4. Le client interroge `/api/light-pollution` avec des coordonnées arrondies et relit son cache local si possible.
+5. En France, `/api/lighting-practice` associe la position arrondie à une commune via API Geo puis consulte l'index Cerema embarqué.
+6. `astro.ts` calcule le Soleil, la Lune et les planètes.
+7. `quest-generator.ts` rassemble les candidats du catalogue, des météores et de l'ISS.
+8. `visibility.ts` attribue les scores, avec un impact plus fort sur les objets faibles.
+9. Le dashboard conserve l'analyse en cache et affiche les quêtes dans l'ordre de pertinence.
+10. `storage.ts` sauvegarde la quête choisie avant la navigation vers `/quest/[id]`.
 
 ## Séparation des responsabilités
 
@@ -61,6 +63,7 @@ Les lectures doivent tolérer un stockage indisponible, corrompu ou provenant d'
 ## Réseau et sécurité
 
 - Open-Meteo est appelé directement par le navigateur ;
+- Open-Meteo Air Quality reçoit des coordonnées arrondies à `0,01°` et son échec reste non bloquant ;
 - N2YO est appelé côté serveur uniquement si `N2YO_API_KEY` existe ;
 - le provider de qualité du ciel est appelé côté serveur uniquement si `LIGHT_POLLUTION_API_URL` existe ;
 - l'API Geo reçoit côté serveur des coordonnées arrondies à `0,01°` et renvoie seulement la commune ;

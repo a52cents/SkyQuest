@@ -41,6 +41,14 @@ export type WeatherNow = {
   temperature?: number;
 };
 
+export type AirQualityNow = {
+  europeanAqi?: number;
+  pm2_5?: number;
+  pm10?: number;
+  aerosolOpticalDepth?: number;
+  dust?: number;
+};
+
 export type WeatherHour = {
   date: string;
   cloudCover: number;
