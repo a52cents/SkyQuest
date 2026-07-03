@@ -1,5 +1,6 @@
 import { GlossaryList } from "@/components/GlossaryList";
 import { PageShell } from "@/components/PageShell";
+import { VisibilityExplanationCard } from "@/components/VisibilityExplanationCard";
 
 export default function GlossaryPage() {
   return (
@@ -12,6 +13,8 @@ export default function GlossaryPage() {
           Des définitions courtes pour mieux suivre tes missions et observer à ton rythme.
         </p>
       </div>
+      <VisibilityExplanationCard />
+      <div className="h-5" aria-hidden="true" />
       <GlossaryList />
     </PageShell>
   );

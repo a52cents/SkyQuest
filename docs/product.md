@@ -46,6 +46,16 @@ La qualité du ciel est présentée comme une estimation. La pollution lumineuse
 galaxies, amas et météores ; elle ne doit pas masquer une planète ou la Lune lorsque les autres
 conditions sont bonnes.
 
+L’indice de visibilité combine la hauteur de la cible, les nuages et la lumière du jour, du
+crépuscule ou de la nuit. La Lune et les planètes brillantes restent plus accessibles que les
+étoiles et le ciel profond, qui demandent davantage d’obscurité. Si Open-Meteo ne répond pas,
+SkyQuest utilise des conditions prudentes de secours. Cet indice sert à classer les quêtes : il ne
+représente ni une probabilité scientifique ni une garantie d’observation.
+
+Le Profil regroupe les réglages d’alertes optionnelles. La permission n’est demandée qu’après un
+appui sur **Activer les alertes** ; les thèmes peuvent ensuite être modifiés ou l’abonnement
+désactivé depuis le même écran, sans compte.
+
 ## Ce que SkyQuest n'est pas
 
 - une carte du ciel complète ;

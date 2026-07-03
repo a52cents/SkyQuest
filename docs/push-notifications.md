@@ -1,8 +1,9 @@
 # Notifications push PWA avec Supabase
 
 SkyQuest utilise le Service Worker, la Push API, des clés VAPID et une table Postgres Supabase.
-La permission n’est jamais demandée au chargement : seul le bouton **Activer les alertes** lance la
-demande du navigateur.
+La permission n’est jamais demandée au chargement : dans **Profil → Notifications**, seul le bouton
+**Activer les alertes** lance la demande du navigateur. Le même écran affiche l’état de support,
+permet de choisir les cinq thèmes existants et de désactiver la subscription.
 
 Le précédent store mémoire a été remplacé parce qu’une fonction Vercel peut redémarrer à tout
 moment et que plusieurs instances ne partagent pas leur mémoire. Les subscriptions sont désormais
@@ -94,8 +95,8 @@ curl -X POST http://localhost:3000/api/push/test \
 
 Parcours local :
 
-1. Ouvrir SkyQuest sans cliquer et confirmer qu’aucune permission n’est demandée.
-2. Cliquer sur **Activer les alertes** et accepter la permission.
+1. Ouvrir SkyQuest puis le Profil sans cliquer et confirmer qu’aucune permission n’est demandée.
+2. Dans **Notifications**, cliquer sur **Activer les alertes** et accepter la permission.
 3. Dans Supabase **Table Editor**, ouvrir `push_subscriptions` et vérifier la nouvelle ligne.
 4. Confirmer que les coordonnées ont un seul chiffre après la virgule.
 5. Modifier une préférence et vérifier que la même ligne est mise à jour, sans doublon d’endpoint.

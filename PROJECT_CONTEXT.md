@@ -208,7 +208,9 @@ Il faut distinguer les horaires calculés précisément des dates ou pics approx
 
 ## Données et confidentialité
 
-SkyQuest n'utilise ni compte, ni base de données, ni authentification.
+SkyQuest n'utilise ni compte ni authentification. Le journal, la progression et les préférences
+restent locaux. Une table Supabase optionnelle conserve uniquement les subscriptions Web Push ;
+elle ne constitue pas un profil utilisateur.
 
 ### Données locales
 
@@ -220,6 +222,7 @@ Le navigateur peut conserver :
 - les observations du journal ;
 - la progression ;
 - les préférences de mode nuit et de retours haptiques ;
+- les préférences de thèmes de notification ;
 - l'état de l'onboarding ;
 - le délai entre deux ouvertures publicitaires.
 
@@ -244,6 +247,7 @@ Les permissions doivent être demandées au moment où leur utilité est éviden
 - géolocalisation après un clic sur **Maintenant** ;
 - caméra après le démarrage du guidage ;
 - orientation après une action explicite lorsque Safari/iOS l'exige ;
+- notifications après un appui explicite sur **Activer les alertes** dans le Profil ;
 - aucune permission en arrière-plan.
 
 GPS, caméra, orientation et installation PWA nécessitent un contexte sécurisé. `localhost` convient au développement sur ordinateur ; les essais sur téléphone doivent utiliser HTTPS.
@@ -273,7 +277,7 @@ Le numéro de cache du service worker doit changer lors d'une évolution incompa
 | `/quest/[id]`   | guidage de la quête active stockée localement                     |
 | `/journal`      | historique local et suppression du journal                        |
 | `/explore`      | catalogue pédagogique des objets                                  |
-| `/profile`      | rang, XP, série, découvertes et accomplissements                  |
+| `/profile`      | progression locale et réglages d’alertes optionnelles             |
 | `/api/iss-pass` | proxy facultatif vers N2YO                                        |
 
 ### Modules principaux
@@ -373,7 +377,6 @@ Ne pas introduire sans décision produit explicite :
 - vraie AR 3D ou WebXR obligatoire ;
 - reconnaissance automatique des photos ;
 - carte du ciel complète ;
-- notifications push ;
 - collecte analytique invasive ;
 - stockage distant des positions ou des photos.
 
@@ -381,7 +384,7 @@ Ne pas introduire sans décision produit explicite :
 
 La feuille de route générale prévoit :
 
-- v0.2 : notifications liées aux conditions du ciel et amélioration du crépuscule ;
+- v0.2 : meilleure pertinence des alertes et amélioration du crépuscule ;
 - v0.3 : sauvegarde multi-appareil et compte optionnel ;
 - v0.4 : module AR 3D ou intégration native si les limites de la PWA le justifient.
 

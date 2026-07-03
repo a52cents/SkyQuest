@@ -2,7 +2,9 @@
 
 ## Vue générale
 
-SkyQuest utilise Next.js App Router, React, TypeScript strict et Tailwind CSS. L'application ne possède ni base de données ni authentification. Les données utilisateur sont persistées dans `localStorage`.
+SkyQuest utilise Next.js App Router, React, TypeScript strict et Tailwind CSS. L'application ne
+possède ni compte ni authentification. Le journal et la progression restent dans `localStorage` ;
+une table Supabase optionnelle conserve uniquement les abonnements Web Push.
 
 ```text
 UI client
@@ -10,7 +12,8 @@ UI client
   ├─ calculs locaux : astronomie, scoring, projection, progression
   ├─ Open-Meteo : météo actuelle
   ├─ /api/iss-pass → N2YO : passage ISS facultatif
-  └─ /api/light-pollution → provider optionnel : qualité du ciel
+  ├─ /api/light-pollution → provider optionnel : qualité du ciel
+  └─ /api/push/* → abonnement Web Push optionnel
 ```
 
 ## Routes
@@ -21,7 +24,7 @@ UI client
 | `/quest/[id]`          | guidage de la quête active                    |
 | `/journal`             | observations stockées localement              |
 | `/explore`             | catalogue pédagogique                         |
-| `/profile`             | XP, rangs, séries et accomplissements         |
+| `/profile`             | progression locale et réglages d’alertes      |
 | `/api/iss-pass`        | proxy facultatif vers N2YO                    |
 | `/api/light-pollution` | estimation de qualité du ciel et fallback     |
 
@@ -48,7 +51,7 @@ Les fonctions de `lib/` doivent rester pures lorsqu'elles n'ont pas besoin d'une
 
 ## Données locales
 
-`storage.ts` centralise la quête active, la position arrondie, les 50 dernières observations et la progression. Les préférences d'onboarding, de mode nuit et de retours haptiques utilisent également `localStorage`.
+`storage.ts` centralise la quête active, la position arrondie, les 50 dernières observations et la progression. Les préférences d'onboarding, de mode nuit, de retours haptiques et de thèmes de notification utilisent également `localStorage`.
 
 Les lectures doivent tolérer un stockage indisponible, corrompu ou provenant d'une ancienne version. Aucun module de stockage ne doit transmettre ces données à un serveur.
 
@@ -57,6 +60,8 @@ Les lectures doivent tolérer un stockage indisponible, corrompu ou provenant d'
 - Open-Meteo est appelé directement par le navigateur ;
 - N2YO est appelé côté serveur uniquement si `N2YO_API_KEY` existe ;
 - le provider de qualité du ciel est appelé côté serveur uniquement si `LIGHT_POLLUTION_API_URL` existe ;
+- les alertes sont activées uniquement après un clic explicite dans le Profil ; les thèmes et une
+  position arrondie à `0,1°` sont synchronisés avec la subscription push ;
 - le middleware définit CSP, Permissions Policy, HSTS en production et protections anti-frame ;
 - GPS, caméra et orientation exigent HTTPS hors `localhost`.
 

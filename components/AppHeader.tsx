@@ -20,7 +20,7 @@ export function AppHeader({ eyebrow, title, action, className }: AppHeaderProps)
   return (
     <header
       className={joinClasses(
-        "sticky top-0 z-30 border-b border-white/[0.06] bg-[#0a0a0b]/85 px-5 pb-4 pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-[24px]",
+        "sticky top-0 z-30 border-b border-white/[0.06] bg-[#0a0a0b]/85 pb-4 pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-[24px]",
         className,
       )}
     >

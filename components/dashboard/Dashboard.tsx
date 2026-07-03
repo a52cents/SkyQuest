@@ -22,6 +22,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { BestSkyWindowCard } from "@/components/BestSkyWindowCard";
 import { Onboarding } from "@/components/Onboarding";
 import { PushPermissionCard } from "@/components/PushPermissionCard";
+import { VisibilityExplanationCard } from "@/components/VisibilityExplanationCard";
 import { getCurrentPosition, type GeoPosition } from "@/lib/browser-support";
 import { getUpcomingCelestialEvents, type CelestialEventType } from "@/lib/celestial-events";
 import { haptic } from "@/lib/haptics";
@@ -607,6 +608,10 @@ export function Dashboard() {
           </div>
         </MotionBlock>
 
+        <MotionBlock>
+          <VisibilityExplanationCard compact />
+        </MotionBlock>
+
         {lightPollution ? (
           <MotionBlock className="sky-quality-card">
             <svg className="sky-quality-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -912,7 +917,7 @@ export function Dashboard() {
         </section>
 
         <MotionBlock>
-          <PushPermissionCard />
+          <PushPermissionCard className="my-6" />
         </MotionBlock>
 
         <section id="journal">

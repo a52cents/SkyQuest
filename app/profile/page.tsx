@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageShell } from "@/components/PageShell";
+import { PushPermissionCard } from "@/components/PushPermissionCard";
 import { ProgressDashboard } from "@/components/ProgressDashboard";
 import { SupportSkyQuest } from "@/components/SupportSkyQuest";
 import { createEmptyProgressProfile } from "@/lib/progression";
@@ -16,9 +17,10 @@ export default function ProfilePage() {
   }, []);
 
   return (
-    <PageShell eyebrow="Progression locale" title="Mon profil" contentClassName="pb-4">
+    <PageShell eyebrow="Espace local" title="Mon profil" contentClassName="pb-4">
       <div className="grid gap-5">
         <ProgressDashboard profile={profile} />
+        <PushPermissionCard />
         <SupportSkyQuest />
       </div>
     </PageShell>

@@ -1,31 +1,32 @@
 "use client";
 
+import { AppButton } from "@/components/AppButton";
 import type { NotificationPreferences, NotificationTopic } from "@/lib/push-client";
 
 const TOPIC_LABELS: Array<{ topic: NotificationTopic; title: string; description: string }> = [
   {
     topic: "clear_sky_evening",
-    title: "Bon créneau",
+    title: "Ciel dégagé ce soir",
     description: "Quand une éclaircie intéressante approche.",
   },
   {
     topic: "moon_visible",
-    title: "Lune",
+    title: "Lune visible",
     description: "Quand elle est bien placée.",
   },
   {
     topic: "planet_visible",
-    title: "Planètes",
+    title: "Planète visible",
     description: "Pour une planète accessible.",
   },
   {
     topic: "celestial_event",
-    title: "Événements rares",
+    title: "Événement céleste",
     description: "Éclipses et rendez-vous proches.",
   },
   {
     topic: "daily_mission",
-    title: "Mission du soir",
+    title: "Mission du jour",
     description: "Un rappel quand une mission est plausible.",
   },
 ];
@@ -50,22 +51,11 @@ export function NotificationSettings({
         </p>
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-4">
+      <div className="mt-4">
         <div>
           <p className="m-0 text-sm font-semibold text-text">Types d’alertes</p>
           <p className="mt-1 mb-0 text-xs text-muted">Choisis ce qui mérite de te prévenir.</p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked="true"
-          aria-label="Désactiver toutes les alertes"
-          disabled={disabled}
-          onClick={onDisable}
-          className="relative h-7 w-12 shrink-0 rounded-full border border-accent/40 bg-accent disabled:opacity-60"
-        >
-          <span className="absolute top-0.5 right-0.5 h-6 w-6 rounded-full bg-white shadow" />
-        </button>
       </div>
 
       <div className="mt-3 divide-y divide-white/[0.06]" aria-label="Types d’alertes">
@@ -94,6 +84,16 @@ export function NotificationSettings({
           </label>
         ))}
       </div>
+      <AppButton
+        variant="danger"
+        size="sm"
+        fullWidth
+        disabled={disabled}
+        className="mt-4"
+        onClick={onDisable}
+      >
+        Désactiver les alertes
+      </AppButton>
     </div>
   );
 }

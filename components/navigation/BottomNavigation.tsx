@@ -80,7 +80,7 @@ export function BottomNavigation() {
                       className="app-bottom-nav-indicator"
                       initial={{ opacity: 0, scaleX: 0.65 }}
                       animate={{ opacity: 1, scaleX: 1 }}
-                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      transition={{ duration: prefersReducedMotion ? 0 : 0.18, ease: "easeOut" }}
                     />
                   ) : null}
                 </span>

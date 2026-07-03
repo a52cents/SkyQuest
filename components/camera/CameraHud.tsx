@@ -50,7 +50,7 @@ export function CameraHud({
               onClick={onOpenDetails}
               className="h-10 rounded-[13px] border border-white/10 bg-white/[0.06] px-3 text-sm font-semibold text-white"
             >
-              Details
+              Détails
             </button>
             <NightModeToggle />
           </div>

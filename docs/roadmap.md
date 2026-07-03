@@ -11,17 +11,19 @@ Cette roadmap décrit une direction produit. Elle ne constitue pas une promesse 
 - guidage caméra 2D prudent ;
 - journal et progression locale ;
 - mode dégradé sans GPS, météo, caméra ou orientation ;
-- aucune authentification ni base de données.
+- alertes Web Push optionnelles et désactivables ;
+- aucune authentification ; Supabase conserve seulement les subscriptions push.
 
 ## v0.2 — Pertinence du moment
 
 - meilleure distinction jour, crépuscule et nuit ;
 - estimation plus fine de la qualité du ciel ;
-- notifications optionnelles comme « Ciel dégagé maintenant » ;
-- notifications optionnelles sur les quêtes disponibles le soir ;
+- meilleure pertinence des alertes « Ciel dégagé maintenant » ;
+- sélection plus fine des quêtes annoncées le soir ;
 - amélioration des suggestions futures.
 
-Les notifications devront rester explicites, peu fréquentes et désactivables. Elles ne doivent être demandées qu'après avoir démontré leur utilité.
+Les notifications restent explicites, peu fréquentes et désactivables. Leur permission n’est
+demandée qu’après une action volontaire dans le Profil.
 
 ## v0.3 — Continuité optionnelle
 

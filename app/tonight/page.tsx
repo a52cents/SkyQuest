@@ -247,7 +247,7 @@ export default function TonightPage() {
         La position est demandée uniquement après ce clic.
       </p>
 
-      <PushPermissionCard />
+      <PushPermissionCard className="my-6" />
     </PageShell>
   );
 }

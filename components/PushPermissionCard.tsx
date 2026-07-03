@@ -19,6 +19,18 @@ import { getLastLocation } from "@/lib/storage";
 
 type PushState = "checking" | "unsupported" | "ios-browser" | "idle" | "active" | "denied";
 
+const STATE_LABELS: Record<Exclude<PushState, "checking">, string> = {
+  unsupported: "Non disponible",
+  "ios-browser": "Installation requise",
+  idle: "Disponibles · désactivées",
+  active: "Activées",
+  denied: "Bloquées",
+};
+
+function joinClasses(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ");
+}
+
 function AlertIcon({ active }: { active: boolean }) {
   return (
     <div
@@ -39,7 +51,7 @@ function AlertIcon({ active }: { active: boolean }) {
   );
 }
 
-export function PushPermissionCard() {
+export function PushPermissionCard({ className }: { className?: string }) {
   const [state, setState] = useState<PushState>("checking");
   const [preferences, setPreferences] = useState<NotificationPreferences>(() =>
     getNotificationPreferences(),
@@ -149,13 +161,23 @@ export function PushPermissionCard() {
 
   const isActive = state === "active";
   const enabledTopicCount = Object.values(preferences).filter(Boolean).length;
+  const title =
+    state === "active"
+      ? "Alertes du ciel activées"
+      : state === "unsupported"
+        ? "Notifications non disponibles"
+        : state === "ios-browser"
+          ? "Installe SkyQuest pour les alertes"
+          : state === "denied"
+            ? "Notifications bloquées"
+            : "Active les alertes du ciel";
 
   return (
     <AppCard
       as="section"
       variant="glass"
       padding="md"
-      className="my-6 overflow-hidden"
+      className={joinClasses("overflow-hidden", className)}
       aria-labelledby="push-card-title"
     >
       <div className="flex items-start gap-3.5">
@@ -163,14 +185,26 @@ export function PushPermissionCard() {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 id="push-card-title" className="m-0 text-base font-semibold text-text">
-              {isActive ? "Alertes du ciel activées" : "Active les alertes du ciel"}
+              {title}
             </h2>
-            {isActive ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-success/[0.08] px-2 py-1 text-[0.68rem] font-semibold text-success">
-                <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                Actives
-              </span>
-            ) : null}
+            <span
+              className={joinClasses(
+                "inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[0.68rem] font-semibold",
+                isActive
+                  ? "bg-success/[0.08] text-success"
+                  : state === "denied"
+                    ? "bg-warning/[0.08] text-warning"
+                    : "bg-white/[0.05] text-muted",
+              )}
+            >
+              <span
+                className={joinClasses(
+                  "h-1.5 w-1.5 rounded-full",
+                  isActive ? "bg-success" : state === "denied" ? "bg-warning" : "bg-faint",
+                )}
+              />
+              {STATE_LABELS[state]}
+            </span>
           </div>
           <p className="mt-1.5 mb-0 text-sm leading-5 text-muted">
             {isActive
@@ -280,6 +314,11 @@ export function PushPermissionCard() {
           </svg>
           Position approximative uniquement · désactivation à tout moment
         </div>
+      ) : null}
+      {isActive ? (
+        <p className="mt-3 mb-0 text-xs leading-5 text-muted">
+          Sans compte. Seuls tes thèmes et une zone approximative servent à choisir les alertes.
+        </p>
       ) : null}
     </AppCard>
   );

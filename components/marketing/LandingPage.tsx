@@ -545,7 +545,7 @@ export function LandingPage() {
             </Reveal>
           </div>
           <Reveal>
-            <PushPermissionCard />
+            <PushPermissionCard className="my-6" />
           </Reveal>
         </div>
       </section>
