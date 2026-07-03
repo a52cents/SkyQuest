@@ -6,9 +6,14 @@ import { sendPushToMany, type SkyQuestPushPayload } from "@/lib/push-server";
 import {
   claimHourlyPushSlot,
   listPushSubscriptions,
-  isEligibleForHourlyPush,
+  isEligibleForScheduledPush,
   type StoredPushSubscription,
 } from "@/lib/push-store";
+import {
+  isExceptionalClearSky,
+  isInterestingApproachingSkyWindow,
+  isInterestingBrightTarget,
+} from "@/lib/push-opportunity";
 import { fetchWeatherForecast, fetchWeatherNow } from "@/lib/weather";
 
 export const runtime = "nodejs";
@@ -111,12 +116,15 @@ async function createOpportunity(
     const minutesUntilWindow = Math.round(
       (new Date(skyWindow.startsAt).getTime() - now.getTime()) / 60_000,
     );
-    if (skyWindow.score >= 60 && minutesUntilWindow >= 15 && minutesUntilWindow <= 75) {
+    if (isInterestingApproachingSkyWindow({ score: skyWindow.score, minutesUntilWindow })) {
       const targetText = skyWindow.bestTargets.length
         ? ` À tenter : ${skyWindow.bestTargets.join(", ")}.`
         : "";
       return {
-        title: `Ciel plus favorable dans ${minutesUntilWindow} min`,
+        title:
+          minutesUntilWindow <= 5
+            ? "Très bon ciel maintenant"
+            : `Très bon ciel dans ${minutesUntilWindow} min`,
         body: `Le meilleur créneau approche (indice ${skyWindow.score}/100).${targetText}`,
         url: "/tonight",
         tag: `best-sky-window-${skyWindow.startsAt.slice(0, 13)}`,
@@ -137,7 +145,14 @@ async function createOpportunity(
   diagnostics.calculations.push("astronomy");
   const skyObjects = getSkyObjects(latitude, longitude, now);
   const planet = skyObjects
-    .filter((object) => object.name !== "Moon" && object.altitude >= 15)
+    .filter(
+      (object) =>
+        object.name !== "Moon" &&
+        isInterestingBrightTarget({
+          cloudCover: weather.cloudCover,
+          altitude: object.altitude,
+        }),
+    )
     .sort((left, right) => right.altitude - left.altitude)[0];
   if (planet && subscription.topics.includes("planet_visible")) {
     return {
@@ -149,7 +164,14 @@ async function createOpportunity(
     };
   }
 
-  const moon = skyObjects.find((object) => object.name === "Moon" && object.altitude >= 15);
+  const moon = skyObjects.find(
+    (object) =>
+      object.name === "Moon" &&
+      isInterestingBrightTarget({
+        cloudCover: weather.cloudCover,
+        altitude: object.altitude,
+      }),
+  );
   if (moon && subscription.topics.includes("moon_visible")) {
     return {
       title: "La Lune est bien placée ce soir",
@@ -160,17 +182,20 @@ async function createOpportunity(
     };
   }
 
-  if (weather.cloudCover <= 35 && subscription.topics.includes("clear_sky_evening")) {
+  if (
+    isExceptionalClearSky(weather.cloudCover) &&
+    subscription.topics.includes("clear_sky_evening")
+  ) {
     return {
-      title: "Ciel plutôt clair prévu ce soir",
-      body: "C’est peut-être un bon moment pour observer quelques astres brillants.",
+      title: "Ciel exceptionnellement clair maintenant",
+      body: "Très peu de nuages sont estimés. C’est un bon moment pour vérifier le ciel.",
       url: "/",
       tag: "clear-sky-evening",
       data: { type: "clear_sky_evening" },
     };
   }
 
-  if (subscription.topics.includes("daily_mission")) {
+  if (weather.cloudCover <= 25 && subscription.topics.includes("daily_mission")) {
     return {
       title: "Mission du soir disponible",
       body: "Ouvre SkyQuest et tente de trouver un astre visible maintenant.",
@@ -193,7 +218,7 @@ export async function GET(request: Request) {
   let eligible: StoredPushSubscription[];
   try {
     eligible = (await listPushSubscriptions()).filter((subscription) =>
-      isEligibleForHourlyPush(subscription, now),
+      isEligibleForScheduledPush(subscription, now),
     );
   } catch {
     return NextResponse.json({ error: "Stockage push indisponible." }, { status: 503 });

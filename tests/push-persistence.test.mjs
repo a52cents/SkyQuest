@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import {
+  isExceptionalClearSky,
+  isInterestingApproachingSkyWindow,
+  isInterestingBrightTarget,
+  isScheduledPushCooldownElapsed,
+} from "../lib/push-opportunity.ts";
 
 const storeSource = readFileSync(new URL("../lib/push-store.ts", import.meta.url), "utf8");
 const supabaseSource = readFileSync(new URL("../lib/supabase-server.ts", import.meta.url), "utf8");
@@ -58,8 +64,28 @@ test("scheduled push logs explain skipped notifications and executed calculation
   assert.match(cronRouteSource, /"hourly_slot_already_claimed"/);
 });
 
-test("scheduled clear-sky alerts can announce an approaching best window", () => {
+test("scheduled clear-sky alerts only announce an imminent strong window", () => {
   assert.match(cronRouteSource, /fetchWeatherForecast/);
-  assert.match(cronRouteSource, /minutesUntilWindow >= 15 && minutesUntilWindow <= 75/);
+  assert.match(cronRouteSource, /isInterestingApproachingSkyWindow/);
   assert.match(cronRouteSource, /url: "\/tonight"/);
+});
+
+test("a sky window 59 minutes away is not worth a notification", () => {
+  assert.equal(isInterestingApproachingSkyWindow({ score: 90, minutesUntilWindow: 59 }), false);
+  assert.equal(isInterestingApproachingSkyWindow({ score: 74, minutesUntilWindow: 5 }), false);
+  assert.equal(isInterestingApproachingSkyWindow({ score: 80, minutesUntilWindow: 10 }), true);
+});
+
+test("generic and bright-target alerts require unusually good current conditions", () => {
+  assert.equal(isExceptionalClearSky(15), true);
+  assert.equal(isExceptionalClearSky(16), false);
+  assert.equal(isInterestingBrightTarget({ cloudCover: 25, altitude: 25 }), true);
+  assert.equal(isInterestingBrightTarget({ cloudCover: 30, altitude: 45 }), false);
+});
+
+test("scheduled alerts wait twelve hours before another opportunity", () => {
+  const now = new Date("2026-07-03T22:00:00Z");
+  assert.equal(isScheduledPushCooldownElapsed(undefined, now), true);
+  assert.equal(isScheduledPushCooldownElapsed("2026-07-03T11:00:01Z", now), false);
+  assert.equal(isScheduledPushCooldownElapsed("2026-07-03T10:00:00Z", now), true);
 });

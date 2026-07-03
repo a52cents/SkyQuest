@@ -47,7 +47,7 @@ export function NotificationSettings({
       <div className="rounded-[16px] border border-accent/15 bg-accent/[0.055] px-4 py-3">
         <p className="m-0 text-sm font-semibold text-text">Fenêtre d’observation</p>
         <p className="mt-1 mb-0 text-xs leading-5 text-muted">
-          De 19 h à 3 h · une alerte maximum par heure
+          De 19 h à 3 h · 12 h minimum entre deux alertes
         </p>
       </div>
 

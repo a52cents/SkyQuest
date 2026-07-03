@@ -20,9 +20,10 @@ La table a la RLS activée et aucune policy `anon` ou `authenticated`. C’est v
 web ne lit et n’écrit jamais `push_subscriptions`. Toutes les opérations passent par les routes
 Next.js avec la clé `service_role`, strictement serveur. La fonction SQL
 `claim_push_notification_slot` réserve atomiquement l’heure UTC courante afin que deux crons
-concurrents ne puissent pas envoyer deux alertes pendant la même heure. La limite quotidienne a été
-retirée : une subscription peut recevoir au maximum une alerte par heure entre 19 h et 3 h 59 dans
-son fuseau enregistré.
+concurrents ne puissent pas envoyer deux alertes pendant la même heure. Le cron ajoute un délai
+minimal de 12 heures entre deux alertes planifiées. Il ne retient un créneau futur que si son indice
+atteint 75/100 et qu’il commence dans 10 minutes au maximum ; un ciel générique doit avoir au plus
+15 % de nuages.
 
 Si la table existait déjà avec l’ancienne limite quotidienne, réexécuter le fichier SQL : le
 `create or replace function` mettra le verrou à jour sans supprimer les subscriptions.
@@ -185,7 +186,7 @@ le réglage, sans redemander automatiquement la permission.
 - `GET /api/cron/sky-alerts` lit seulement les rows actives et exige `CRON_SECRET` ;
 - une réponse Web Push 404/410 désactive la subscription expirée ;
 - les coordonnées sont réarrondies à `0.1°` côté route et côté store ;
-- la fonction SQL atomique limite chaque subscription à une notification par heure ;
+- la fonction SQL atomique empêche les doublons horaires et le cron impose 12 heures entre deux alertes planifiées ;
 - aucune opportunité n’est envoyée hors de la plage locale 19 h–3 h 59.
 
 ## Checklist complète
