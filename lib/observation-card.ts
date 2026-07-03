@@ -196,8 +196,8 @@ export async function createObservationCardBlob(observation: Observation): Promi
   context.fillStyle = "#ffffff";
   context.font = "700 31px Arial, sans-serif";
   const xpLabel = observation.xpEarned
-    ? `+${observation.xpEarned} · ${observation.totalXp ?? 0} Éclats`
-    : `${observation.totalXp ?? 0} Éclats`;
+    ? `+${observation.xpEarned} · ${observation.totalXp ?? 0} Éclats d’étoile`
+    : `${observation.totalXp ?? 0} Éclats d’étoile`;
   context.fillText(xpLabel, 72, 1215);
   context.fillText(
     `${observation.streak ?? 0} nuit${observation.streak === 1 ? "" : "s"}`,

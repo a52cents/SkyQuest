@@ -6,6 +6,7 @@ const dashboardCss = readFileSync(
   new URL("../components/dashboard/Dashboard.css", import.meta.url),
   "utf8",
 );
+const globalsCss = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
 const dashboardSource = readFileSync(
   new URL("../components/dashboard/Dashboard.tsx", import.meta.url),
   "utf8",
@@ -35,11 +36,29 @@ const appHeaderSource = readFileSync(
   "utf8",
 );
 const tonightSource = readFileSync(new URL("../app/tonight/page.tsx", import.meta.url), "utf8");
+const exploreSource = readFileSync(new URL("../app/explore/page.tsx", import.meta.url), "utf8");
 
 test("screen styles do not erase reusable component spacing", () => {
   assert.doesNotMatch(dashboardCss, /\.sky-dashboard \*\s*\{[^}]*margin:\s*0[^}]*padding:\s*0/s);
   assert.match(landingCss, /\.marketing-landing > section\s*\{/);
   assert.doesNotMatch(landingCss, /\.marketing-landing section\s*\{/);
+});
+
+test("application chrome and dashboard accents follow theme tokens", () => {
+  assert.match(appHeaderSource, /bg-background\/85/);
+  assert.match(appHeaderSource, /bg-surface-strong\/95/);
+  assert.doesNotMatch(appHeaderSource, /bg-\[#/);
+  assert.match(globalsCss, /\.app-bottom-nav[\s\S]+var\(--background\)/);
+  assert.doesNotMatch(dashboardCss, /rgba\(124, 92, 255/);
+});
+
+test("the dashboard composes shared button and card primitives", () => {
+  assert.match(dashboardSource, /import \{ AppButton \} from "@\/components\/AppButton"/);
+  assert.match(dashboardSource, /import \{ AppCard, getAppCardClassName \}/);
+  assert.equal((dashboardSource.match(/<AppButton/g) ?? []).length, 2);
+  assert.ok((dashboardSource.match(/<AppCard/g) ?? []).length >= 5);
+  assert.doesNotMatch(dashboardSource, /className="(?:camera-btn|quest-btn)"/);
+  assert.doesNotMatch(dashboardCss, /\.sky-dashboard \.(?:camera-btn|quest-btn)/);
 });
 
 test("mobile onboarding stays concise and adapts to short screens", () => {
@@ -55,7 +74,7 @@ test("notification preferences are hidden behind an explicit disclosure", () => 
 });
 
 test("sky explanations share one compact disclosure below the condition tiles", () => {
-  assert.match(dashboardSource, /<details className="sky-insights-details">/);
+  assert.match(dashboardSource, /<details[\s\S]+className: "sky-insights-details"/);
   assert.match(dashboardSource, /Indice de visibilité · Qualité du ciel/);
   assert.equal((dashboardSource.match(/className="sky-quality-card"/g) ?? []).length, 1);
   assert.match(dashboardCss, /\.sky-dashboard \.sky-insights-details\s*\{/);
@@ -94,8 +113,18 @@ test("primary navigation prioritizes Now, Tonight, Explore, and Journal", () => 
   assert.match(appHeaderSource, /Profil et progression/);
 });
 
+test("Explore prioritizes the learning catalog and keeps space news secondary", () => {
+  assert.ok(
+    exploreSource.indexOf("Catalogue du ciel") < exploreSource.indexOf("Actualités spatiales"),
+  );
+  assert.match(exploreSource, /typeFilter/);
+  assert.match(exploreSource, /difficultyFilter/);
+  assert.match(exploreSource, /filteredObjects\.map/);
+});
+
 test("the Now dashboard stays focused on three quests and sky conditions", () => {
   assert.match(dashboardSource, /const visibleQuests = quests\.slice\(0, 3\)/);
+  assert.match(dashboardSource, /weather\?\.isDay \? "À observer maintenant" : "Quêtes du soir"/);
   assert.doesNotMatch(
     dashboardSource,
     /Objets observables|Prochains événements|id="journal"|id="progression"|futureSuggestions/,

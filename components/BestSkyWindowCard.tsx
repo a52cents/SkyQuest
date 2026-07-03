@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getAppCardClassName } from "@/components/AppCard";
 import type { BestSkyWindow } from "@/lib/types";
 
 function formatTime(date: string, timezone: string): string {
@@ -20,7 +21,10 @@ export function BestSkyWindowCard({ window }: { window: BestSkyWindow | null }) 
   return (
     <Link
       href="/tonight"
-      className="best-window-card"
+      className={getAppCardClassName({
+        variant: "solid",
+        className: "best-window-card",
+      })}
       aria-label="Voir le meilleur créneau du soir"
     >
       <div className="best-window-orbit" aria-hidden="true">

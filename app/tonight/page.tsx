@@ -174,9 +174,12 @@ export default function TonightPage() {
               {skyWindow.hours.map((hour) => {
                 const active = hour.date === bestHour?.date;
                 return (
-                  <article
+                  <AppCard
+                    as="article"
+                    variant="solid"
+                    padding="sm"
                     key={hour.date}
-                    className={`min-w-[86px] snap-start rounded-[18px] border p-3 text-center ${active ? "border-accent/60 bg-accent/[0.12]" : "border-white/[0.07] bg-surface-strong"}`}
+                    className={`min-w-[86px] snap-start text-center ${active ? "border-accent/60 bg-accent/[0.12]" : ""}`}
                   >
                     <p className="text-xs font-semibold text-muted">
                       {formatTime(hour.date, skyWindow.timezone)}
@@ -195,7 +198,7 @@ export default function TonightPage() {
                     <p className="mt-2 text-[0.65rem] text-faint">
                       ☁ {Math.round(hour.cloudCover)}%
                     </p>
-                  </article>
+                  </AppCard>
                 );
               })}
             </div>
@@ -233,12 +236,14 @@ export default function TonightPage() {
       )}
 
       {notice ? (
-        <p
-          className="mt-4 rounded-[16px] border border-warning/20 bg-warning/[0.06] p-3 text-sm leading-5 text-muted"
+        <AppCard
+          variant="subtle"
+          padding="sm"
+          className="mt-4 border-warning/20 bg-warning/[0.06] text-sm leading-5 text-muted"
           role="status"
         >
-          {notice}
-        </p>
+          <p>{notice}</p>
+        </AppCard>
       ) : null}
       <AppButton fullWidth className="mt-4" isLoading={isLoading} onClick={() => void calculate()}>
         {skyWindow ? "Actualiser mon créneau" : "Calculer ma soirée"}

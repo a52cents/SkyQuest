@@ -35,7 +35,7 @@ export function ProgressDashboard({ profile }: { profile: ProgressProfile }) {
 
   return (
     <div className="grid gap-4">
-      <AppCard className="overflow-hidden border-accent/20 bg-[radial-gradient(circle_at_100%_0%,rgba(124,92,255,0.12),transparent_48%),#161619]">
+      <AppCard className="overflow-hidden border-accent/20 bg-surface-strong bg-[radial-gradient(circle_at_100%_0%,color-mix(in_srgb,var(--accent)_12%,transparent),transparent_48%)]">
         <p className="premium-kicker">Ma progression</p>
         <div className="mt-3 flex items-end justify-between gap-4">
           <div>
@@ -50,7 +50,7 @@ export function ProgressDashboard({ profile }: { profile: ProgressProfile }) {
         </div>
         <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-white/[0.07]">
           <motion.div
-            className="h-full rounded-full bg-accent shadow-[0_0_14px_rgba(124,92,255,0.35)]"
+            className="h-full rounded-full bg-accent shadow-[0_0_14px_color-mix(in_srgb,var(--accent)_35%,transparent)]"
             initial={prefersReducedMotion ? false : { width: 0 }}
             animate={{ width: `${rank.progressPercent}%` }}
             transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.8, ease: "easeOut" }}
@@ -58,7 +58,7 @@ export function ProgressDashboard({ profile }: { profile: ProgressProfile }) {
         </div>
         <p className="mt-2 text-xs text-faint">
           {rank.next
-            ? `${rank.xpToNext} Éclats avant ${rank.next.name}`
+            ? `${rank.xpToNext} Éclats d’étoile avant ${rank.next.name}`
             : "Tous les rangs symboliques sont atteints."}
         </p>
       </AppCard>
@@ -98,7 +98,7 @@ export function ProgressDashboard({ profile }: { profile: ProgressProfile }) {
         </motion.div>
       </AppCard>
 
-      <AppCard as="section" className="border-white/[0.06] bg-[#161619]">
+      <AppCard as="section" variant="solid">
         <p className="premium-kicker">Série en cours</p>
         <div className="mt-3 flex items-start justify-between gap-4">
           <div>

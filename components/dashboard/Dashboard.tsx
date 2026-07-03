@@ -17,6 +17,8 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
+import { AppButton } from "@/components/AppButton";
+import { AppCard, getAppCardClassName } from "@/components/AppCard";
 import { fetchAirQualityNow, getAirTransparencyEstimate } from "@/lib/air-quality";
 import { AppHeader } from "@/components/AppHeader";
 import { BestSkyWindowCard } from "@/components/BestSkyWindowCard";
@@ -176,7 +178,11 @@ function QuestCard({
       }
       whileHover={prefersReducedMotion || locked ? undefined : { scale: 1.02, y: -2 }}
       whileTap={prefersReducedMotion || locked ? undefined : { scale: 0.99 }}
-      className={`quest-card ${locked ? "locked" : ""}`}
+      className={getAppCardClassName({
+        variant: "solid",
+        padding: "lg",
+        className: `quest-card ${locked ? "locked" : ""}`,
+      })}
       onClick={() => {
         if (!locked) onStart(quest);
       }}
@@ -222,9 +228,10 @@ function QuestCard({
       </div>
       <div className="quest-action">
         <span className="quest-hint">{quest.tip}</span>
-        <button
-          type="button"
-          className="quest-btn"
+        <AppButton
+          size="sm"
+          className="shrink-0 gap-1.5"
+          hapticFeedback={false}
           disabled={locked}
           onClick={(event) => {
             event.stopPropagation();
@@ -232,10 +239,13 @@ function QuestCard({
           }}
         >
           {locked ? "Actualise d'abord" : "Guider"}
-          <svg viewBox="0 0 24 24">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-3.5 w-3.5 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]"
+          >
             <path d="M5 12h14M13 6l6 6-6 6" />
           </svg>
-        </button>
+        </AppButton>
       </div>
     </motion.article>
   );
@@ -509,14 +519,14 @@ export function Dashboard() {
         animate="visible"
       >
         <MotionBlock className="conditions-bar">
-          <div className="condition-item">
+          <AppCard variant="solid" padding="none" className="condition-item">
             <svg className="condition-icon" viewBox="0 0 24 24">
               <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
             </svg>
             <AnimatedValue value={weather ? `${Math.round(weather.cloudCover)}%` : "—"} />
             <div className="condition-label">Nuages</div>
-          </div>
-          <div className="condition-item">
+          </AppCard>
+          <AppCard variant="solid" padding="none" className="condition-item">
             <svg className="condition-icon" viewBox="0 0 24 24">
               <path d="M12 2L2 7l10 5 10-5-10-5z" />
               <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
@@ -525,8 +535,8 @@ export function Dashboard() {
               value={averageVisibility === null ? "—" : `${Math.round(averageVisibility / 10)}/10`}
             />
             <div className="condition-label">Visibilité</div>
-          </div>
-          <div className="condition-item">
+          </AppCard>
+          <AppCard variant="solid" padding="none" className="condition-item">
             <svg className="condition-icon" viewBox="0 0 24 24">
               <path d="M14 14.76V3.5a2 2 0 0 0-4 0v11.26a4 4 0 1 0 4 0z" />
             </svg>
@@ -538,18 +548,24 @@ export function Dashboard() {
               }
             />
             <div className="condition-label">Temp.</div>
-          </div>
-          <div className="condition-item">
+          </AppCard>
+          <AppCard variant="solid" padding="none" className="condition-item">
             <svg className="condition-icon" viewBox="0 0 24 24">
               <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" />
             </svg>
             <AnimatedValue value={loadState === "ready" ? String(guidableQuests.length) : "—"} />
             <div className="condition-label">Cibles</div>
-          </div>
+          </AppCard>
         </MotionBlock>
 
         <MotionBlock className="sky-insights-disclosure">
-          <details className="sky-insights-details">
+          <details
+            className={getAppCardClassName({
+              variant: "subtle",
+              padding: "none",
+              className: "sky-insights-details",
+            })}
+          >
             <summary>
               <span className="sky-insights-summary-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24">
@@ -577,7 +593,7 @@ export function Dashboard() {
               </section>
 
               {lightPollution ? (
-                <section className="sky-quality-card">
+                <AppCard as="section" variant="subtle" padding="sm" className="sky-quality-card">
                   <svg className="sky-quality-icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" />
                     <path d="M18 3v3m-1.5-1.5h3M5 5v2M4 6h2" />
@@ -607,9 +623,15 @@ export function Dashboard() {
                       </div>
                     ) : null}
                   </div>
-                </section>
+                </AppCard>
               ) : (
-                <p className="sky-quality-placeholder">
+                <p
+                  className={getAppCardClassName({
+                    variant: "subtle",
+                    padding: "sm",
+                    className: "sky-quality-placeholder",
+                  })}
+                >
                   Lance « Maintenant » pour estimer la qualité du ciel autour de toi.
                 </p>
               )}
@@ -618,7 +640,13 @@ export function Dashboard() {
         </MotionBlock>
 
         {analysisDateLabel ? (
-          <MotionBlock className={`analysis-banner ${isGuidanceUnlocked ? "current" : "stale"}`}>
+          <MotionBlock
+            className={getAppCardClassName({
+              variant: "subtle",
+              padding: "sm",
+              className: `analysis-banner ${isGuidanceUnlocked ? "current" : "stale"}`,
+            })}
+          >
             <div>
               <strong>{isGuidanceUnlocked ? "Analyse actuelle" : "Dernière analyse"}</strong>
               <span>{analysisDateLabel}</span>
@@ -637,7 +665,11 @@ export function Dashboard() {
           {notice ? (
             <motion.div
               key={notice}
-              className="dashboard-notice"
+              className={getAppCardClassName({
+                variant: "subtle",
+                padding: "sm",
+                className: "dashboard-notice",
+              })}
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
@@ -647,7 +679,13 @@ export function Dashboard() {
           ) : null}
         </AnimatePresence>
 
-        <MotionBlock className="camera-guide">
+        <MotionBlock
+          className={getAppCardClassName({
+            variant: "solid",
+            padding: "lg",
+            className: "camera-guide",
+          })}
+        >
           <div className="camera-guide-inner">
             <motion.div
               className="camera-icon"
@@ -656,9 +694,9 @@ export function Dashboard() {
                   ? undefined
                   : {
                       boxShadow: [
-                        "0 0 0 rgba(124,92,255,0)",
-                        "0 0 28px rgba(124,92,255,.22)",
-                        "0 0 0 rgba(124,92,255,0)",
+                        "0 0 0 color-mix(in srgb, var(--accent) 0%, transparent)",
+                        "0 0 28px color-mix(in srgb, var(--accent) 22%, transparent)",
+                        "0 0 0 color-mix(in srgb, var(--accent) 0%, transparent)",
                       ],
                     }
               }
@@ -683,15 +721,17 @@ export function Dashboard() {
                   ? "Une ancienne analyse est disponible ci-dessous, mais le ciel peut avoir changé depuis."
                   : "Autorise la position pour estimer les cibles à tenter et préparer tes quêtes."}
             </p>
-            <motion.button
-              type="button"
-              className="camera-btn"
+            <AppButton
+              size="lg"
+              className="gap-2"
+              hapticFeedback={false}
+              isLoading={loadState === "loading" || isLocationLoading}
               onClick={() => void handleRefreshRequest()}
-              disabled={loadState === "loading" || isLocationLoading}
-              whileHover={prefersReducedMotion ? undefined : { y: -2 }}
-              whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
             >
-              <svg viewBox="0 0 24 24">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4 fill-none stroke-current stroke-2 [stroke-linecap:round]"
+              >
                 <circle cx="12" cy="12" r="4" />
                 <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2" />
               </svg>
@@ -700,12 +740,14 @@ export function Dashboard() {
                 : loadState === "loading"
                   ? "Lecture du ciel…"
                   : "Maintenant"}
-            </motion.button>
+            </AppButton>
           </div>
         </MotionBlock>
 
         <MotionBlock className="section-header">
-          <h2 className="section-title">Quêtes du soir</h2>
+          <h2 className="section-title">
+            {weather?.isDay ? "À observer maintenant" : "Quêtes du soir"}
+          </h2>
           <span className={`status-pill ${loadState === "loading" ? "loading" : ""}`}>
             <span className="dot" />
             {loadState === "loading" ? "Calcul…" : conditionsLabel}
@@ -726,7 +768,13 @@ export function Dashboard() {
           </AnimatePresence>
         </motion.div>
         {loadState === "idle" ? (
-          <MotionBlock className="empty-state">
+          <MotionBlock
+            className={getAppCardClassName({
+              variant: "subtle",
+              padding: "lg",
+              className: "empty-state py-12",
+            })}
+          >
             <svg viewBox="0 0 24 24">
               <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" />
             </svg>

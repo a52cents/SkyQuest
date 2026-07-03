@@ -11,17 +11,19 @@ type AppButtonProps = Omit<HTMLMotionProps<"button">, "ref"> & {
   size?: AppButtonSize;
   fullWidth?: boolean;
   isLoading?: boolean;
+  hapticFeedback?: boolean;
 };
 
 const baseClasses = [
   "inline-flex items-center justify-center rounded-full border font-semibold tracking-[-0.01em]",
   "transition-[transform,background-color,border-color,box-shadow,color] duration-200 ease-brand-out active:scale-[0.985]",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
   "disabled:cursor-not-allowed disabled:opacity-70",
 ].join(" ");
 
 const variantClasses: Record<AppButtonVariant, string> = {
   primary:
-    "border-white/10 bg-accent px-5 text-white shadow-[0_4px_20px_rgba(124,92,255,0.30)] hover:-translate-y-px hover:bg-brand-primary-hover",
+    "border-white/10 bg-accent text-white shadow-[0_4px_20px_color-mix(in_srgb,var(--accent)_30%,transparent)] hover:-translate-y-px hover:bg-brand-primary-hover",
   secondary: "border-white/[0.14] bg-transparent text-text hover:bg-surface",
   ghost:
     "border-white/[0.10] bg-white/[0.035] text-text hover:border-white/[0.18] hover:bg-white/[0.06]",
@@ -64,6 +66,7 @@ export function AppButton({
   size = "md",
   fullWidth = false,
   isLoading = false,
+  hapticFeedback = true,
   disabled,
   className,
   children,
@@ -72,7 +75,7 @@ export function AppButton({
 }: AppButtonProps) {
   const handleClick = props.onClick
     ? (event: MouseEvent<HTMLButtonElement>) => {
-        haptic("tap");
+        if (hapticFeedback) haptic("tap");
         props.onClick?.(event);
       }
     : undefined;

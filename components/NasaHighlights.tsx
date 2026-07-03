@@ -57,7 +57,7 @@ export function NasaHighlights() {
       <AppCard variant="subtle" padding="sm">
         <p className="text-sm font-medium text-text">Les nouvelles spatiales font une pause.</p>
         <p className="mt-1 text-xs leading-5 text-muted">
-          Le catalogue du ciel reste disponible juste en dessous. Réessaie un peu plus tard.
+          Le catalogue du ciel reste disponible juste au-dessus. Réessaie un peu plus tard.
         </p>
       </AppCard>
     );

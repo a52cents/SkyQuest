@@ -98,9 +98,9 @@ export function HapticsToggle() {
       className={
         isSupported
           ? isEnabled
-            ? "inline-flex h-10 items-center gap-2 rounded-[13px] border border-accent/30 bg-accent/10 px-3 text-sm font-semibold text-accent transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-accent/45 hover:bg-accent/14 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            : "inline-flex h-10 items-center gap-2 rounded-[13px] border border-white/10 bg-white/[0.045] px-3 text-sm font-semibold text-muted transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-white/20 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          : "inline-flex h-10 items-center gap-2 rounded-[13px] border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-muted opacity-55"
+            ? "inline-flex h-11 items-center gap-2 rounded-brand border border-accent/30 bg-accent/10 px-3 text-sm font-semibold text-accent transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-accent/45 hover:bg-accent/14 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            : "inline-flex h-11 items-center gap-2 rounded-brand border border-white/10 bg-white/[0.045] px-3 text-sm font-semibold text-muted transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-white/20 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          : "inline-flex h-11 items-center gap-2 rounded-brand border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-muted opacity-55"
       }
     >
       <span className={isSupported ? (isEnabled ? "text-accent" : "text-muted") : "text-muted"}>

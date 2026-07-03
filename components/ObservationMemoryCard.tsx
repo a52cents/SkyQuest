@@ -107,7 +107,7 @@ export function ObservationMemoryCard({ observation, onClose }: ObservationMemor
   return (
     <AppCard
       as="section"
-      className="overflow-hidden border-accent/25 bg-[radial-gradient(circle_at_100%_0%,rgba(124,92,255,0.16),transparent_42%),#131316]"
+      className="overflow-hidden border-accent/25 bg-surface bg-[radial-gradient(circle_at_100%_0%,color-mix(in_srgb,var(--accent)_16%,transparent),transparent_42%)]"
       padding="sm"
       aria-label="Carte souvenir de l’observation"
     >
@@ -119,14 +119,15 @@ export function ObservationMemoryCard({ observation, onClose }: ObservationMemor
           </h2>
         </div>
         {onClose ? (
-          <button
-            type="button"
+          <AppButton
+            variant="ghost"
+            size="sm"
             onClick={onClose}
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-lg text-muted"
+            className="h-11 w-11 px-0 text-lg text-muted"
             aria-label="Fermer la carte"
           >
             ×
-          </button>
+          </AppButton>
         ) : null}
       </div>
 
@@ -146,7 +147,7 @@ export function ObservationMemoryCard({ observation, onClose }: ObservationMemor
         {badges.map((badge) => (
           <span
             key={badge}
-            className="rounded-full border border-accent/25 bg-accent/[0.1] px-3 py-1 text-xs font-bold text-[#c9c4ff]"
+            className="rounded-full border border-accent/25 bg-accent/[0.1] px-3 py-1 text-xs font-bold text-accent-cyan"
           >
             ✦ {badge}
           </span>

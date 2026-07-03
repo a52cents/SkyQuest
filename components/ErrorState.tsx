@@ -12,6 +12,9 @@ export function ErrorState({ message, tone = "error" }: ErrorStateProps) {
         : "border-danger/25 bg-danger/10 text-danger";
 
   return (
-    <div className={`mb-4 rounded-[16px] border p-4 text-sm leading-6 ${color}`}>{message}</div>
+    <AppCard variant="subtle" padding="sm" className={`mb-4 text-sm leading-6 ${color}`}>
+      {message}
+    </AppCard>
   );
 }
+import { AppCard } from "@/components/AppCard";

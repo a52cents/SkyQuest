@@ -48,7 +48,7 @@ export default function JournalPage() {
       <AnimatePresence>
         {confirmation ? (
           <motion.div
-            className="fixed inset-0 z-[70] flex items-end justify-center bg-[#0a0a0b]/85 p-3 backdrop-blur-xl sm:items-center"
+            className="fixed inset-0 z-[70] flex items-end justify-center bg-background/85 p-3 backdrop-blur-xl sm:items-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

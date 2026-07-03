@@ -21,7 +21,7 @@ const PRIVACY_POINTS = [
 
 function PromiseIllustration() {
   return (
-    <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-accent/20 bg-accent/[0.08] shadow-[0_0_44px_rgba(124,92,255,0.16)]">
+    <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-accent/20 bg-accent/[0.08] shadow-[0_0_44px_color-mix(in_srgb,var(--accent)_16%,transparent)]">
       <span className="absolute top-5 left-4 h-1.5 w-1.5 rounded-full bg-accent-cyan" />
       <span className="absolute top-4 right-5 h-1 w-1 rounded-full bg-white/70" />
       <span className="absolute right-3 bottom-5 h-1.5 w-1.5 rounded-full bg-accent" />
@@ -98,13 +98,13 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-[60] overflow-hidden bg-[#0a0a0b]"
+      className="fixed inset-0 z-[60] overflow-hidden bg-background"
       role="dialog"
       aria-modal="true"
       aria-labelledby="onboarding-title"
     >
       <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_12%,rgba(124,92,255,0.11),transparent_38%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_12%,color-mix(in_srgb,var(--accent)_11%,transparent),transparent_38%)]"
         aria-hidden="true"
       />
       <div className="relative z-10 mx-auto grid h-[100dvh] w-full max-w-md grid-rows-[auto_minmax(0,1fr)_auto] px-5 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -212,7 +212,7 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
           </AnimatePresence>
         </main>
 
-        <footer className="relative z-10 border-t border-white/[0.06] bg-[#0a0a0b]/95 pt-4">
+        <footer className="relative z-10 border-t border-white/[0.06] bg-background/95 pt-4">
           <div className="mb-4 flex items-center justify-between gap-4">
             <span className="text-xs font-semibold tracking-[0.12em] text-muted uppercase">
               Étape {step} sur 2

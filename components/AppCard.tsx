@@ -1,7 +1,7 @@
 import type { HTMLAttributes } from "react";
 
 type AppCardVariant = "glass" | "solid" | "subtle";
-type AppCardPadding = "sm" | "md" | "lg";
+type AppCardPadding = "none" | "sm" | "md" | "lg";
 type AppCardElement = "div" | "article" | "section";
 
 type AppCardProps = HTMLAttributes<HTMLElement> & {
@@ -17,6 +17,7 @@ const variantClasses: Record<AppCardVariant, string> = {
 };
 
 const paddingClasses: Record<AppCardPadding, string> = {
+  none: "",
   sm: "p-4",
   md: "p-5",
   lg: "p-6 sm:p-8",
@@ -24,6 +25,23 @@ const paddingClasses: Record<AppCardPadding, string> = {
 
 function joinClasses(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
+}
+
+export function getAppCardClassName({
+  variant = "glass",
+  padding = "md",
+  className,
+}: {
+  variant?: AppCardVariant;
+  padding?: AppCardPadding;
+  className?: string;
+} = {}) {
+  return joinClasses(
+    "rounded-brand-lg",
+    variantClasses[variant],
+    paddingClasses[padding],
+    className,
+  );
 }
 
 export function AppCard({
@@ -35,15 +53,7 @@ export function AppCard({
   ...props
 }: AppCardProps) {
   return (
-    <Component
-      className={joinClasses(
-        "rounded-[20px]",
-        variantClasses[variant],
-        paddingClasses[padding],
-        className,
-      )}
-      {...props}
-    >
+    <Component className={getAppCardClassName({ variant, padding, className })} {...props}>
       {children}
     </Component>
   );

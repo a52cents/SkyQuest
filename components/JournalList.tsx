@@ -80,7 +80,7 @@ export function JournalList({ observations, onClear }: JournalListProps) {
     <div className="grid gap-4">
       {memoryObservation ? (
         <div
-          className="fixed inset-0 z-[70] overflow-y-auto bg-[#0a0a0b]/95 p-3 backdrop-blur-xl"
+          className="fixed inset-0 z-[70] overflow-y-auto bg-background/95 p-3 backdrop-blur-xl"
           role="dialog"
           aria-modal="true"
           aria-label="Carte souvenir"
@@ -154,7 +154,7 @@ export function JournalList({ observations, onClear }: JournalListProps) {
                       type="button"
                       variants={itemVariants}
                       onClick={() => setMemoryObservation(observation)}
-                      className="group relative aspect-[4/5] overflow-hidden rounded-[18px] border border-white/[0.1] bg-[radial-gradient(circle_at_70%_15%,rgba(124,92,255,0.36),transparent_35%),#10131d] text-left shadow-[0_12px_32px_rgba(0,0,0,0.25)]"
+                      className="group relative aspect-[4/5] overflow-hidden rounded-[18px] border border-white/[0.1] bg-surface-strong bg-[radial-gradient(circle_at_70%_15%,color-mix(in_srgb,var(--accent)_36%,transparent),transparent_35%)] text-left shadow-[0_12px_32px_rgba(0,0,0,0.25)]"
                       aria-label={`Ouvrir la carte de ${getObservationTargetLabel(observation)}`}
                     >
                       {thumbnailUrls[observation.id] ? (
@@ -232,20 +232,21 @@ export function JournalList({ observations, onClear }: JournalListProps) {
                         {observation.visibilityScore}/100
                       </span>
                       {typeof observation.xpEarned === "number" ? (
-                        <span className="rounded-md bg-accent/[0.09] px-2 py-1 text-[#bdb7ff]">
-                          +{observation.xpEarned} Éclats
+                        <span className="rounded-md bg-accent/[0.09] px-2 py-1 text-accent-cyan">
+                          +{observation.xpEarned} Éclats d’étoile
                         </span>
                       ) : null}
                     </div>
                   </div>
                   {observation.status === "seen" ? (
-                    <button
-                      type="button"
+                    <AppButton
+                      variant="secondary"
+                      size="sm"
                       onClick={() => setMemoryObservation(observation)}
-                      className="min-h-11 shrink-0 rounded-full border border-accent/25 bg-accent/[0.09] px-3 text-xs font-bold text-[#c9c4ff]"
+                      className="shrink-0 border-accent/25 bg-accent/[0.09] text-xs text-accent-cyan"
                     >
                       Carte
-                    </button>
+                    </AppButton>
                   ) : null}
                 </div>
               </AppCard>

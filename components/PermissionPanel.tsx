@@ -8,7 +8,7 @@ const permissions = [
 
 export function PermissionPanel() {
   return (
-    <AppCard variant="subtle" className="mt-4 rounded-[20px]" padding="sm">
+    <AppCard variant="subtle" className="mt-4" padding="sm">
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm font-semibold text-text">Accès utilisés à la demande</p>
         <span className="text-xs text-faint">Rien en arrière-plan</span>

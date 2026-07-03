@@ -89,7 +89,7 @@ export function ProgressFeedback({
         }
       >
         <AppCard
-          className="border-accent/25 bg-[radial-gradient(circle_at_100%_0%,rgba(124,92,255,0.14),transparent_48%),#161619]"
+          className="border-accent/25 bg-surface-strong bg-[radial-gradient(circle_at_100%_0%,color-mix(in_srgb,var(--accent)_14%,transparent),transparent_48%)]"
           aria-live="polite"
         >
           <p className="premium-kicker">Progression enregistrée</p>
@@ -117,12 +117,14 @@ export function ProgressFeedback({
             <div className="flex justify-between gap-3 text-xs text-muted">
               <span>{rank.current.name}</span>
               <span>
-                {rank.next ? `${rank.xpToNext} Éclats avant ${rank.next.name}` : "Rang maximal"}
+                {rank.next
+                  ? `${rank.xpToNext} Éclats d’étoile avant ${rank.next.name}`
+                  : "Rang maximal"}
               </span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.07]">
               <motion.div
-                className="h-full rounded-full bg-accent shadow-[0_0_14px_rgba(124,92,255,0.35)]"
+                className="h-full rounded-full bg-accent shadow-[0_0_14px_color-mix(in_srgb,var(--accent)_35%,transparent)]"
                 initial={prefersReducedMotion ? false : { width: 0 }}
                 animate={{ width: `${rank.progressPercent}%` }}
                 transition={

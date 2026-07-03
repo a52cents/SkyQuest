@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { getAppButtonClassName } from "@/components/AppButton";
+import { AppButton, getAppButtonClassName } from "@/components/AppButton";
 import { NightModeToggle } from "@/components/NightModeToggle";
 import type { SkyQuest } from "@/lib/types";
 import { getGearLabel } from "./camera-utils";
@@ -45,13 +45,14 @@ export function CameraHud({
             {quest.title}
           </h1>
           <div className="ml-auto flex items-center gap-2">
-            <button
-              type="button"
+            <AppButton
+              variant="ghost"
+              size="sm"
               onClick={onOpenDetails}
-              className="h-10 rounded-[13px] border border-white/10 bg-white/[0.06] px-3 text-sm font-semibold text-white"
+              className="h-10 min-h-0 border-white/10 bg-white/[0.06] px-3 text-white"
             >
               Détails
-            </button>
+            </AppButton>
             <NightModeToggle />
           </div>
         </header>

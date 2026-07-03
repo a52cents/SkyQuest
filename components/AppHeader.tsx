@@ -21,7 +21,7 @@ export function AppHeader({ eyebrow, title, action, className }: AppHeaderProps)
   return (
     <header
       className={joinClasses(
-        "sticky top-0 z-30 border-b border-white/[0.06] bg-[#0a0a0b]/85 pb-4 pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-[24px]",
+        "sticky top-0 z-30 border-b border-white/[0.06] bg-background/85 pb-4 pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] pt-[max(1rem,env(safe-area-inset-top))] backdrop-blur-[24px]",
         className,
       )}
     >
@@ -40,7 +40,7 @@ export function AppHeader({ eyebrow, title, action, className }: AppHeaderProps)
               <>
                 <p className="premium-kicker truncate">{eyebrow ?? "SkyQuest"}</p>
                 {title ? (
-                  <h1 className="mt-0.5 truncate font-[Georgia,'Times_New_Roman',serif] text-[1.55rem] font-normal tracking-[-0.03em] text-white">
+                  <h1 className="mt-0.5 truncate font-[Georgia,'Times_New_Roman',serif] text-[1.55rem] font-normal tracking-[-0.03em] text-text">
                     {title}
                   </h1>
                 ) : null}
@@ -55,7 +55,7 @@ export function AppHeader({ eyebrow, title, action, className }: AppHeaderProps)
           <details className="group relative">
             <summary
               aria-label="Ouvrir le profil et les réglages"
-              className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-[13px] border border-white/10 bg-white/[0.045] text-muted transition-colors marker:hidden hover:border-accent/40 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden"
+              className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-brand border border-white/10 bg-white/[0.045] text-muted transition-colors marker:hidden hover:border-accent/40 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -66,7 +66,7 @@ export function AppHeader({ eyebrow, title, action, className }: AppHeaderProps)
                 <path d="M5 20a7 7 0 0 1 14 0" />
               </svg>
             </summary>
-            <div className="absolute top-12 right-0 z-50 w-64 rounded-[18px] border border-white/10 bg-[#111218]/95 p-3 shadow-2xl backdrop-blur-xl">
+            <div className="absolute top-13 right-0 z-50 w-64 rounded-brand-lg border border-white/10 bg-surface-strong/95 p-3 shadow-2xl backdrop-blur-xl">
               <p className="px-2 pb-2 text-[0.68rem] font-semibold tracking-[0.1em] text-faint uppercase">
                 Profil et réglages
               </p>

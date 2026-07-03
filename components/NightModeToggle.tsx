@@ -88,8 +88,8 @@ export function NightModeToggle() {
       aria-label="Activer le mode observation (préserve la vision de nuit)"
       className={
         enabled
-          ? "inline-flex h-10 items-center gap-2 rounded-[13px] border border-danger/30 bg-danger/12 px-3 text-sm font-semibold text-danger transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-danger/40 hover:bg-danger/16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          : "inline-flex h-10 items-center gap-2 rounded-[13px] border border-white/10 bg-white/[0.045] px-3 text-sm font-semibold text-muted transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-white/20 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          ? "inline-flex h-11 items-center gap-2 rounded-brand border border-danger/30 bg-danger/12 px-3 text-sm font-semibold text-danger transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-danger/40 hover:bg-danger/16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          : "inline-flex h-11 items-center gap-2 rounded-brand border border-white/10 bg-white/[0.045] px-3 text-sm font-semibold text-muted transition-[background-color,border-color,color,box-shadow,transform] duration-200 hover:-translate-y-px hover:border-white/20 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       }
     >
       <span className={enabled ? "text-danger" : "text-muted"}>

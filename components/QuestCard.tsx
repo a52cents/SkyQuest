@@ -93,7 +93,7 @@ export function QuestCard({ quest, onStart, onSeen, onMissed, layout }: QuestCar
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-5 rounded-[12px] border border-white/[0.06] bg-[#131316] p-4 sm:grid-cols-3">
+        <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-5 rounded-brand border border-white/[0.06] bg-surface p-4 sm:grid-cols-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-faint">Direction</p>
             <p className="mt-1 text-base font-semibold text-white">
