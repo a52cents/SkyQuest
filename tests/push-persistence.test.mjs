@@ -46,7 +46,16 @@ test("test pushes use the same atomic hourly limit as scheduled pushes", () => {
 
 test("scheduled opportunities are restricted to 19:00 through 03:59 local time", () => {
   assert.match(cronRouteSource, /localHour >= 19 \|\| localHour < 4/);
-  assert.match(cronRouteSource, /if \(!isNotificationWindow\) return null/);
+  assert.match(cronRouteSource, /diagnostics\.reason = "outside_notification_window"/);
+});
+
+test("scheduled push logs explain skipped notifications and executed calculations", () => {
+  assert.match(cronRouteSource, /calculations: \{\} as Partial<Record<CalculationName, number>>/);
+  assert.match(cronRouteSource, /reasons: \{\} as Record<string, number>/);
+  assert.match(cronRouteSource, /diagnostics\.reason = "missing_location"/);
+  assert.match(cronRouteSource, /diagnostics\.reason = "daylight"/);
+  assert.match(cronRouteSource, /diagnostics\.reason = "cloud_cover_too_high"/);
+  assert.match(cronRouteSource, /"hourly_slot_already_claimed"/);
 });
 
 test("scheduled clear-sky alerts can announce an approaching best window", () => {

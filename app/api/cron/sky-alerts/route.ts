@@ -22,6 +22,27 @@ const PLANET_NAMES: Record<string, string> = {
   Mars: "Mars",
 };
 
+type CalculationName =
+  | "celestial_events"
+  | "weather"
+  | "forecast_requested"
+  | "forecast_available"
+  | "astronomy";
+
+type NoOpportunityReason =
+  | "missing_location"
+  | "invalid_timezone"
+  | "outside_notification_window"
+  | "daylight"
+  | "cloud_cover_too_high"
+  | "no_enabled_topics"
+  | "no_matching_opportunity";
+
+type OpportunityDiagnostics = {
+  calculations: CalculationName[];
+  reason?: NoOpportunityReason;
+};
+
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
   return Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`);
@@ -43,15 +64,27 @@ function getLocalHour(date: Date, timezone?: string): number | null {
 async function createOpportunity(
   subscription: StoredPushSubscription,
   now: Date,
+  diagnostics: OpportunityDiagnostics,
 ): Promise<SkyQuestPushPayload | null> {
   const latitude = subscription.latitudeRounded;
   const longitude = subscription.longitudeRounded;
-  if (latitude === undefined || longitude === undefined) return null;
+  if (latitude === undefined || longitude === undefined) {
+    diagnostics.reason = "missing_location";
+    return null;
+  }
 
   const localHour = getLocalHour(now, subscription.timezone);
+  if (localHour === null) {
+    diagnostics.reason = "invalid_timezone";
+    return null;
+  }
   const isNotificationWindow = localHour !== null && (localHour >= 19 || localHour < 4);
-  if (!isNotificationWindow) return null;
+  if (!isNotificationWindow) {
+    diagnostics.reason = "outside_notification_window";
+    return null;
+  }
 
+  diagnostics.calculations.push("celestial_events");
   const rareEvent = subscription.topics.includes("celestial_event")
     ? getUpcomingCelestialEvents(now, 1)[0]
     : undefined;
@@ -65,6 +98,10 @@ async function createOpportunity(
     };
   }
 
+  diagnostics.calculations.push("weather");
+  if (subscription.topics.includes("clear_sky_evening")) {
+    diagnostics.calculations.push("forecast_requested");
+  }
   const [weather, forecast] = await Promise.all([
     fetchWeatherNow(latitude, longitude),
     subscription.topics.includes("clear_sky_evening")
@@ -73,6 +110,7 @@ async function createOpportunity(
   ]);
 
   if (forecast) {
+    diagnostics.calculations.push("forecast_available");
     const skyWindow = calculateBestSkyWindow({ latitude, longitude, forecast, now });
     const minutesUntilWindow = Math.round(
       (new Date(skyWindow.startsAt).getTime() - now.getTime()) / 60_000,
@@ -91,8 +129,16 @@ async function createOpportunity(
     }
   }
 
-  if (weather.isDay || weather.cloudCover > 65) return null;
+  if (weather.isDay) {
+    diagnostics.reason = "daylight";
+    return null;
+  }
+  if (weather.cloudCover > 65) {
+    diagnostics.reason = "cloud_cover_too_high";
+    return null;
+  }
 
+  diagnostics.calculations.push("astronomy");
   const skyObjects = getSkyObjects(latitude, longitude, now);
   const planet = skyObjects
     .filter((object) => object.name !== "Moon" && object.altitude >= 15)
@@ -137,6 +183,8 @@ async function createOpportunity(
       data: { type: "daily_mission" },
     };
   }
+  diagnostics.reason =
+    subscription.topics.length === 0 ? "no_enabled_topics" : "no_matching_opportunity";
   return null;
 }
 
@@ -154,21 +202,56 @@ export async function GET(request: Request) {
   } catch {
     return NextResponse.json({ error: "Stockage push indisponible." }, { status: 503 });
   }
-  const totals = { checked: eligible.length, opportunities: 0, sent: 0, failed: 0, expired: 0 };
+  const totals = {
+    checked: eligible.length,
+    opportunities: 0,
+    sent: 0,
+    failed: 0,
+    expired: 0,
+    calculations: {} as Partial<Record<CalculationName, number>>,
+    reasons: {} as Record<string, number>,
+  };
+
+  const increment = (counters: Record<string, number>, name: string, amount = 1) => {
+    counters[name] = (counters[name] ?? 0) + amount;
+  };
 
   for (const subscription of eligible) {
+    const diagnostics: OpportunityDiagnostics = { calculations: [] };
+    let calculationsRecorded = false;
+    let phase: "evaluation" | "hourly_claim" | "delivery" = "evaluation";
+    const recordCalculations = () => {
+      if (calculationsRecorded) return;
+      for (const calculation of diagnostics.calculations) {
+        increment(totals.calculations, calculation);
+      }
+      calculationsRecorded = true;
+    };
     try {
-      const payload = await createOpportunity(subscription, now);
-      if (!payload) continue;
+      const payload = await createOpportunity(subscription, now, diagnostics);
+      recordCalculations();
+      if (!payload) {
+        increment(totals.reasons, diagnostics.reason ?? "unknown");
+        continue;
+      }
       // This atomic database claim prevents overlapping cron runs from sending twice this hour.
-      if (!(await claimHourlyPushSlot(subscription.endpoint, now))) continue;
+      phase = "hourly_claim";
+      if (!(await claimHourlyPushSlot(subscription.endpoint, now))) {
+        increment(totals.reasons, "hourly_slot_already_claimed");
+        continue;
+      }
       totals.opportunities += 1;
+      phase = "delivery";
       const result = await sendPushToMany([subscription], payload);
       totals.sent += result.sent;
       totals.failed += result.failed;
       totals.expired += result.expired;
+      if (result.failed > 0) increment(totals.reasons, "delivery_failed", result.failed);
+      if (result.expired > 0) increment(totals.reasons, "subscription_expired", result.expired);
     } catch {
+      recordCalculations();
       totals.failed += 1;
+      increment(totals.reasons, `${phase}_error`);
     }
   }
 
