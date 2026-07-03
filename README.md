@@ -17,7 +17,7 @@ Le projet privilégie un parcours simple — **Maintenant → quoi regarder → 
 - journal, XP, rangs, séries et accomplissements stockés localement ;
 - mode nuit, retours haptiques, onboarding et prise en compte de la réduction des animations ;
 - manifest PWA et cache hors ligne simple de la coquille applicative.
-- alertes Web Push optionnelles, personnalisables et limitées à une par jour.
+- alertes Web Push optionnelles, personnalisables et évaluées chaque heure de 19 h à 3 h incluses.
 
 La racine `/` affiche la page de présentation dans un navigateur classique et le tableau de bord lorsque l'application est lancée en mode installé (`standalone`).
 

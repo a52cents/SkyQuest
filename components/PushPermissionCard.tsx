@@ -140,7 +140,7 @@ export function PushPermissionCard() {
             Active les alertes du ciel
           </h2>
           <p className="mt-2 mb-0 text-sm leading-relaxed text-muted">
-            Reçois une alerte rare quand la Lune, une planète ou une mission intéressante semble
+            Reçois une alerte utile quand la Lune, une planète ou une mission intéressante semble
             observable près de chez toi.
           </p>
         </div>

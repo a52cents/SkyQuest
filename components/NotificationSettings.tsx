@@ -46,7 +46,9 @@ export function NotificationSettings({
       <div className="mb-3 flex items-center justify-between gap-4">
         <div>
           <p className="m-0 font-semibold text-text">Alertes du ciel activées</p>
-          <p className="mt-1 mb-0 text-sm text-muted">Une alerte maximum par jour.</p>
+          <p className="mt-1 mb-0 text-sm text-muted">
+            Jusqu’à une alerte par heure, de 19 h à 3 h incluses.
+          </p>
         </div>
         <button
           type="button"

@@ -18,8 +18,13 @@ persistantes et dédupliquées par leur `endpoint` unique.
 La table a la RLS activée et aucune policy `anon` ou `authenticated`. C’est volontaire : le client
 web ne lit et n’écrit jamais `push_subscriptions`. Toutes les opérations passent par les routes
 Next.js avec la clé `service_role`, strictement serveur. La fonction SQL
-`claim_push_notification_slot` réserve atomiquement la fenêtre de 24 heures afin que deux crons
-concurrents ne puissent pas envoyer deux alertes.
+`claim_push_notification_slot` réserve atomiquement l’heure UTC courante afin que deux crons
+concurrents ne puissent pas envoyer deux alertes pendant la même heure. La limite quotidienne a été
+retirée : une subscription peut recevoir au maximum une alerte par heure entre 19 h et 3 h 59 dans
+son fuseau enregistré.
+
+Si la table existait déjà avec l’ancienne limite quotidienne, réexécuter le fichier SQL : le
+`create or replace function` mettra le verrou à jour sans supprimer les subscriptions.
 
 Les topics SQL utilisent les identifiants réels du code : `clear_sky_evening`, `moon_visible`,
 `planet_visible`, `celestial_event` et `daily_mission`.
@@ -98,8 +103,8 @@ Parcours local :
 7. Désactiver les alertes et vérifier que `enabled` passe à `false`.
 
 La route test est libre uniquement en développement. En production, elle exige toujours
-`Authorization: Bearer <PUSH_TEST_SECRET>`. Elle respecte également la limite globale de 24 heures
-et répond `429` si une notification a déjà été réservée pour cet abonnement.
+`Authorization: Bearer <PUSH_TEST_SECRET>`. Elle utilise le même verrou horaire et répond `429` si
+une notification a déjà été réservée pour cet abonnement pendant l’heure UTC courante.
 
 ## 5. Déployer sur Vercel
 
@@ -107,15 +112,43 @@ Dans **Project Settings → Environment Variables**, ajouter toutes les variable
 environnements concernés, puis redéployer. Les secrets ne doivent pas être cochés comme exposés au
 navigateur.
 
-`vercel.json` appelle `/api/cron/sky-alerts` une fois par jour à `17:00 UTC`. Cela correspond à
-`18:00` en France métropolitaine l’hiver et `19:00` l’été, donc à la fenêtre locale 17 h–23 h déjà
-contrôlée par le code. Cette fréquence est compatible avec le plan Vercel Hobby et convient au MVP
-France.
+`vercel.json` conserve un appel de secours une fois par jour à `18:00 UTC`, compatible avec Vercel
+Hobby. Pour obtenir le contrôle horaire demandé, utiliser un Cloudflare Worker avec le Cron Trigger
+suivant :
+
+```text
+0 0-2,17-23 * * *
+```
+
+Cette plage UTC couvre `19:00 → 03:59` en France aussi bien en heure d’hiver qu’en heure d’été. Le
+code serveur vérifie ensuite l’heure locale exacte de chaque subscription et ne traite rien hors de
+la plage 19 h–3 h 59.
+
+Le Worker Cloudflare peut appeler la route avec :
+
+```js
+export default {
+  async scheduled(_controller, env) {
+    const response = await fetch("https://sky-quest-psi.vercel.app/api/cron/sky-alerts", {
+      headers: { Authorization: `Bearer ${env.CRON_SECRET}` },
+    });
+
+    if (!response.ok) {
+      throw new Error(`SkyQuest cron failed: ${response.status}`);
+    }
+  },
+};
+```
+
+Ajouter `CRON_SECRET` comme secret chiffré Cloudflare avec exactement la même valeur que dans
+Vercel. Le déclencheur Vercel quotidien peut rester comme secours : le verrou SQL horaire empêche un
+double envoi s’il chevauche Cloudflare.
 
 Vercel envoie automatiquement `Authorization: Bearer <CRON_SECRET>` lorsque la variable
-`CRON_SECRET` existe dans le projet ; l’endpoint reste donc privé. Une future prise en charge
-mondiale des fuseaux nécessitera un cron horaire sur un plan Pro, ou un ordonnanceur externe capable
-d’envoyer le même header `Authorization`.
+`CRON_SECRET` existe dans le projet ; l’endpoint reste donc privé.
+
+Le plan Vercel Hobby ne peut pas lancer ce contrôle chaque heure ; Cloudflare joue donc uniquement
+le rôle d’ordonnanceur et aucun serveur permanent n’est nécessaire.
 
 Test de production :
 
@@ -123,7 +156,8 @@ Test de production :
 2. Activer les alertes après une action explicite.
 3. Vérifier la row dans Supabase et l’absence de doublon après une nouvelle activation.
 4. Appeler `/api/push/test` avec son Bearer token depuis un terminal sécurisé.
-5. Vérifier les exécutions dans **Vercel → Cron Jobs** et les réponses JSON de la fonction.
+5. Vérifier les exécutions dans les logs du Worker Cloudflare et les réponses JSON de la fonction
+   Vercel.
 6. Confirmer qu’une subscription désactivée ne reçoit rien.
 7. Pour simuler un endpoint expiré, supprimer la subscription dans le navigateur puis lancer un
    envoi : une réponse fournisseur 404/410 doit faire passer `enabled` à `false`.
@@ -150,7 +184,8 @@ le réglage, sans redemander automatiquement la permission.
 - `GET /api/cron/sky-alerts` lit seulement les rows actives et exige `CRON_SECRET` ;
 - une réponse Web Push 404/410 désactive la subscription expirée ;
 - les coordonnées sont réarrondies à `0.1°` côté route et côté store ;
-- la fonction SQL atomique limite chaque subscription à une notification par période de 24 heures.
+- la fonction SQL atomique limite chaque subscription à une notification par heure ;
+- aucune opportunité n’est envoyée hors de la plage locale 19 h–3 h 59.
 
 ## Checklist complète
 

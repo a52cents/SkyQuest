@@ -46,8 +46,8 @@ create index if not exists push_subscriptions_last_notification_idx
 create index if not exists push_subscriptions_location_idx
   on public.push_subscriptions (latitude_rounded, longitude_rounded);
 
--- Atomically reserves the 24-hour send slot. This prevents overlapping Vercel cron runs
--- from sending two notifications to the same subscription.
+-- Atomically reserves the current UTC hour. This prevents overlapping cron runs
+-- from sending two notifications to the same subscription during the same hour.
 create or replace function public.claim_push_notification_slot(
   p_endpoint text,
   p_now timestamptz default now()
@@ -68,7 +68,7 @@ begin
     and enabled = true
     and (
       last_notification_sent_at is null
-      or last_notification_sent_at <= p_now - interval '24 hours'
+      or last_notification_sent_at < date_trunc('hour', p_now)
     )
   returning true into claimed;
 

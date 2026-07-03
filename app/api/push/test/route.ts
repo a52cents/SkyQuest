@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { sendPushToMany } from "@/lib/push-server";
-import { claimDailyPushSlot, getPushSubscription } from "@/lib/push-store";
+import { claimHourlyPushSlot, getPushSubscription } from "@/lib/push-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,10 +37,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    if (!(await claimDailyPushSlot(subscription.endpoint))) {
+    if (!(await claimHourlyPushSlot(subscription.endpoint))) {
       return NextResponse.json(
-        { error: "Une notification a déjà été envoyée à cet abonnement dans les dernières 24 h." },
-        { status: 429, headers: { "Retry-After": "86400" } },
+        { error: "Une notification a déjà été envoyée à cet abonnement pendant cette heure." },
+        { status: 429, headers: { "Retry-After": "3600" } },
       );
     }
   } catch {

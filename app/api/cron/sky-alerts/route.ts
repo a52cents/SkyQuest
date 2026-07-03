@@ -3,9 +3,9 @@ import { getSkyObjects } from "@/lib/astro";
 import { getUpcomingCelestialEvents } from "@/lib/celestial-events";
 import { sendPushToMany, type SkyQuestPushPayload } from "@/lib/push-server";
 import {
-  claimDailyPushSlot,
-  isEligibleForDailyPush,
+  claimHourlyPushSlot,
   listPushSubscriptions,
+  isEligibleForHourlyPush,
   type StoredPushSubscription,
 } from "@/lib/push-store";
 import { fetchWeatherNow } from "@/lib/weather";
@@ -47,6 +47,10 @@ async function createOpportunity(
   const longitude = subscription.longitudeRounded;
   if (latitude === undefined || longitude === undefined) return null;
 
+  const localHour = getLocalHour(now, subscription.timezone);
+  const isNotificationWindow = localHour !== null && (localHour >= 19 || localHour < 4);
+  if (!isNotificationWindow) return null;
+
   const rareEvent = subscription.topics.includes("celestial_event")
     ? getUpcomingCelestialEvents(now, 1)[0]
     : undefined;
@@ -59,9 +63,6 @@ async function createOpportunity(
       data: { type: "celestial_event" },
     };
   }
-
-  const localHour = getLocalHour(now, subscription.timezone);
-  if (localHour === null || localHour < 17 || localHour >= 23) return null;
 
   const weather = await fetchWeatherNow(latitude, longitude);
   if (weather.isDay || weather.cloudCover > 65) return null;
@@ -122,7 +123,7 @@ export async function GET(request: Request) {
   let eligible: StoredPushSubscription[];
   try {
     eligible = (await listPushSubscriptions()).filter((subscription) =>
-      isEligibleForDailyPush(subscription, now),
+      isEligibleForHourlyPush(subscription, now),
     );
   } catch {
     return NextResponse.json({ error: "Stockage push indisponible." }, { status: 503 });
@@ -133,8 +134,8 @@ export async function GET(request: Request) {
     try {
       const payload = await createOpportunity(subscription, now);
       if (!payload) continue;
-      // This synchronous claim prevents two overlapping cron runs from sending twice.
-      if (!(await claimDailyPushSlot(subscription.endpoint, now))) continue;
+      // This atomic database claim prevents overlapping cron runs from sending twice this hour.
+      if (!(await claimHourlyPushSlot(subscription.endpoint, now))) continue;
       totals.opportunities += 1;
       const result = await sendPushToMany([subscription], payload);
       totals.sent += result.sent;

@@ -187,22 +187,24 @@ export async function markPushNotificationSent(
   if (error) throwStoreError("mark sent", error);
 }
 
-export function isEligibleForDailyPush(
+export function isEligibleForHourlyPush(
   subscription: StoredPushSubscription,
   now = new Date(),
 ): boolean {
   if (!subscription.enabled) return false;
   if (!subscription.lastNotificationSentAt) return true;
-  return now.getTime() - new Date(subscription.lastNotificationSentAt).getTime() >= 86_400_000;
+  const currentHourStartedAt = new Date(now);
+  currentHourStartedAt.setUTCMinutes(0, 0, 0);
+  return new Date(subscription.lastNotificationSentAt).getTime() < currentHourStartedAt.getTime();
 }
 
-export async function claimDailyPushSlot(endpoint: string, now = new Date()): Promise<boolean> {
+export async function claimHourlyPushSlot(endpoint: string, now = new Date()): Promise<boolean> {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase.rpc("claim_push_notification_slot", {
     p_endpoint: endpoint,
     p_now: now.toISOString(),
   });
 
-  if (error) throwStoreError("claim daily slot", error);
+  if (error) throwStoreError("claim hourly slot", error);
   return data === true;
 }
