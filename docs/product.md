@@ -46,6 +46,11 @@ La qualité du ciel est présentée comme une estimation. La pollution lumineuse
 galaxies, amas et météores ; elle ne doit pas masquer une planète ou la Lune lorsque les autres
 conditions sont bonnes.
 
+En France, les pratiques communales d'éclairage détectées par le Cerema constituent un signal
+complémentaire. Une extinction ou réduction probable améliore légèrement le classement des cibles
+faibles ; une extension ou reprise d'éclairage le réduit légèrement. Ce signal historique n'est
+jamais présenté comme une mesure du ciel en direct.
+
 L’indice de visibilité combine la hauteur de la cible, les nuages et la lumière du jour, du
 crépuscule ou de la nuit. La Lune et les planètes brillantes restent plus accessibles que les
 étoiles et le ciel profond, qui demandent davantage d’obscurité. Si Open-Meteo ne répond pas,

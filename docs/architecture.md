@@ -13,31 +13,34 @@ UI client
   ├─ Open-Meteo : météo actuelle
   ├─ /api/iss-pass → N2YO : passage ISS facultatif
   ├─ /api/light-pollution → provider optionnel : qualité du ciel
+  ├─ /api/lighting-practice → API Geo + index communal Cerema
   └─ /api/push/* → abonnement Web Push optionnel
 ```
 
 ## Routes
 
-| Route                  | Responsabilité                                |
-| ---------------------- | --------------------------------------------- |
-| `/`                    | vitrine web ou dashboard en mode PWA installé |
-| `/quest/[id]`          | guidage de la quête active                    |
-| `/journal`             | observations stockées localement              |
-| `/explore`             | catalogue pédagogique                         |
-| `/profile`             | progression locale et réglages d’alertes      |
-| `/api/iss-pass`        | proxy facultatif vers N2YO                    |
-| `/api/light-pollution` | estimation de qualité du ciel et fallback     |
+| Route                    | Responsabilité                                |
+| ------------------------ | --------------------------------------------- |
+| `/`                      | vitrine web ou dashboard en mode PWA installé |
+| `/quest/[id]`            | guidage de la quête active                    |
+| `/journal`               | observations stockées localement              |
+| `/explore`               | catalogue pédagogique                         |
+| `/profile`               | progression locale et réglages d’alertes      |
+| `/api/iss-pass`          | proxy facultatif vers N2YO                    |
+| `/api/light-pollution`   | estimation de qualité du ciel et fallback     |
+| `/api/lighting-practice` | commune française et pratique d'éclairage     |
 
 ## Flux « Maintenant »
 
 1. `Dashboard` demande la position après un clic.
 2. `weather.ts` interroge Open-Meteo et fournit un fallback prudent en cas d'échec.
 3. Le client interroge `/api/light-pollution` avec des coordonnées arrondies et relit son cache local si possible.
-4. `astro.ts` calcule le Soleil, la Lune et les planètes.
-5. `quest-generator.ts` rassemble les candidats du catalogue, des météores et de l'ISS.
-6. `visibility.ts` attribue les scores, avec un impact plus fort sur les objets faibles.
-7. Le dashboard conserve l'analyse en cache et affiche les quêtes dans l'ordre de pertinence.
-8. `storage.ts` sauvegarde la quête choisie avant la navigation vers `/quest/[id]`.
+4. En France, `/api/lighting-practice` associe la position arrondie à une commune via API Geo puis consulte l'index Cerema embarqué.
+5. `astro.ts` calcule le Soleil, la Lune et les planètes.
+6. `quest-generator.ts` rassemble les candidats du catalogue, des météores et de l'ISS.
+7. `visibility.ts` attribue les scores, avec un impact plus fort sur les objets faibles.
+8. Le dashboard conserve l'analyse en cache et affiche les quêtes dans l'ordre de pertinence.
+9. `storage.ts` sauvegarde la quête choisie avant la navigation vers `/quest/[id]`.
 
 ## Séparation des responsabilités
 
@@ -60,6 +63,7 @@ Les lectures doivent tolérer un stockage indisponible, corrompu ou provenant d'
 - Open-Meteo est appelé directement par le navigateur ;
 - N2YO est appelé côté serveur uniquement si `N2YO_API_KEY` existe ;
 - le provider de qualité du ciel est appelé côté serveur uniquement si `LIGHT_POLLUTION_API_URL` existe ;
+- l'API Geo reçoit côté serveur des coordonnées arrondies à `0,01°` et renvoie seulement la commune ;
 - les alertes sont activées uniquement après un clic explicite dans le Profil ; les thèmes et une
   position arrondie à `0,1°` sont synchronisés avec la subscription push ;
 - le middleware définit CSP, Permissions Policy, HSTS en production et protections anti-frame ;

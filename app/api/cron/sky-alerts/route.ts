@@ -23,11 +23,7 @@ const PLANET_NAMES: Record<string, string> = {
 };
 
 type CalculationName =
-  | "celestial_events"
-  | "weather"
-  | "forecast_requested"
-  | "forecast_available"
-  | "astronomy";
+  "celestial_events" | "weather" | "forecast_requested" | "forecast_available" | "astronomy";
 
 type NoOpportunityReason =
   | "missing_location"

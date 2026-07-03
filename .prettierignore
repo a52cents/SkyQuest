@@ -19,3 +19,6 @@ AGENTS.md
 
 # Package manager output
 package-lock.json
+
+# Compact generated data
+lib/data/cerema-lighting-practices-2026.json

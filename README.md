@@ -12,6 +12,7 @@ Le projet privilégie un parcours simple — **Maintenant → quoi regarder → 
 - pluies de météores, événements célestes à venir et passages visibles de l'ISS en option ;
 - score de visibilité et sélection prioritaire des cibles ayant un score d'au moins 50 ;
 - estimation de la qualité du ciel, avec une pénalité adaptée aux cibles faibles ;
+- prise en compte prudente des pratiques communales d'éclairage nocturne en France ;
 - observation libre de secours lorsque les données ou les conditions sont insuffisantes ;
 - guidage caméra 2D avec orientation, indications directionnelles et mode dégradé ;
 - capture facultative d'une photo, conservée uniquement dans le navigateur ;
@@ -128,7 +129,8 @@ app/
 ├── profile/page.tsx         # progression locale
 ├── support/page.tsx         # soutien volontaire, hors du parcours principal
 ├── api/iss-pass/route.ts    # proxy N2YO optionnel
-└── api/light-pollution/     # proxy et fallback de qualité du ciel
+├── api/light-pollution/     # proxy et fallback de qualité du ciel
+└── api/lighting-practice/   # commune API Geo et signal Cerema
 components/
 ├── dashboard/               # écran principal installé
 ├── marketing/               # page de présentation
@@ -138,6 +140,7 @@ lib/
 ├── astro.ts                 # positions astronomiques
 ├── weather.ts               # météo Open-Meteo
 ├── light-pollution.ts       # normalisation et impact selon la cible
+├── lighting-practices.ts    # signal communal d'éclairage nocturne
 ├── visibility.ts            # scores de visibilité
 ├── quest-generator.ts       # sélection des quêtes
 ├── orientation.ts           # boussole et altitude du téléphone
@@ -180,10 +183,27 @@ Sans provider, le fallback vaut 50/100 avec une confiance faible. Il maintient l
 pénalise pas les cibles et rend explicite l'absence de mesure ; il ne prétend pas déduire la
 pollution lumineuse de la seule position.
 
+### Pratiques communales d'éclairage en France
+
+SkyQuest embarque un index compact dérivé de la
+[cartographie nationale Cerema 2026](https://www.data.gouv.fr/datasets/cartographie-nationale-des-pratiques-declairage-nocturne),
+distribuée sous Licence Ouverte 2.0. La route `/api/lighting-practice` envoie une position arrondie
+à deux décimales à l'[API Geo officielle](https://geo.api.gouv.fr/decoupage-administratif/communes)
+pour obtenir uniquement la commune et son code INSEE. Le signal Cerema le plus récent ajuste
+légèrement le classement, surtout pour les cibles faibles. Il ne remplace jamais une mesure de
+qualité du ciel et son absence ne bloque pas l'analyse.
+
+L'index est régénérable depuis le GeoPackage source avec :
+
+```bash
+python scripts/generate-cerema-lighting-index.py chemin/vers/carte-extinction.gpkg
+```
+
 - **Position** : demandée après action sur **Maintenant**. La dernière position et l'analyse mise en cache sont arrondies à deux décimales avant stockage local.
 - **Météo** : les coordonnées sont envoyées directement depuis le navigateur à Open-Meteo.
 - **ISS** : si `N2YO_API_KEY` est définie, les coordonnées transitent par `/api/iss-pass` puis sont envoyées à N2YO.
 - **Qualité du ciel** : les coordonnées sont arrondies à deux décimales avant `/api/light-pollution`. Si un provider est configuré, il reçoit uniquement cette position approximative. Une mesure réussie est mise en cache 14 jours dans le navigateur et jusqu'à 30 jours côté serveur/CDN ; le fallback expire après un jour et aucun historique de position n'est créé.
+- **Pratiques d'éclairage** : une position arrondie à deux décimales est envoyée côté serveur à l'API Geo pour identifier la commune française. Le signal Cerema est mis en cache 30 jours et aucune adresse ni position précise n'est demandée ou conservée.
 - **Caméra et orientation** : demandées au lancement du guidage. Les pistes caméra sont arrêtées au démontage du composant.
 - **Photos** : redimensionnées et stockées sous forme de données locales ; elles ne sont ni analysées ni téléversées par SkyQuest.
 - **Journal et progression** : conservés dans `localStorage`, limités aux 50 observations les plus récentes et effaçables depuis l'interface.

@@ -1,6 +1,7 @@
 import { getMoonIllumination, getSkyObjects, getSunAltitude } from "@/lib/astro";
 import { generateQuests } from "@/lib/quest-generator";
 import type { LightPollutionEstimate } from "@/lib/light-pollution";
+import type { LightingPracticeEstimate } from "@/lib/lighting-practices";
 import { catalogSkyObjects } from "@/lib/sky-catalog";
 import { calculateFogRisk, selectBestWindowRange } from "@/lib/sky-window-score";
 import type {
@@ -55,11 +56,13 @@ function scoreHour({
   longitude,
   hour,
   lightPollution,
+  lightingPractice,
 }: {
   latitude: number;
   longitude: number;
   hour: WeatherHour;
   lightPollution?: LightPollutionEstimate;
+  lightingPractice?: LightingPracticeEstimate | null;
 }): SkyWindowHour {
   const date = new Date(hour.date);
   const sunAltitude = getSunAltitude(latitude, longitude, date);
@@ -75,6 +78,7 @@ function scoreHour({
     weather,
     now: date,
     lightPollution,
+    lightingPractice,
     limit: 5,
   }).filter((quest) => quest.targetType !== "free_observation");
   const bestTargets = quests.slice(0, 3).map((quest) => getTargetLabel(quest.target));
@@ -107,18 +111,20 @@ export function calculateBestSkyWindow({
   longitude,
   forecast,
   lightPollution,
+  lightingPractice,
   now = new Date(),
 }: {
   latitude: number;
   longitude: number;
   forecast: WeatherForecast;
   lightPollution?: LightPollutionEstimate;
+  lightingPractice?: LightingPracticeEstimate | null;
   now?: Date;
 }): BestSkyWindow {
   const hours = forecast.hours
     .filter((hour) => new Date(hour.date).getTime() >= now.getTime() - HOUR_MS)
     .slice(0, 24)
-    .map((hour) => scoreHour({ latitude, longitude, hour, lightPollution }));
+    .map((hour) => scoreHour({ latitude, longitude, hour, lightPollution, lightingPractice }));
 
   if (hours.length === 0) throw new Error("No hourly forecast available");
 

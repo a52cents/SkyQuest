@@ -29,6 +29,8 @@ import { haptic } from "@/lib/haptics";
 import { fetchNextIssVisiblePass } from "@/lib/iss";
 import { fetchLightPollutionEstimate } from "@/lib/light-pollution-client";
 import type { LightPollutionEstimate } from "@/lib/light-pollution";
+import { fetchLightingPracticeEstimate } from "@/lib/lighting-practices-client";
+import type { LightingPracticeEstimate } from "@/lib/lighting-practices";
 import { getOnboardingCompleted, setOnboardingCompleted } from "@/lib/storage";
 import { meteorShowers } from "@/lib/meteor-showers";
 import { calculateBestSkyWindow } from "@/lib/sky-window";
@@ -84,6 +86,7 @@ type DashboardAnalysis = {
   futureSuggestions: FutureQuestSuggestion[];
   bestSkyWindow?: BestSkyWindow;
   lightPollution?: LightPollutionEstimate;
+  lightingPractice?: LightingPracticeEstimate;
 };
 
 const QUEST_TARGET_LABELS: Record<QuestTargetType, string> = {
@@ -315,6 +318,7 @@ export function Dashboard() {
   const [futureSuggestions, setFutureSuggestions] = useState<FutureQuestSuggestion[]>([]);
   const [bestSkyWindow, setBestSkyWindow] = useState<BestSkyWindow | null>(null);
   const [lightPollution, setLightPollution] = useState<LightPollutionEstimate | null>(null);
+  const [lightingPractice, setLightingPractice] = useState<LightingPracticeEstimate | null>(null);
   const [eventTimeline, setEventTimeline] = useState<TimelineEvent[]>([]);
   const [profile, setProfile] = useState<ProgressProfile | null>(null);
   const [observations, setObservations] = useState<Observation[]>([]);
@@ -347,29 +351,36 @@ export function Dashboard() {
     const currentDate = new Date();
     let currentWeatherFailed = false;
     let forecastFailed = false;
-    const [currentWeather, forecast, currentIssPass, futureIssPass, currentLightPollution] =
-      await Promise.all([
-        fetchWeatherNow(coords.latitude, coords.longitude).catch(() => {
-          currentWeatherFailed = true;
-          return getFallbackWeather();
-        }),
-        fetchWeatherForecast(coords.latitude, coords.longitude, 24).catch(() => {
-          forecastFailed = true;
-          return getFallbackWeatherForecast(currentDate);
-        }),
-        fetchNextIssVisiblePass({
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          now: currentDate,
-        }).catch(() => null),
-        fetchNextIssVisiblePass({
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          now: currentDate,
-          horizonMinutes: 24 * 60,
-        }).catch(() => null),
-        fetchLightPollutionEstimate(coords.latitude, coords.longitude),
-      ]);
+    const [
+      currentWeather,
+      forecast,
+      currentIssPass,
+      futureIssPass,
+      currentLightPollution,
+      currentLightingPractice,
+    ] = await Promise.all([
+      fetchWeatherNow(coords.latitude, coords.longitude).catch(() => {
+        currentWeatherFailed = true;
+        return getFallbackWeather();
+      }),
+      fetchWeatherForecast(coords.latitude, coords.longitude, 24).catch(() => {
+        forecastFailed = true;
+        return getFallbackWeatherForecast(currentDate);
+      }),
+      fetchNextIssVisiblePass({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        now: currentDate,
+      }).catch(() => null),
+      fetchNextIssVisiblePass({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        now: currentDate,
+        horizonMinutes: 24 * 60,
+      }).catch(() => null),
+      fetchLightPollutionEstimate(coords.latitude, coords.longitude),
+      fetchLightingPracticeEstimate(coords.latitude, coords.longitude),
+    ]);
     const weatherNotice =
       currentWeatherFailed && forecastFailed
         ? "Météo indisponible : des estimations prudentes sont utilisées."
@@ -386,6 +397,7 @@ export function Dashboard() {
       now: currentDate,
       issPass: currentIssPass,
       lightPollution: currentLightPollution,
+      lightingPractice: currentLightingPractice,
       limit: 20,
     });
     const nextFutureSuggestions = generateFutureQuestSuggestions({
@@ -395,6 +407,7 @@ export function Dashboard() {
       now: currentDate,
       issPass: futureIssPass,
       lightPollution: currentLightPollution,
+      lightingPractice: currentLightingPractice,
       excludedTargets: new Set(nextQuests.map((quest) => quest.target)),
       horizonMinutes: 7 * 24 * 60,
     });
@@ -403,6 +416,7 @@ export function Dashboard() {
       longitude: coords.longitude,
       forecast,
       lightPollution: currentLightPollution,
+      lightingPractice: currentLightingPractice,
       now: currentDate,
     });
 
@@ -415,6 +429,7 @@ export function Dashboard() {
       futureSuggestions: nextFutureSuggestions,
       bestSkyWindow: nextBestSkyWindow,
       lightPollution: currentLightPollution,
+      lightingPractice: currentLightingPractice ?? undefined,
     };
 
     setWeather(currentWeather);
@@ -422,6 +437,7 @@ export function Dashboard() {
     setFutureSuggestions(nextFutureSuggestions);
     setBestSkyWindow(nextBestSkyWindow);
     setLightPollution(currentLightPollution);
+    setLightingPractice(currentLightingPractice);
     saveBestSkyWindow(nextBestSkyWindow);
     setAnalysisSavedAt(savedAt);
     setIsGuidanceUnlocked(true);
@@ -450,6 +466,7 @@ export function Dashboard() {
       setFutureSuggestions(cachedAnalysis.futureSuggestions);
       setBestSkyWindow(cachedAnalysis.bestSkyWindow ?? null);
       setLightPollution(cachedAnalysis.lightPollution ?? null);
+      setLightingPractice(cachedAnalysis.lightingPractice ?? null);
       setAnalysisSavedAt(cachedAnalysis.savedAt);
       setIsGuidanceUnlocked(unlockedAnalysisForRuntime === cachedAnalysis.savedAt);
       setLoadState("ready");
@@ -626,6 +643,14 @@ export function Dashboard() {
                 Estimation{lightPollution.confidence === "low" ? " prudente" : " locale"}, sans
                 garantie d’observation.
               </small>
+              {lightingPractice ? (
+                <div className="lighting-practice-detail">
+                  <span>Éclairage à {lightingPractice.municipalityName}</span>
+                  <strong>{lightingPractice.label}</strong>
+                  <p>{lightingPractice.shortAdvice}</p>
+                  <small>Signal communal Cerema, pas une mesure du ciel en direct.</small>
+                </div>
+              ) : null}
             </div>
           </MotionBlock>
         ) : null}
