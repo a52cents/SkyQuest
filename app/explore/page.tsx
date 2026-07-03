@@ -2,6 +2,7 @@
 
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { AppCard } from "@/components/AppCard";
+import { NasaHighlights } from "@/components/NasaHighlights";
 import { PageShell } from "@/components/PageShell";
 import { catalogSkyObjects } from "@/lib/sky-catalog";
 
@@ -34,6 +35,33 @@ export default function ExplorePage() {
           La disponibilité réelle dépend de ta position, de l’heure et de la météo. Lance «
           Maintenant » pour obtenir les cibles guidables.
         </p>
+      </div>
+      <section className="mb-8" aria-labelledby="nasa-highlights-title">
+        <div className="mb-3 flex items-end justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent-cyan">
+              En direct des catalogues NASA
+            </p>
+            <h2
+              id="nasa-highlights-title"
+              className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal text-text"
+            >
+              Aujourd’hui dans l’espace
+            </h2>
+          </div>
+          <span className="text-xl text-accent" aria-hidden="true">
+            ✦
+          </span>
+        </div>
+        <NasaHighlights />
+      </section>
+      <div className="mb-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
+          Repères à apprendre
+        </p>
+        <h2 className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal text-text">
+          Catalogue du ciel
+        </h2>
       </div>
       <motion.div className="grid gap-3" variants={container} initial="hidden" animate="show">
         {catalogSkyObjects.map((object) => (

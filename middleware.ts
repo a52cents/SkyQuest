@@ -8,7 +8,7 @@ export function middleware(request: NextRequest) {
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDevelopment ? " 'unsafe-eval'" : ""}`,
     `style-src 'self' 'nonce-${nonce}' 'unsafe-inline'`,
     "style-src-attr 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    "img-src 'self' data: blob: https://apod.nasa.gov https://img.youtube.com https://i.ytimg.com",
     "font-src 'self' data:",
     "media-src 'self' data: blob:",
     "connect-src 'self' https://api.open-meteo.com https://air-quality-api.open-meteo.com" +
