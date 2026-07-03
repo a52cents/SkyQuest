@@ -6,7 +6,6 @@ import { sendPushToMany, type SkyQuestPushPayload } from "@/lib/push-server";
 import {
   claimHourlyPushSlot,
   listPushSubscriptions,
-  isEligibleForScheduledPush,
   type StoredPushSubscription,
 } from "@/lib/push-store";
 import {
@@ -215,16 +214,14 @@ export async function GET(request: Request) {
   }
 
   const now = new Date();
-  let eligible: StoredPushSubscription[];
+  let subscriptions: StoredPushSubscription[];
   try {
-    eligible = (await listPushSubscriptions()).filter((subscription) =>
-      isEligibleForScheduledPush(subscription, now),
-    );
+    subscriptions = await listPushSubscriptions();
   } catch {
     return NextResponse.json({ error: "Stockage push indisponible." }, { status: 503 });
   }
   const totals = {
-    checked: eligible.length,
+    checked: subscriptions.length,
     opportunities: 0,
     sent: 0,
     failed: 0,
@@ -237,7 +234,7 @@ export async function GET(request: Request) {
     counters[name] = (counters[name] ?? 0) + amount;
   };
 
-  for (const subscription of eligible) {
+  for (const subscription of subscriptions) {
     const diagnostics: OpportunityDiagnostics = { calculations: [] };
     let calculationsRecorded = false;
     let phase: "evaluation" | "hourly_claim" | "delivery" = "evaluation";

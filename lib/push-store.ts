@@ -1,7 +1,6 @@
 import "server-only";
 
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
-import { isScheduledPushCooldownElapsed } from "@/lib/push-opportunity";
 import { NOTIFICATION_TOPICS, type NotificationTopic } from "@/lib/push-types";
 
 export type StoredPushSubscription = {
@@ -186,14 +185,6 @@ export async function markPushNotificationSent(
     .eq("enabled", true);
 
   if (error) throwStoreError("mark sent", error);
-}
-
-export function isEligibleForScheduledPush(
-  subscription: StoredPushSubscription,
-  now = new Date(),
-): boolean {
-  if (!subscription.enabled) return false;
-  return isScheduledPushCooldownElapsed(subscription.lastNotificationSentAt, now);
 }
 
 export async function claimHourlyPushSlot(endpoint: string, now = new Date()): Promise<boolean> {

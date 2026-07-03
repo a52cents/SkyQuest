@@ -5,7 +5,6 @@ import {
   isExceptionalClearSky,
   isInterestingApproachingSkyWindow,
   isInterestingBrightTarget,
-  isScheduledPushCooldownElapsed,
 } from "../lib/push-opportunity.ts";
 
 const storeSource = readFileSync(new URL("../lib/push-store.ts", import.meta.url), "utf8");
@@ -55,6 +54,11 @@ test("scheduled opportunities are restricted to 19:00 through 03:59 local time",
   assert.match(cronRouteSource, /diagnostics\.reason = "outside_notification_window"/);
 });
 
+test("scheduled alerts evaluate every active subscription without a cooldown", () => {
+  assert.match(cronRouteSource, /subscriptions = await listPushSubscriptions\(\)/);
+  assert.doesNotMatch(cronRouteSource, /lastNotificationSentAt|cooldown/i);
+});
+
 test("scheduled push logs explain skipped notifications and executed calculations", () => {
   assert.match(cronRouteSource, /calculations: \{\} as Partial<Record<CalculationName, number>>/);
   assert.match(cronRouteSource, /reasons: \{\} as Record<string, number>/);
@@ -81,11 +85,4 @@ test("generic and bright-target alerts require unusually good current conditions
   assert.equal(isExceptionalClearSky(16), false);
   assert.equal(isInterestingBrightTarget({ cloudCover: 25, altitude: 25 }), true);
   assert.equal(isInterestingBrightTarget({ cloudCover: 30, altitude: 45 }), false);
-});
-
-test("scheduled alerts wait twelve hours before another opportunity", () => {
-  const now = new Date("2026-07-03T22:00:00Z");
-  assert.equal(isScheduledPushCooldownElapsed(undefined, now), true);
-  assert.equal(isScheduledPushCooldownElapsed("2026-07-03T11:00:01Z", now), false);
-  assert.equal(isScheduledPushCooldownElapsed("2026-07-03T10:00:00Z", now), true);
 });
