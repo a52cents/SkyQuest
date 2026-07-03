@@ -270,7 +270,7 @@ export function generateQuests({
   limit = 8,
 }: GenerateQuestsInput): SkyQuest[] {
   if (latitude === null || longitude === null) {
-    return [createFreeObservationQuest(now)];
+    return [{ ...createFreeObservationQuest(now), weather }];
   }
 
   try {
@@ -376,12 +376,12 @@ export function generateQuests({
     const selected = selectQuestCandidates(candidates, limit);
 
     if (selected.length === 0) {
-      return [createFreeObservationQuest(now)];
+      return [{ ...createFreeObservationQuest(now), weather: effectiveWeather }];
     }
 
-    return selected;
+    return selected.map((quest) => ({ ...quest, weather: effectiveWeather }));
   } catch {
-    return [createFreeObservationQuest(now)];
+    return [{ ...createFreeObservationQuest(now), weather }];
   }
 }
 

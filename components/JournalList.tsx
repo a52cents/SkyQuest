@@ -1,8 +1,10 @@
 import { AppButton } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
+import { ObservationMemoryCard } from "@/components/ObservationMemoryCard";
+import { getObservationTargetLabel, getSeasonLabel, getWeatherLabel } from "@/lib/observation-card";
 import { getPhotoObjectUrl, revokePhotoObjectUrl } from "@/lib/photo-db";
 import type { Observation } from "@/lib/types";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 
 type JournalListProps = {
@@ -10,22 +12,52 @@ type JournalListProps = {
   onClear: () => void;
 };
 
+type AlbumGroup = {
+  key: string;
+  title: string;
+  season: string;
+  observations: Observation[];
+};
+
+function groupAlbum(observations: Observation[]): AlbumGroup[] {
+  const groups = new Map<string, AlbumGroup>();
+  observations.forEach((observation) => {
+    const date = new Date(observation.createdAt);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.observations.push(observation);
+      return;
+    }
+    groups.set(key, {
+      key,
+      title: new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(date),
+      season: getSeasonLabel(date),
+      observations: [observation],
+    });
+  });
+  return [...groups.values()];
+}
+
 export function JournalList({ observations, onClear }: JournalListProps) {
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string | null>>({});
-  const [previewPhotoId, setPreviewPhotoId] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null | undefined>(undefined);
+  const [memoryObservation, setMemoryObservation] = useState<Observation | null>(null);
+  const [view, setView] = useState<"album" | "history">("album");
   const prefersReducedMotion = useReducedMotion() ?? false;
+  const albumGroups = useMemo(
+    () => groupAlbum(observations.filter((observation) => observation.status === "seen")),
+    [observations],
+  );
   const listVariants: Variants = prefersReducedMotion
     ? { hidden: {}, show: {} }
-    : { hidden: {}, show: { transition: { staggerChildren: 0.07 } } };
+    : { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
   const itemVariants: Variants = prefersReducedMotion
     ? { hidden: { opacity: 1 }, show: { opacity: 1 } }
-    : { hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0 } };
+    : { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } };
 
   useEffect(() => {
-    let isActive = true;
+    let active = true;
     const createdUrls: string[] = [];
-
     void Promise.all(
       observations.map(async (observation) => {
         const photoId = observation.photoThumbnailId ?? observation.photoId;
@@ -35,160 +67,192 @@ export function JournalList({ observations, onClear }: JournalListProps) {
         return [observation.id, url] as const;
       }),
     ).then((entries) => {
-      if (isActive) {
-        setThumbnailUrls(Object.fromEntries(entries));
-      } else {
-        createdUrls.forEach(revokePhotoObjectUrl);
-      }
+      if (active) setThumbnailUrls(Object.fromEntries(entries));
+      else createdUrls.forEach(revokePhotoObjectUrl);
     });
-
     return () => {
-      isActive = false;
+      active = false;
       createdUrls.forEach(revokePhotoObjectUrl);
     };
   }, [observations]);
 
-  useEffect(() => {
-    let isActive = true;
-    let objectUrl: string | null = null;
-    setPreviewUrl(undefined);
-
-    if (previewPhotoId) {
-      void getPhotoObjectUrl(previewPhotoId)
-        .catch(() => null)
-        .then((url) => {
-          objectUrl = url;
-          if (isActive) setPreviewUrl(url);
-          else if (url) revokePhotoObjectUrl(url);
-        });
-    }
-
-    return () => {
-      isActive = false;
-      if (objectUrl) revokePhotoObjectUrl(objectUrl);
-    };
-  }, [previewPhotoId]);
-
   return (
     <div className="grid gap-4">
-      {previewPhotoId ? (
+      {memoryObservation ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0b]/90 p-4 backdrop-blur-xl"
+          className="fixed inset-0 z-[70] overflow-y-auto bg-[#0a0a0b]/95 p-3 backdrop-blur-xl"
           role="dialog"
           aria-modal="true"
-          aria-label="Aperçu photo"
+          aria-label="Carte souvenir"
         >
-          <div className="w-full max-w-3xl">
-            {previewUrl ? (
-              <div
-                className="h-[70dvh] rounded-[22px] border border-white/[0.12] bg-contain bg-center bg-no-repeat shadow-2xl"
-                style={{ backgroundImage: `url(${previewUrl})` }}
-              />
-            ) : (
-              <div className="flex h-[70dvh] items-center justify-center rounded-[22px] border border-white/[0.12] bg-white/[0.04] p-6 text-center text-sm text-muted">
-                {previewUrl === undefined
-                  ? "Chargement de la photoâ€¦"
-                  : "Cette photo n'est plus disponible sur cet appareil."}
-              </div>
-            )}
-            <AppButton
-              variant="ghost"
-              className="mt-3"
-              fullWidth
-              onClick={() => setPreviewPhotoId(null)}
-            >
-              Fermer
-            </AppButton>
+          <div className="mx-auto w-full max-w-md py-3">
+            <ObservationMemoryCard
+              observation={memoryObservation}
+              onClose={() => setMemoryObservation(null)}
+            />
           </div>
         </div>
       ) : null}
 
-      <div className="mb-2 flex items-end justify-between gap-4 border-b border-white/[0.06] pb-5">
-        <div>
-          <p className="premium-kicker">Historique</p>
-          <h2 className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal tracking-[-0.03em] text-white">
-            Observations récentes
-          </h2>
-          <p className="mt-1 text-sm text-faint">
-            {observations.length} entrée{observations.length > 1 ? "s" : ""} sur cet appareil
-          </p>
+      <div className="border-b border-white/[0.06] pb-5">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="premium-kicker">Mémoire locale</p>
+            <h2 className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal tracking-[-0.03em] text-white">
+              Mon ciel observé
+            </h2>
+            <p className="mt-1 text-sm text-faint">
+              {observations.length} souvenir{observations.length > 1 ? "s" : ""} sur cet appareil
+            </p>
+          </div>
+          <AppButton variant="danger" size="sm" onClick={onClear}>
+            Vider
+          </AppButton>
         </div>
-        <AppButton variant="danger" size="sm" onClick={onClear}>
-          Vider
-        </AppButton>
+        <div className="mt-4 grid grid-cols-2 rounded-full border border-white/[0.08] bg-white/[0.025] p-1">
+          {(["album", "history"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setView(option)}
+              className={`min-h-11 rounded-full px-4 text-sm font-semibold transition-colors ${
+                view === option ? "bg-accent text-white" : "text-muted"
+              }`}
+              aria-pressed={view === option}
+            >
+              {option === "album" ? "Album" : "Historique"}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <motion.div className="grid gap-3" variants={listVariants} initial="hidden" animate="show">
-        {observations.map((observation) => (
-          <motion.div
-            key={observation.id}
-            variants={itemVariants}
-            whileHover={prefersReducedMotion ? undefined : { scale: 1.01 }}
-          >
-            <AppCard
-              as="article"
-              className="transition-colors hover:border-white/[0.14]"
-              padding="sm"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium uppercase tracking-[0.1em] text-faint">
-                    {new Intl.DateTimeFormat("fr-FR", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    }).format(new Date(observation.createdAt))}
-                  </p>
-                  <h3 className="mt-1.5 font-[Georgia,'Times_New_Roman',serif] text-lg font-normal tracking-[-0.02em] text-white">
-                    {observation.questTitle}
-                  </h3>
-                  <p className="mt-1 text-sm text-muted">{observation.target}</p>
-                </div>
-                {observation.photoThumbnailId || observation.photoId ? (
-                  <button
-                    type="button"
-                    aria-label="Voir la photo"
-                    onClick={() =>
-                      setPreviewPhotoId(observation.photoId ?? observation.photoThumbnailId ?? null)
-                    }
-                    className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[13px] border border-white/[0.12] bg-white/[0.04] bg-cover bg-center text-[10px] text-faint transition-transform active:scale-95"
-                    style={
-                      thumbnailUrls[observation.id]
-                        ? { backgroundImage: `url(${thumbnailUrls[observation.id]})` }
-                        : undefined
-                    }
+      {view === "album" ? (
+        albumGroups.length > 0 ? (
+          <div className="grid gap-7">
+            {albumGroups.map((group) => (
+              <section key={group.key} aria-labelledby={`album-${group.key}`}>
+                <div className="mb-3 flex items-baseline justify-between gap-3">
+                  <h3
+                    id={`album-${group.key}`}
+                    className="font-[Georgia,'Times_New_Roman',serif] text-xl capitalize text-white"
                   >
-                    {thumbnailUrls[observation.id] ? null : "Photo"}
-                  </button>
-                ) : null}
-                <span
-                  className={`rounded-lg border px-2.5 py-1 text-xs font-bold ${
-                    observation.status === "seen"
-                      ? "border-success/20 bg-success/[0.09] text-success"
-                      : "border-white/[0.08] bg-white/[0.04] text-muted"
-                  }`}
+                    {group.title}
+                  </h3>
+                  <span className="text-xs font-bold uppercase tracking-[0.12em] text-accent-cyan">
+                    {group.season}
+                  </span>
+                </div>
+                <motion.div
+                  className="grid grid-cols-2 gap-3"
+                  variants={listVariants}
+                  initial="hidden"
+                  animate="show"
                 >
-                  {observation.status === "seen" ? "Vu" : "Pas trouvé"}
-                </span>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2 border-t border-white/[0.07] pt-3 text-xs text-muted">
-                <span className="rounded-md bg-white/[0.035] px-2.5 py-1">
-                  Conditions {observation.visibilityScore}/100
-                </span>
-                {typeof observation.xpEarned === "number" ? (
-                  <span className="rounded-md bg-accent/[0.09] px-2.5 py-1 font-semibold text-[#bdb7ff]">
-                    +{observation.xpEarned} Éclats
-                  </span>
-                ) : null}
-                {observation.latitude !== undefined && observation.longitude !== undefined ? (
-                  <span className="rounded-md bg-white/[0.035] px-2.5 py-1">
-                    {observation.latitude.toFixed(2)}, {observation.longitude.toFixed(2)}
-                  </span>
-                ) : null}
-              </div>
-            </AppCard>
-          </motion.div>
-        ))}
-      </motion.div>
+                  {group.observations.map((observation) => (
+                    <motion.button
+                      key={observation.id}
+                      type="button"
+                      variants={itemVariants}
+                      onClick={() => setMemoryObservation(observation)}
+                      className="group relative aspect-[4/5] overflow-hidden rounded-[18px] border border-white/[0.1] bg-[radial-gradient(circle_at_70%_15%,rgba(124,92,255,0.36),transparent_35%),#10131d] text-left shadow-[0_12px_32px_rgba(0,0,0,0.25)]"
+                      aria-label={`Ouvrir la carte de ${getObservationTargetLabel(observation)}`}
+                    >
+                      {thumbnailUrls[observation.id] ? (
+                        <span
+                          className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                          style={{ backgroundImage: `url(${thumbnailUrls[observation.id]})` }}
+                        />
+                      ) : null}
+                      <span className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,14,0.1),rgba(5,6,14,0.25)_38%,rgba(5,6,14,0.96))]" />
+                      <span className="absolute left-3 top-3 rounded-full border border-white/15 bg-black/45 px-2.5 py-1 text-[10px] font-bold tracking-[0.08em] text-white backdrop-blur-md">
+                        ✦ SKYQUEST
+                      </span>
+                      <span className="absolute inset-x-0 bottom-0 p-3">
+                        <span className="block font-[Georgia,'Times_New_Roman',serif] text-lg leading-tight text-white">
+                          {getObservationTargetLabel(observation)}
+                        </span>
+                        <span className="mt-1 block text-[11px] text-white/65">
+                          {new Intl.DateTimeFormat("fr-FR", {
+                            day: "numeric",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          }).format(new Date(observation.createdAt))}
+                        </span>
+                        <span className="mt-2 flex items-center justify-between text-[10px] font-semibold text-white/80">
+                          <span>{getWeatherLabel(observation)}</span>
+                          <span>{observation.visibilityScore}%</span>
+                        </span>
+                      </span>
+                    </motion.button>
+                  ))}
+                </motion.div>
+              </section>
+            ))}
+          </div>
+        ) : (
+          <AppCard variant="subtle" padding="sm">
+            <p className="text-sm leading-6 text-muted">
+              Ton album apparaîtra après ta première cible repérée.
+            </p>
+          </AppCard>
+        )
+      ) : (
+        <motion.div className="grid gap-3" variants={listVariants} initial="hidden" animate="show">
+          {observations.map((observation) => (
+            <motion.div key={observation.id} variants={itemVariants}>
+              <AppCard
+                as="article"
+                padding="sm"
+                className="transition-colors hover:border-white/[0.14]"
+              >
+                <div className="flex items-start gap-3">
+                  {thumbnailUrls[observation.id] ? (
+                    <div
+                      className="h-16 w-14 shrink-0 rounded-[12px] border border-white/10 bg-cover bg-center"
+                      style={{ backgroundImage: `url(${thumbnailUrls[observation.id]})` }}
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs uppercase tracking-[0.08em] text-faint">
+                      {new Intl.DateTimeFormat("fr-FR", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      }).format(new Date(observation.createdAt))}
+                    </p>
+                    <h3 className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-lg text-white">
+                      {getObservationTargetLabel(observation)}
+                    </h3>
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-xs text-muted">
+                      <span className="rounded-md bg-white/[0.04] px-2 py-1">
+                        {observation.status === "seen" ? "Vu" : "Pas trouvé"}
+                      </span>
+                      <span className="rounded-md bg-white/[0.04] px-2 py-1">
+                        {observation.visibilityScore}/100
+                      </span>
+                      {typeof observation.xpEarned === "number" ? (
+                        <span className="rounded-md bg-accent/[0.09] px-2 py-1 text-[#bdb7ff]">
+                          +{observation.xpEarned} Éclats
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  {observation.status === "seen" ? (
+                    <button
+                      type="button"
+                      onClick={() => setMemoryObservation(observation)}
+                      className="min-h-11 shrink-0 rounded-full border border-accent/25 bg-accent/[0.09] px-3 text-xs font-bold text-[#c9c4ff]"
+                    >
+                      Carte
+                    </button>
+                  ) : null}
+                </div>
+              </AppCard>
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
     </div>
   );
 }

@@ -246,6 +246,9 @@ function isTargetType(value: unknown): value is QuestTargetType {
 function isAchievementId(value: unknown): value is AchievementId {
   return [
     "first-look",
+    "first-planet",
+    "first-constellation",
+    "moon-hunter",
     "planet-tour",
     "night-landmarks",
     "orbital-watcher",
@@ -321,6 +324,10 @@ export async function addObservation(
     xpEarned: reward.xpEarned,
     isFirstDiscovery: reward.isFirstDiscovery,
     unlockedAchievements: reward.unlockedAchievements,
+    totalXp: reward.totalXp,
+    rankName: reward.rankName,
+    streak: reward.currentStreak,
+    weather: quest.weather,
     latitude: location ? roundCoordinate(location.latitude) : undefined,
     longitude: location ? roundCoordinate(location.longitude) : undefined,
     photoId,

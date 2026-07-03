@@ -55,6 +55,24 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
     goal: 1,
   },
   {
+    id: "first-planet",
+    title: "Première planète",
+    description: "Découvrir une première planète.",
+    goal: 1,
+  },
+  {
+    id: "first-constellation",
+    title: "Première constellation",
+    description: "Découvrir une première constellation ou un astérisme.",
+    goal: 1,
+  },
+  {
+    id: "moon-hunter",
+    title: "Chasseur de Lune",
+    description: "Réussir une première observation de la Lune.",
+    goal: 1,
+  },
+  {
     id: "planet-tour",
     title: "Tour des planètes",
     description: "Observer trois planètes différentes.",
@@ -244,6 +262,19 @@ function getAchievementValue(profile: ProgressProfile, id: AchievementId): numbe
   switch (id) {
     case "first-look":
       return Math.min(1, getSuccessfulObservationCount(profile));
+    case "first-planet":
+      return Math.min(1, discoveries.some((item) => item.targetType === "planet") ? 1 : 0);
+    case "first-constellation":
+      return Math.min(
+        1,
+        discoveries.some(
+          (item) => item.targetType === "constellation" || item.targetType === "asterism",
+        )
+          ? 1
+          : 0,
+      );
+    case "moon-hunter":
+      return Math.min(1, discoveries.some((item) => item.targetType === "moon") ? 1 : 0);
     case "planet-tour":
       return discoveries.filter((item) => item.targetType === "planet").length;
     case "night-landmarks":

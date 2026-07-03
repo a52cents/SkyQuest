@@ -18,6 +18,9 @@ export type QuestDifficulty = "easy" | "medium";
 
 export type AchievementId =
   | "first-look"
+  | "first-planet"
+  | "first-constellation"
+  | "moon-hunter"
   | "planet-tour"
   | "night-landmarks"
   | "orbital-watcher"
@@ -97,6 +100,7 @@ export type SkyQuest = {
   requiredGear: RequiredGear;
   warning?: string;
   targetTime?: string;
+  weather?: WeatherNow;
 };
 
 export type Observation = {
@@ -111,6 +115,10 @@ export type Observation = {
   xpEarned?: number;
   isFirstDiscovery?: boolean;
   unlockedAchievements?: AchievementId[];
+  totalXp?: number;
+  rankName?: string;
+  streak?: number;
+  weather?: WeatherNow;
   latitude?: number;
   longitude?: number;
   photoId?: string;

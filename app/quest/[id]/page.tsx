@@ -7,11 +7,12 @@ import { getAppButtonClassName } from "@/components/AppButton";
 import { CameraGuide } from "@/components/CameraGuide";
 import { ErrorState } from "@/components/ErrorState";
 import { PageShell } from "@/components/PageShell";
+import { ObservationMemoryCard } from "@/components/ObservationMemoryCard";
 import { ProgressFeedback } from "@/components/ProgressFeedback";
 import { addObservation, getActiveQuest, getLastLocation, getProgressProfile } from "@/lib/storage";
 import { getRankProgress } from "@/lib/progression";
 import { haptic } from "@/lib/haptics";
-import type { ObservationPhotoDraft, ProgressReward, SkyQuest } from "@/lib/types";
+import type { Observation, ObservationPhotoDraft, ProgressReward, SkyQuest } from "@/lib/types";
 
 export default function QuestGuidePage() {
   const params = useParams<{ id: string }>();
@@ -19,6 +20,7 @@ export default function QuestGuidePage() {
   const [reward, setReward] = useState<{
     reward: ProgressReward;
     previousRankName: string | null;
+    observation: Observation;
   } | null>(null);
   const isLoggingRef = useRef(false);
 
@@ -37,7 +39,7 @@ export default function QuestGuidePage() {
     const previousRankName = getRankProgress(getProgressProfile().totalXp).current.name;
     const result = await addObservation(quest, status, getLastLocation() ?? undefined, photo);
     haptic(status === "seen" ? "success" : "missed");
-    setReward({ reward: result.reward, previousRankName });
+    setReward({ reward: result.reward, previousRankName, observation: result.observation });
   }
 
   if (reward) {
@@ -48,6 +50,9 @@ export default function QuestGuidePage() {
         className="max-w-2xl justify-center"
         contentClassName="flex flex-col justify-center gap-3"
       >
+        {reward.observation.status === "seen" ? (
+          <ObservationMemoryCard observation={reward.observation} />
+        ) : null}
         <ProgressFeedback
           reward={reward.reward}
           previousRankName={reward.previousRankName}
