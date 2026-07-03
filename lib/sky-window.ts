@@ -1,5 +1,6 @@
 import { getMoonIllumination, getSkyObjects, getSunAltitude } from "@/lib/astro";
 import { generateQuests } from "@/lib/quest-generator";
+import type { LightPollutionEstimate } from "@/lib/light-pollution";
 import { catalogSkyObjects } from "@/lib/sky-catalog";
 import { calculateFogRisk, selectBestWindowRange } from "@/lib/sky-window-score";
 import type {
@@ -53,10 +54,12 @@ function scoreHour({
   latitude,
   longitude,
   hour,
+  lightPollution,
 }: {
   latitude: number;
   longitude: number;
   hour: WeatherHour;
+  lightPollution?: LightPollutionEstimate;
 }): SkyWindowHour {
   const date = new Date(hour.date);
   const sunAltitude = getSunAltitude(latitude, longitude, date);
@@ -66,9 +69,14 @@ function scoreHour({
     isDay: sunAltitude > 0,
     temperature: hour.temperature,
   };
-  const quests = generateQuests({ latitude, longitude, weather, now: date, limit: 5 }).filter(
-    (quest) => quest.targetType !== "free_observation",
-  );
+  const quests = generateQuests({
+    latitude,
+    longitude,
+    weather,
+    now: date,
+    lightPollution,
+    limit: 5,
+  }).filter((quest) => quest.targetType !== "free_observation");
   const bestTargets = quests.slice(0, 3).map((quest) => getTargetLabel(quest.target));
   const targetQuality = quests[0]?.visibilityScore ?? 0;
   const cloudScore = (1 - hour.cloudCover / 100) * 45;
@@ -98,17 +106,19 @@ export function calculateBestSkyWindow({
   latitude,
   longitude,
   forecast,
+  lightPollution,
   now = new Date(),
 }: {
   latitude: number;
   longitude: number;
   forecast: WeatherForecast;
+  lightPollution?: LightPollutionEstimate;
   now?: Date;
 }): BestSkyWindow {
   const hours = forecast.hours
     .filter((hour) => new Date(hour.date).getTime() >= now.getTime() - HOUR_MS)
     .slice(0, 24)
-    .map((hour) => scoreHour({ latitude, longitude, hour }));
+    .map((hour) => scoreHour({ latitude, longitude, hour, lightPollution }));
 
   if (hours.length === 0) throw new Error("No hourly forecast available");
 

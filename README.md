@@ -11,6 +11,7 @@ Le projet privilégie un parcours simple — **Maintenant → quoi regarder → 
 - catalogue de repères accessibles : étoiles, constellations, astérismes, Pléiades et Andromède ;
 - pluies de météores, événements célestes à venir et passages visibles de l'ISS en option ;
 - score de visibilité et sélection prioritaire des cibles ayant un score d'au moins 50 ;
+- estimation de la qualité du ciel, avec une pénalité adaptée aux cibles faibles ;
 - observation libre de secours lorsque les données ou les conditions sont insuffisantes ;
 - guidage caméra 2D avec orientation, indications directionnelles et mode dégradé ;
 - capture facultative d'une photo, conservée uniquement dans le navigateur ;
@@ -52,6 +53,11 @@ soutien volontaire :
 N2YO_API_KEY=votre_cle_n2yo
 NEXT_PUBLIC_SUPPORT_URL=https://votre-prestataire.example/soutenir
 
+# Provider de qualité du ciel facultatif, appelé uniquement côté serveur
+LIGHT_POLLUTION_API_URL=https://votre-worker.example/estimate
+LIGHT_POLLUTION_API_KEY=votre_cle_privee
+LIGHT_POLLUTION_PROVIDER=viirs
+
 # Notifications push facultatives
 NEXT_PUBLIC_SUPABASE_URL=https://votre-projet.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=votre_cle_publique_supabase
@@ -63,7 +69,8 @@ CRON_SECRET=un_secret_aleatoire
 PUSH_TEST_SECRET=un_autre_secret_aleatoire
 ```
 
-Sans ces variables, l'application continue normalement : elle omet les passages ISS et indique
+Sans ces variables, l'application continue normalement : elle omet les passages ISS, utilise une
+estimation prudente de qualité du ciel et indique
 simplement que le soutien financier ou les alertes ne sont pas encore configurés. L'URL de soutien
 doit utiliser HTTPS et n'est ouverte qu'après une action volontaire depuis la page de soutien. La
 configuration complète des alertes et le SQL Supabase sont décrits dans
@@ -120,7 +127,8 @@ app/
 ├── explore/page.tsx         # catalogue du ciel
 ├── profile/page.tsx         # progression locale
 ├── support/page.tsx         # soutien volontaire, hors du parcours principal
-└── api/iss-pass/route.ts    # proxy N2YO optionnel
+├── api/iss-pass/route.ts    # proxy N2YO optionnel
+└── api/light-pollution/     # proxy et fallback de qualité du ciel
 components/
 ├── dashboard/               # écran principal installé
 ├── marketing/               # page de présentation
@@ -129,6 +137,7 @@ hooks/                       # capteurs, installation et haptique
 lib/
 ├── astro.ts                 # positions astronomiques
 ├── weather.ts               # météo Open-Meteo
+├── light-pollution.ts       # normalisation et impact selon la cible
 ├── visibility.ts            # scores de visibilité
 ├── quest-generator.ts       # sélection des quêtes
 ├── orientation.ts           # boussole et altitude du téléphone
@@ -156,9 +165,25 @@ Les fonctions de calcul sont regroupées dans `lib/`. Les composants client sont
 
 ## Données, permissions et services externes
 
+### Provider de qualité du ciel
+
+SkyQuest n'appelle pas directement un raster scientifique depuis le navigateur. Les jeux officiels
+[VIIRS DNB annuels](https://developers.google.com/earth-engine/datasets/catalog/NOAA_VIIRS_DNB_ANNUAL_V22)
+et [NASA Black Marble VNP46A1](https://developers.google.com/earth-engine/datasets/catalog/NOAA_VIIRS_001_VNP46A1)
+nécessitent un traitement géospatial intermédiaire. `LIGHT_POLLUTION_API_URL` peut pointer vers un
+worker interne qui échantillonne l'un de ces jeux à la position arrondie. Il doit accepter `lat`,
+`lon` et éventuellement `provider`, puis renvoyer au moins une valeur parmi `score` (0–100, 100 =
+ciel sombre), `bortleClass`, `sqm` ou `radiance`. Une clé optionnelle est envoyée en Bearer depuis le
+serveur uniquement.
+
+Sans provider, le fallback vaut 50/100 avec une confiance faible. Il maintient le parcours, ne
+pénalise pas les cibles et rend explicite l'absence de mesure ; il ne prétend pas déduire la
+pollution lumineuse de la seule position.
+
 - **Position** : demandée après action sur **Maintenant**. La dernière position et l'analyse mise en cache sont arrondies à deux décimales avant stockage local.
 - **Météo** : les coordonnées sont envoyées directement depuis le navigateur à Open-Meteo.
 - **ISS** : si `N2YO_API_KEY` est définie, les coordonnées transitent par `/api/iss-pass` puis sont envoyées à N2YO.
+- **Qualité du ciel** : les coordonnées sont arrondies à deux décimales avant `/api/light-pollution`. Si un provider est configuré, il reçoit uniquement cette position approximative. Une mesure réussie est mise en cache 14 jours dans le navigateur et jusqu'à 30 jours côté serveur/CDN ; le fallback expire après un jour et aucun historique de position n'est créé.
 - **Caméra et orientation** : demandées au lancement du guidage. Les pistes caméra sont arrêtées au démontage du composant.
 - **Photos** : redimensionnées et stockées sous forme de données locales ; elles ne sont ni analysées ni téléversées par SkyQuest.
 - **Journal et progression** : conservés dans `localStorage`, limités aux 50 observations les plus récentes et effaçables depuis l'interface.
@@ -192,6 +217,7 @@ npm run build
 
 - le guidage caméra est une aide 2D approximative, pas une réalité augmentée certifiée ;
 - une visibilité calculée reste une estimation et ne garantit jamais l'observation ;
+- la qualité du ciel est une estimation à l'échelle du secteur : éclairage local, brume et obstacles peuvent différer sur place ;
 - le fonctionnement hors ligne est limité aux ressources déjà mises en cache ;
 - les données sont propres au navigateur et ne sont pas synchronisées entre appareils ;
 - les subscriptions push nécessitent un projet Supabase configuré et des clés VAPID valides ;

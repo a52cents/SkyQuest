@@ -9,19 +9,22 @@
  * de l'interface. Toute nouvelle pénalité doit se dégrader proprement avec des données
  * partielles et ne jamais produire une valeur hors de l'intervalle 0–100.
  */
-import type { SkyObject, VisibilityLabel, WeatherNow } from "@/lib/types";
+import { getTargetLightPollutionPenalty, type LightPollutionEstimate } from "./light-pollution.ts";
+import type { QuestTargetType, SkyObject, VisibilityLabel, WeatherNow } from "@/lib/types";
 import type { CatalogSkyObject } from "@/lib/sky-catalog";
 
 type VisibilityInput = {
   object: SkyObject;
   weather: WeatherNow;
   sunAltitude: number;
+  lightPollution?: LightPollutionEstimate;
 };
 
 export function calculateVisibilityScore({
   object,
   weather,
   sunAltitude,
+  lightPollution,
 }: VisibilityInput): number {
   if (object.altitude < 5) {
     return 5;
@@ -76,6 +79,13 @@ export function calculateVisibilityScore({
 
   if (object.name === "Moon" && object.altitude >= 10 && weather.cloudCover < 50 && !daylight) {
     score += 8;
+  }
+
+  if (lightPollution) {
+    score -= getTargetLightPollutionPenalty(
+      object.name === "Moon" ? "moon" : "planet",
+      lightPollution,
+    );
   }
 
   return Math.max(0, Math.min(100, Math.round(score)));
@@ -145,12 +155,14 @@ export function calculateCatalogVisibilityScore({
   weather,
   sunAltitude,
   now,
+  lightPollution,
 }: {
   object: CatalogSkyObject;
   altitude: number;
   weather: WeatherNow;
   sunAltitude: number;
   now: Date;
+  lightPollution?: LightPollutionEstimate;
 }): number {
   if (altitude < 10 || !object.franceFriendly || !isDarkEnoughForStars(weather, sunAltitude)) {
     return 0;
@@ -196,6 +208,10 @@ export function calculateCatalogVisibilityScore({
     score += 8;
   }
 
+  if (lightPollution) {
+    score -= getTargetLightPollutionPenalty(object.type as QuestTargetType, lightPollution);
+  }
+
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
@@ -203,10 +219,12 @@ export function calculateMeteorShowerVisibilityScore({
   weather,
   sunAltitude,
   nearPeak,
+  lightPollution,
 }: {
   weather: WeatherNow;
   sunAltitude: number;
   nearPeak: boolean;
+  lightPollution?: LightPollutionEstimate;
 }): number {
   if (!isDarkEnoughForStars(weather, sunAltitude)) {
     return 0;
@@ -214,6 +232,9 @@ export function calculateMeteorShowerVisibilityScore({
 
   let score = nearPeak ? 76 : 58;
   score += getCloudPenalty(weather.cloudCover);
+  if (lightPollution) {
+    score -= getTargetLightPollutionPenalty("meteor_shower", lightPollution);
+  }
 
   return Math.max(0, Math.min(100, Math.round(score)));
 }

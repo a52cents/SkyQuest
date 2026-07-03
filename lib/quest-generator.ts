@@ -15,6 +15,10 @@
  */
 import { equatorialToHorizontal, getSkyObjects, getSunAltitude } from "@/lib/astro";
 import type { IssVisiblePass } from "@/lib/iss";
+import {
+  getDefaultLightPollutionEstimate,
+  type LightPollutionEstimate,
+} from "@/lib/light-pollution";
 import { isMeteorShowerActive, isNearMeteorShowerPeak, meteorShowers } from "@/lib/meteor-showers";
 import { azimuthToCardinal } from "@/lib/orientation";
 import { catalogSkyObjects } from "@/lib/sky-catalog";
@@ -32,6 +36,7 @@ type GenerateQuestsInput = {
   weather: WeatherNow;
   now: Date;
   issPass?: IssVisiblePass | null;
+  lightPollution?: LightPollutionEstimate;
   limit?: number;
 };
 
@@ -267,6 +272,7 @@ export function generateQuests({
   weather,
   now,
   issPass,
+  lightPollution = getDefaultLightPollutionEstimate(),
   limit = 8,
 }: GenerateQuestsInput): SkyQuest[] {
   if (latitude === null || longitude === null) {
@@ -278,7 +284,12 @@ export function generateQuests({
     const effectiveWeather: WeatherNow = { ...weather, isDay: sunAltitude > 0 };
     const planetCandidates = getSkyObjects(latitude, longitude, now)
       .map((object) => {
-        const score = calculateVisibilityScore({ object, weather: effectiveWeather, sunAltitude });
+        const score = calculateVisibilityScore({
+          object,
+          weather: effectiveWeather,
+          sunAltitude,
+          lightPollution,
+        });
 
         return {
           quest: createQuest(object, score, now),
@@ -311,6 +322,7 @@ export function generateQuests({
           weather: effectiveWeather,
           sunAltitude,
           now,
+          lightPollution,
         });
 
         if (score < 50) {
@@ -338,6 +350,7 @@ export function generateQuests({
           weather: effectiveWeather,
           sunAltitude,
           nearPeak: isNearMeteorShowerPeak(shower, now),
+          lightPollution,
         });
 
         if (score < 50) {
@@ -391,6 +404,7 @@ export function generateFutureQuestSuggestions({
   weather,
   now,
   issPass,
+  lightPollution,
   excludedTargets,
   horizonMinutes = 24 * 60,
 }: {
@@ -399,6 +413,7 @@ export function generateFutureQuestSuggestions({
   weather: WeatherNow;
   now: Date;
   issPass?: IssVisiblePass | null;
+  lightPollution?: LightPollutionEstimate;
   excludedTargets?: ReadonlySet<string>;
   horizonMinutes?: number;
 }): FutureQuestSuggestion[] {
@@ -413,6 +428,7 @@ export function generateFutureQuestSuggestions({
       weather,
       now: date,
       issPass: isIssPassNearTime(issPass, date) ? issPass : null,
+      lightPollution,
       limit: 3,
     }).filter((quest) => quest.targetType !== "free_observation");
 

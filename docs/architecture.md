@@ -9,29 +9,32 @@ UI client
   ├─ permissions navigateur : GPS, caméra, orientation
   ├─ calculs locaux : astronomie, scoring, projection, progression
   ├─ Open-Meteo : météo actuelle
-  └─ /api/iss-pass → N2YO : passage ISS facultatif
+  ├─ /api/iss-pass → N2YO : passage ISS facultatif
+  └─ /api/light-pollution → provider optionnel : qualité du ciel
 ```
 
 ## Routes
 
-| Route           | Responsabilité                                |
-| --------------- | --------------------------------------------- |
-| `/`             | vitrine web ou dashboard en mode PWA installé |
-| `/quest/[id]`   | guidage de la quête active                    |
-| `/journal`      | observations stockées localement              |
-| `/explore`      | catalogue pédagogique                         |
-| `/profile`      | XP, rangs, séries et accomplissements         |
-| `/api/iss-pass` | proxy facultatif vers N2YO                    |
+| Route                  | Responsabilité                                |
+| ---------------------- | --------------------------------------------- |
+| `/`                    | vitrine web ou dashboard en mode PWA installé |
+| `/quest/[id]`          | guidage de la quête active                    |
+| `/journal`             | observations stockées localement              |
+| `/explore`             | catalogue pédagogique                         |
+| `/profile`             | XP, rangs, séries et accomplissements         |
+| `/api/iss-pass`        | proxy facultatif vers N2YO                    |
+| `/api/light-pollution` | estimation de qualité du ciel et fallback     |
 
 ## Flux « Maintenant »
 
 1. `Dashboard` demande la position après un clic.
 2. `weather.ts` interroge Open-Meteo et fournit un fallback prudent en cas d'échec.
-3. `astro.ts` calcule le Soleil, la Lune et les planètes.
-4. `quest-generator.ts` rassemble les candidats du catalogue, des météores et de l'ISS.
-5. `visibility.ts` attribue les scores.
-6. Le dashboard conserve l'analyse en cache et affiche les quêtes dans l'ordre de pertinence.
-7. `storage.ts` sauvegarde la quête choisie avant la navigation vers `/quest/[id]`.
+3. Le client interroge `/api/light-pollution` avec des coordonnées arrondies et relit son cache local si possible.
+4. `astro.ts` calcule le Soleil, la Lune et les planètes.
+5. `quest-generator.ts` rassemble les candidats du catalogue, des météores et de l'ISS.
+6. `visibility.ts` attribue les scores, avec un impact plus fort sur les objets faibles.
+7. Le dashboard conserve l'analyse en cache et affiche les quêtes dans l'ordre de pertinence.
+8. `storage.ts` sauvegarde la quête choisie avant la navigation vers `/quest/[id]`.
 
 ## Séparation des responsabilités
 
@@ -53,6 +56,7 @@ Les lectures doivent tolérer un stockage indisponible, corrompu ou provenant d'
 
 - Open-Meteo est appelé directement par le navigateur ;
 - N2YO est appelé côté serveur uniquement si `N2YO_API_KEY` existe ;
+- le provider de qualité du ciel est appelé côté serveur uniquement si `LIGHT_POLLUTION_API_URL` existe ;
 - le middleware définit CSP, Permissions Policy, HSTS en production et protections anti-frame ;
 - GPS, caméra et orientation exigent HTTPS hors `localhost`.
 

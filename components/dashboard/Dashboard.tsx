@@ -26,6 +26,8 @@ import { getCurrentPosition, type GeoPosition } from "@/lib/browser-support";
 import { getUpcomingCelestialEvents, type CelestialEventType } from "@/lib/celestial-events";
 import { haptic } from "@/lib/haptics";
 import { fetchNextIssVisiblePass } from "@/lib/iss";
+import { fetchLightPollutionEstimate } from "@/lib/light-pollution-client";
+import type { LightPollutionEstimate } from "@/lib/light-pollution";
 import { getOnboardingCompleted, setOnboardingCompleted } from "@/lib/storage";
 import { meteorShowers } from "@/lib/meteor-showers";
 import { calculateBestSkyWindow } from "@/lib/sky-window";
@@ -80,6 +82,7 @@ type DashboardAnalysis = {
   quests: SkyQuest[];
   futureSuggestions: FutureQuestSuggestion[];
   bestSkyWindow?: BestSkyWindow;
+  lightPollution?: LightPollutionEstimate;
 };
 
 const QUEST_TARGET_LABELS: Record<QuestTargetType, string> = {
@@ -310,6 +313,7 @@ export function Dashboard() {
   const [quests, setQuests] = useState<SkyQuest[]>([]);
   const [futureSuggestions, setFutureSuggestions] = useState<FutureQuestSuggestion[]>([]);
   const [bestSkyWindow, setBestSkyWindow] = useState<BestSkyWindow | null>(null);
+  const [lightPollution, setLightPollution] = useState<LightPollutionEstimate | null>(null);
   const [eventTimeline, setEventTimeline] = useState<TimelineEvent[]>([]);
   const [profile, setProfile] = useState<ProgressProfile | null>(null);
   const [observations, setObservations] = useState<Observation[]>([]);
@@ -342,27 +346,29 @@ export function Dashboard() {
     const currentDate = new Date();
     let currentWeatherFailed = false;
     let forecastFailed = false;
-    const [currentWeather, forecast, currentIssPass, futureIssPass] = await Promise.all([
-      fetchWeatherNow(coords.latitude, coords.longitude).catch(() => {
-        currentWeatherFailed = true;
-        return getFallbackWeather();
-      }),
-      fetchWeatherForecast(coords.latitude, coords.longitude, 24).catch(() => {
-        forecastFailed = true;
-        return getFallbackWeatherForecast(currentDate);
-      }),
-      fetchNextIssVisiblePass({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        now: currentDate,
-      }).catch(() => null),
-      fetchNextIssVisiblePass({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        now: currentDate,
-        horizonMinutes: 24 * 60,
-      }).catch(() => null),
-    ]);
+    const [currentWeather, forecast, currentIssPass, futureIssPass, currentLightPollution] =
+      await Promise.all([
+        fetchWeatherNow(coords.latitude, coords.longitude).catch(() => {
+          currentWeatherFailed = true;
+          return getFallbackWeather();
+        }),
+        fetchWeatherForecast(coords.latitude, coords.longitude, 24).catch(() => {
+          forecastFailed = true;
+          return getFallbackWeatherForecast(currentDate);
+        }),
+        fetchNextIssVisiblePass({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          now: currentDate,
+        }).catch(() => null),
+        fetchNextIssVisiblePass({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          now: currentDate,
+          horizonMinutes: 24 * 60,
+        }).catch(() => null),
+        fetchLightPollutionEstimate(coords.latitude, coords.longitude),
+      ]);
     const weatherNotice =
       currentWeatherFailed && forecastFailed
         ? "Météo indisponible : des estimations prudentes sont utilisées."
@@ -378,6 +384,7 @@ export function Dashboard() {
       weather: currentWeather,
       now: currentDate,
       issPass: currentIssPass,
+      lightPollution: currentLightPollution,
       limit: 20,
     });
     const nextFutureSuggestions = generateFutureQuestSuggestions({
@@ -386,6 +393,7 @@ export function Dashboard() {
       weather: currentWeather,
       now: currentDate,
       issPass: futureIssPass,
+      lightPollution: currentLightPollution,
       excludedTargets: new Set(nextQuests.map((quest) => quest.target)),
       horizonMinutes: 7 * 24 * 60,
     });
@@ -393,6 +401,7 @@ export function Dashboard() {
       latitude: coords.latitude,
       longitude: coords.longitude,
       forecast,
+      lightPollution: currentLightPollution,
       now: currentDate,
     });
 
@@ -404,12 +413,14 @@ export function Dashboard() {
       quests: nextQuests,
       futureSuggestions: nextFutureSuggestions,
       bestSkyWindow: nextBestSkyWindow,
+      lightPollution: currentLightPollution,
     };
 
     setWeather(currentWeather);
     setQuests(nextQuests);
     setFutureSuggestions(nextFutureSuggestions);
     setBestSkyWindow(nextBestSkyWindow);
+    setLightPollution(currentLightPollution);
     saveBestSkyWindow(nextBestSkyWindow);
     setAnalysisSavedAt(savedAt);
     setIsGuidanceUnlocked(true);
@@ -437,6 +448,7 @@ export function Dashboard() {
       setQuests(cachedAnalysis.quests);
       setFutureSuggestions(cachedAnalysis.futureSuggestions);
       setBestSkyWindow(cachedAnalysis.bestSkyWindow ?? null);
+      setLightPollution(cachedAnalysis.lightPollution ?? null);
       setAnalysisSavedAt(cachedAnalysis.savedAt);
       setIsGuidanceUnlocked(unlockedAnalysisForRuntime === cachedAnalysis.savedAt);
       setLoadState("ready");
@@ -594,6 +606,24 @@ export function Dashboard() {
             <div className="condition-label">Cibles</div>
           </div>
         </MotionBlock>
+
+        {lightPollution ? (
+          <MotionBlock className="sky-quality-card">
+            <svg className="sky-quality-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" />
+              <path d="M18 3v3m-1.5-1.5h3M5 5v2M4 6h2" />
+            </svg>
+            <div>
+              <span>Qualité du ciel</span>
+              <strong>{lightPollution.label}</strong>
+              <p>{lightPollution.shortAdvice}</p>
+              <small>
+                Estimation{lightPollution.confidence === "low" ? " prudente" : " locale"}, sans
+                garantie d’observation.
+              </small>
+            </div>
+          </MotionBlock>
+        ) : null}
 
         {analysisDateLabel ? (
           <MotionBlock className={`analysis-banner ${isGuidanceUnlocked ? "current" : "stale"}`}>

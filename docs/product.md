@@ -20,7 +20,7 @@ Maintenant → conditions du ciel → quête → guidage 2D → résultat → jo
 ```
 
 1. L'utilisateur appuie sur **Maintenant**.
-2. SkyQuest demande la position et récupère la météo.
+2. SkyQuest demande la position, récupère la météo et estime la qualité du ciel.
 3. L'application calcule et classe les cibles possibles.
 4. Elle affiche les quêtes fiables dans un ordre de priorité compréhensible.
 5. L'utilisateur ouvre le guidage d'une quête.
@@ -41,6 +41,10 @@ Maintenant → conditions du ciel → quête → guidage 2D → résultat → jo
 Une quête comporte une cible, un titre, une difficulté, un score de visibilité, une direction, une altitude approximative, un conseil et le matériel recommandé. Certaines cibles peuvent aussi fournir un avertissement ou un horaire conseillé.
 
 Les principales familles sont la Lune, les planètes, les étoiles, les constellations, les astérismes, les amas, les galaxies accessibles, les météores et l'ISS.
+
+La qualité du ciel est présentée comme une estimation. La pollution lumineuse pénalise surtout les
+galaxies, amas et météores ; elle ne doit pas masquer une planète ou la Lune lorsque les autres
+conditions sont bonnes.
 
 ## Ce que SkyQuest n'est pas
 
