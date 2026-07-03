@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { AppCard } from "@/components/AppCard";
 import { NasaHighlights } from "@/components/NasaHighlights";
@@ -70,29 +72,46 @@ export default function ExplorePage() {
             variants={item}
             whileHover={prefersReducedMotion ? undefined : { scale: 1.015 }}
           >
-            <AppCard
-              as="article"
-              padding="sm"
-              className="transition-colors hover:border-white/[0.14]"
+            <Link
+              href={`/explore/${object.id}`}
+              className="group block rounded-[20px] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <span className="inline-flex rounded-full border border-accent/20 bg-accent/[0.08] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-accent">
+              <AppCard
+                as="article"
+                padding="sm"
+                className="overflow-hidden transition-colors hover:border-white/[0.14]"
+              >
+                <div className="relative aspect-[16/9] overflow-hidden rounded-[14px] bg-surface">
+                  <Image
+                    src={object.image.src}
+                    alt=""
+                    fill
+                    sizes="(max-width: 600px) calc(100vw - 72px), 528px"
+                    className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                  <span className="absolute bottom-3 left-3 inline-flex rounded-full border border-white/15 bg-black/45 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-white backdrop-blur-sm">
                     {typeLabels[object.type]}
                   </span>
-                  <h2 className="mt-3 font-[Georgia,'Times_New_Roman',serif] text-xl font-normal text-text">
-                    {object.frenchName}
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-muted">{object.description}</p>
                 </div>
-                <span className="text-xl text-accent" aria-hidden="true">
-                  ✦
-                </span>
-              </div>
-              <p className="mt-4 border-t border-white/[0.06] pt-3 text-xs leading-5 text-faint">
-                {object.observationTip}
-              </p>
-            </AppCard>
+                <div className="mt-4 flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="font-[Georgia,'Times_New_Roman',serif] text-xl font-normal text-text">
+                      {object.frenchName}
+                    </h2>
+                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted">
+                      {object.description}
+                    </p>
+                  </div>
+                  <span className="text-xl text-accent" aria-hidden="true">
+                    →
+                  </span>
+                </div>
+                <p className="mt-4 border-t border-white/[0.06] pt-3 text-xs leading-5 text-faint">
+                  {object.observationTip}
+                </p>
+              </AppCard>
+            </Link>
           </motion.div>
         ))}
       </motion.div>
