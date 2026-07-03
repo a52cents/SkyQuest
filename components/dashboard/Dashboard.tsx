@@ -646,10 +646,6 @@ export function Dashboard() {
           </div>
         </MotionBlock>
 
-        <MotionBlock>
-          <PushPermissionCard />
-        </MotionBlock>
-
         <MotionBlock className="section-header">
           <h2 className="section-title">Quêtes du soir</h2>
           <span className={`status-pill ${loadState === "loading" ? "loading" : ""}`}>
@@ -846,6 +842,10 @@ export function Dashboard() {
             })}
           </motion.div>
         </section>
+
+        <MotionBlock>
+          <PushPermissionCard />
+        </MotionBlock>
 
         <section id="journal">
           <MotionBlock className="section-header spaced">

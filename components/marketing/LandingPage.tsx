@@ -490,9 +490,9 @@ export function LandingPage() {
           <Reveal>
             <div className="section-label">Permissions</div>
             <h2 className="section-title">
-              Quatre accès,
+              Trois accès,
               <br />
-              rien de plus
+              toujours à la demande
             </h2>
             <p className="section-desc">
               SkyQuest demande le strict minimum. Chaque permission a un rôle précis — et tu gardes
@@ -533,7 +533,7 @@ export function LandingPage() {
                 <svg viewBox="0 0 24 24">
                   <circle cx="12" cy="12" r="10" />
                   <path d="M12 2L12 22M2 12L22 12" />
-                  <path d="M12 2a1515 0 0 1 0 20M12 2a15 15 0 0 0 0 20" />
+                  <path d="M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20" />
                 </svg>
               </div>
               <h3>Orientation</h3>
@@ -542,17 +542,6 @@ export function LandingPage() {
                 direction.
               </p>
               <span className="tag">À la demande</span>
-            </Reveal>
-            <Reveal className="access-card">
-              <div className="access-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                  <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
-                  <path d="M10 21h4" />
-                </svg>
-              </div>
-              <h3>Notifications</h3>
-              <p>Pour te prévenir rarement lorsqu’une occasion d’observer semble intéressante.</p>
-              <span className="tag">Facultatif</span>
             </Reveal>
           </div>
           <Reveal>

@@ -64,8 +64,6 @@ html.night-mode .sky-dashboard .analysis-banner {
   box-sizing: border-box;
 }
 .sky-dashboard * {
-  margin: 0;
-  padding: 0;
   -webkit-tap-highlight-color: transparent;
 }
 .sky-dashboard ::selection {
