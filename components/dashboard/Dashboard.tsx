@@ -27,7 +27,7 @@ import { VisibilityExplanationContent } from "@/components/VisibilityExplanation
 import { getCurrentPosition, type GeoPosition } from "@/lib/browser-support";
 import { getUpcomingCelestialEvents, type CelestialEventType } from "@/lib/celestial-events";
 import { haptic } from "@/lib/haptics";
-import { fetchNextIssVisiblePass } from "@/lib/iss";
+import { fetchNextIssVisiblePass, isIssQuestGuidable } from "@/lib/iss";
 import { fetchLightPollutionEstimate } from "@/lib/light-pollution-client";
 import type { LightPollutionEstimate } from "@/lib/light-pollution";
 import { fetchLightingPracticeEstimate } from "@/lib/lighting-practices-client";
@@ -35,6 +35,7 @@ import type { LightingPracticeEstimate } from "@/lib/lighting-practices";
 import { getOnboardingCompleted, setOnboardingCompleted } from "@/lib/storage";
 import { meteorShowers } from "@/lib/meteor-showers";
 import { getNasaUpcomingEvents, type NasaHighlights, type NasaUpcomingEvent } from "@/lib/nasa";
+import { createNetworkTimeoutSignal } from "@/lib/network";
 import { calculateBestSkyWindow } from "@/lib/sky-window";
 import { getAchievementProgress, getRankProgress } from "@/lib/progression";
 import {
@@ -42,6 +43,7 @@ import {
   generateQuests,
   type FutureQuestSuggestion,
 } from "@/lib/quest-generator";
+import { isGeneratedAtFresh, isQuestFresh, SKY_DATA_TTL_MS } from "@/lib/quest-freshness";
 import {
   getObservations,
   getProgressProfile,
@@ -84,6 +86,7 @@ let unlockedAnalysisForRuntime: number | null = null;
 
 type DashboardAnalysis = {
   savedAt: number;
+  generatedAt: string;
   position: GeoPosition;
   weather: WeatherNow;
   quests: SkyQuest[];
@@ -203,7 +206,13 @@ function readCachedAnalysis(): DashboardAnalysis | null {
     ) {
       return null;
     }
-    return value as DashboardAnalysis;
+    return {
+      ...value,
+      generatedAt:
+        typeof value.generatedAt === "string"
+          ? value.generatedAt
+          : new Date(value.savedAt).toISOString(),
+    } as DashboardAnalysis;
   } catch {
     return null;
   }
@@ -255,6 +264,16 @@ function MotionBlock({ children, className }: { children: ReactNode; className?:
   );
 }
 
+function isQuestGuidanceAvailable(quest: SkyQuest, isGuidanceUnlocked: boolean): boolean {
+  if (!isQuestFresh(quest)) return false;
+  if (quest.targetType === "free_observation") return true;
+  if (!isGuidanceUnlocked) return false;
+  if (quest.targetType === "satellite") {
+    return isIssQuestGuidable(quest.startsAt, quest.endsAt);
+  }
+  return true;
+}
+
 function QuestCard({
   quest,
   onStart,
@@ -267,6 +286,10 @@ function QuestCard({
   stale: boolean;
 }) {
   const prefersReducedMotion = useReducedMotion() ?? false;
+  const isSatelliteUpcoming =
+    quest.targetType === "satellite" &&
+    quest.startsAt !== undefined &&
+    new Date(quest.startsAt).getTime() > Date.now();
   return (
     <motion.article
       layout
@@ -289,7 +312,9 @@ function QuestCard({
             ? "Dernière analyse"
             : "Guidage indisponible"
           : quest.altitude !== null && quest.altitude >= 10
-            ? "Visible maintenant"
+            ? isSatelliteUpcoming
+              ? "Passage imminent"
+              : "Visible maintenant"
             : "Observation prudente"}
       </div>
       <h3>{quest.title}</h3>
@@ -357,6 +382,8 @@ export function Dashboard() {
   const [isOnboardingReady, setIsOnboardingReady] = useState(false);
   const [isLocationLoading, setIsLocationLoading] = useState(false);
   const [analysisSavedAt, setAnalysisSavedAt] = useState<number | null>(null);
+  const [analysisGeneratedAt, setAnalysisGeneratedAt] = useState<string | null>(null);
+  const [hasAnalysisExpired, setHasAnalysisExpired] = useState(false);
   const [isGuidanceUnlocked, setIsGuidanceUnlocked] = useState(false);
   const [showAllQuests, setShowAllQuests] = useState(false);
 
@@ -454,8 +481,10 @@ export function Dashboard() {
     });
 
     const savedAt = Date.now();
+    const generatedAt = currentDate.toISOString();
     const analysis = {
       savedAt,
+      generatedAt,
       position: coords,
       weather: currentWeather,
       quests: nextQuests,
@@ -475,6 +504,8 @@ export function Dashboard() {
     setAirQuality(currentAirQuality);
     saveBestSkyWindow(nextBestSkyWindow);
     setAnalysisSavedAt(savedAt);
+    setAnalysisGeneratedAt(generatedAt);
+    setHasAnalysisExpired(false);
     setIsGuidanceUnlocked(true);
     unlockedAnalysisForRuntime = savedAt;
     setShowAllQuests(false);
@@ -488,7 +519,7 @@ export function Dashboard() {
     const currentDate = new Date();
     const localTimeline = createEventTimeline(currentDate);
     setEventTimeline(localTimeline);
-    void fetch("/api/nasa/highlights")
+    void fetch("/api/nasa/highlights", { signal: createNetworkTimeoutSignal() })
       .then((response) => {
         if (!response.ok) throw new Error("NASA events unavailable");
         return response.json() as Promise<NasaHighlights>;
@@ -510,6 +541,7 @@ export function Dashboard() {
 
     const cachedAnalysis = readCachedAnalysis();
     if (cachedAnalysis) {
+      const isFresh = isGeneratedAtFresh(cachedAnalysis.generatedAt);
       setWeather(cachedAnalysis.weather);
       setQuests(cachedAnalysis.quests);
       setFutureSuggestions(cachedAnalysis.futureSuggestions);
@@ -518,7 +550,12 @@ export function Dashboard() {
       setLightingPractice(cachedAnalysis.lightingPractice ?? null);
       setAirQuality(cachedAnalysis.airQuality ?? null);
       setAnalysisSavedAt(cachedAnalysis.savedAt);
-      setIsGuidanceUnlocked(unlockedAnalysisForRuntime === cachedAnalysis.savedAt);
+      setAnalysisGeneratedAt(cachedAnalysis.generatedAt);
+      setHasAnalysisExpired(!isFresh);
+      setIsGuidanceUnlocked(isFresh && unlockedAnalysisForRuntime === cachedAnalysis.savedAt);
+      if (!isFresh) {
+        setNotice("Cette analyse a expiré. Relancer Maintenant pour actualiser le ciel.");
+      }
       setLoadState("ready");
     }
 
@@ -527,11 +564,34 @@ export function Dashboard() {
     };
   }, [loadDashboard]);
 
+  useEffect(() => {
+    if (!analysisGeneratedAt || hasAnalysisExpired) return;
+
+    const generatedTime = new Date(analysisGeneratedAt).getTime();
+    const remainingMs = generatedTime + SKY_DATA_TTL_MS - Date.now();
+    const expireAnalysis = () => {
+      setHasAnalysisExpired(true);
+      setIsGuidanceUnlocked(false);
+      unlockedAnalysisForRuntime = null;
+      setNotice("Cette analyse a expiré. Relancer Maintenant pour actualiser le ciel.");
+    };
+
+    if (!Number.isFinite(generatedTime) || remainingMs <= 0) {
+      expireAnalysis();
+      return;
+    }
+
+    const timeoutId = window.setTimeout(expireAnalysis, remainingMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [analysisGeneratedAt, hasAnalysisExpired]);
+
   async function handleRefreshRequest() {
     if (isLocationLoading) return;
 
     haptic("select");
     setIsGuidanceUnlocked(false);
+    setHasAnalysisExpired(false);
+    unlockedAnalysisForRuntime = null;
     setIsLocationLoading(true);
     setNotice(null);
 
@@ -540,13 +600,24 @@ export function Dashboard() {
       saveLastLocation(coords);
       await loadDashboard(coords);
     } catch (error) {
+      const fallbackWeather = getFallbackWeather();
       const fallbackQuests = generateQuests({
         latitude: null,
         longitude: null,
-        weather: getFallbackWeather(),
+        weather: fallbackWeather,
         now: new Date(),
       });
-      setQuests((currentQuests) => (currentQuests.length > 0 ? currentQuests : fallbackQuests));
+      setWeather(fallbackWeather);
+      setQuests(fallbackQuests);
+      setFutureSuggestions([]);
+      setBestSkyWindow(null);
+      setLightPollution(null);
+      setLightingPractice(null);
+      setAirQuality(null);
+      setAnalysisSavedAt(null);
+      setAnalysisGeneratedAt(null);
+      setHasAnalysisExpired(false);
+      setShowAllQuests(false);
       setLoadState("ready");
       setNotice(
         error instanceof Error
@@ -559,7 +630,7 @@ export function Dashboard() {
   }
 
   function handleStart(quest: SkyQuest) {
-    if (!isGuidanceUnlocked) {
+    if (!isQuestGuidanceAvailable(quest, isGuidanceUnlocked)) {
       setNotice("Appuie sur « Maintenant » pour actualiser le ciel avant de lancer un guidage.");
       return;
     }
@@ -754,7 +825,9 @@ export function Dashboard() {
             <p>
               {isGuidanceUnlocked
                 ? "Les guidages sont disponibles pour cette analyse."
-                : "Ces résultats sont affichés à titre indicatif. Appuie sur « Maintenant » avant tout guidage."}
+                : hasAnalysisExpired
+                  ? "Cette analyse a expiré. Relancer Maintenant pour actualiser le ciel."
+                  : "Ces résultats sont affichés à titre indicatif. Appuie sur « Maintenant » avant tout guidage."}
             </p>
           </MotionBlock>
         ) : null}
@@ -849,7 +922,7 @@ export function Dashboard() {
                 key={quest.id}
                 quest={quest}
                 onStart={handleStart}
-                locked={!isGuidanceUnlocked}
+                locked={!isQuestGuidanceAvailable(quest, isGuidanceUnlocked)}
                 stale={analysisSavedAt !== null}
               />
             ))}

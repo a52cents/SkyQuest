@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { PushPermissionCard } from "@/components/PushPermissionCard";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
@@ -10,13 +10,6 @@ import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 const HERO_IMAGE = "/HERO_IMAGE.webp";
 const OBSERVATION_IMAGE = "/OBSERVATION_IMAGE.webp";
 const PRIVACY_IMAGE = "/PRIVACY_IMAGE.webp";
-const SKY_STATUSES = [
-  "Cielobservable",
-  "Conditions optimales",
-  "Nuit claire détectée",
-  "Prêt pour l'observation",
-];
-
 type Star = {
   x: number;
   y: number;
@@ -76,8 +69,6 @@ export function LandingPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const prefersReducedMotion = useReducedMotion() ?? false;
   const { canPrompt, installed, promptInstall } = useInstallPrompt();
-  const [skyStatus, setSkyStatus] = useState(SKY_STATUSES[0]);
-  const [skyStatusVisible, setSkyStatusVisible] = useState(true);
 
   useEffect(() => {
     const previousScrollBehavior = document.documentElement.style.scrollBehavior;
@@ -101,24 +92,6 @@ export function LandingPage() {
     window.addEventListener("scroll", updateNav, { passive: true });
     updateNav();
     return () => window.removeEventListener("scroll", updateNav);
-  }, []);
-
-  useEffect(() => {
-    let statusIndex = 0;
-    let revealTimeout = 0;
-    const interval = window.setInterval(() => {
-      statusIndex = (statusIndex + 1) % SKY_STATUSES.length;
-      setSkyStatusVisible(false);
-      revealTimeout = window.setTimeout(() => {
-        setSkyStatus(SKY_STATUSES[statusIndex]);
-        setSkyStatusVisible(true);
-      }, 300);
-    }, 3500);
-
-    return () => {
-      window.clearInterval(interval);
-      window.clearTimeout(revealTimeout);
-    };
   }, []);
 
   useEffect(() => {
@@ -219,15 +192,16 @@ export function LandingPage() {
         >
           <motion.div className="hero-eyebrow" variants={heroItemVariants}>
             <span className="dot" />
-            Ciel actuel · Conseils simples
+            Estimations locales · Conseils simples
           </motion.div>
           <motion.h1 variants={heroItemVariants}>
             Le ciel a quelque chose
             <br />à <span className="accent">te montrer</span>
           </motion.h1>
           <motion.p variants={heroItemVariants}>
-            Des observations choisies selon ta position, la météo et ce qui est réellement visible.
-            Ton compagnon de poche pour explorer la voûte céleste.
+            {
+              "Des cibles à tenter selon ta position, l'heure et la météo estimée. Les conditions restent toujours à vérifier sur place."
+            }
           </motion.p>
           <motion.div className="hero-cta" variants={heroItemVariants}>
             <a href="#cta" className="btn btn-primary" onClick={showInstallInstructions}>
@@ -248,8 +222,8 @@ export function LandingPage() {
         variants={heroContainerVariants}
       >
         <motion.div className="stat" variants={heroItemVariants}>
-          <div className="stat-num">88</div>
-          <div className="stat-label">Constellations</div>
+          <div className="stat-num">GPS + météo</div>
+          <div className="stat-label">Contexte estimé</div>
         </motion.div>
         <motion.div className="stat" variants={heroItemVariants}>
           <div className="stat-num">0</div>
@@ -260,8 +234,8 @@ export function LandingPage() {
           <div className="stat-label">Journal local</div>
         </motion.div>
         <motion.div className="stat" variants={heroItemVariants}>
-          <div className="stat-num">24/7</div>
-          <div className="stat-label">Disponible</div>
+          <div className="stat-num">PWA</div>
+          <div className="stat-label">Installable</div>
         </motion.div>
       </motion.div>
 
@@ -276,7 +250,7 @@ export function LandingPage() {
             </h2>
             <p className="section-desc">
               SkyQuest reste volontairement simple. Pas de cartes complexes ni de jargon technique —
-              juste le ciel, ta position, et ce que tu peux vraiment voir ce soir.
+              juste le ciel, ta position et des cibles simples à tenter ce soir.
             </p>
           </Reveal>
           <div className="features-grid">
@@ -286,10 +260,10 @@ export function LandingPage() {
                   <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                 </svg>
               </div>
-              <h3>Ciel en temps réel</h3>
+              <h3>Ciel estimé maintenant</h3>
               <p>
                 {
-                  "Voici ce que tu peux voir maintenant, calculé d'après ta position et l'heure exacte. Pas de théorie — uniquement le ciel réel au-dessus de ta tête."
+                  "SkyQuest calcule la position de cibles du catalogue pour ton lieu et l'heure actuelle, puis propose les plus favorables."
                 }
               </p>
             </Reveal>
@@ -303,7 +277,7 @@ export function LandingPage() {
               <h3>Conseils météo</h3>
               <p>
                 {
-                  "Cloudiness, humidité, phases lunaires — SkyQuest filtre intelligemment pour ne te montrer que les bonnes fenêtres d'observation."
+                  "Couverture nuageuse, humidité et Lune alimentent un indice indicatif. La météo locale peut différer de l'estimation."
                 }
               </p>
             </Reveal>
@@ -316,7 +290,7 @@ export function LandingPage() {
               <h3>Guidage 2D</h3>
               <p>
                 {
-                  "Pointe ton téléphone vers le ciel. La caméra et les capteurs d'orientation te guident directement vers les objets visibles, pas à pas."
+                  "La caméra et les capteurs donnent une direction approximative. Ils aident à chercher sans garantir que la cible sera visible."
                 }
               </p>
             </Reveal>
@@ -343,7 +317,7 @@ export function LandingPage() {
               <h3>Maintenant &amp; futur</h3>
               <p>
                 {
-                  "Planifie tes soirées d'observation. Regarde ce qui sera visible plus tard ce soir, cette semaine, ou lors du prochain événement céleste."
+                  "Consulte des suggestions pour plus tard et des événements célestes à venir. Les conditions devront être recalculées au moment d'observer."
                 }
               </p>
             </Reveal>
@@ -356,9 +330,7 @@ export function LandingPage() {
               </div>
               <h3>Installable</h3>
               <p>
-                {
-                  "Ajoute SkyQuest à ton écran d'accueil. Une vraie app, sans store d'applications — légère, instantanée, toujours prête."
-                }
+                {"Ajoute cette PWA à ton écran d'accueil sans passer par un store d'applications."}
               </p>
             </Reveal>
           </div>
@@ -388,15 +360,15 @@ export function LandingPage() {
               <ul className="showcase-features">
                 <li>
                   <span className="check" />
-                  Carte du ciel adaptée à ta position GPS
+                  Quêtes adaptées à ta position GPS
                 </li>
                 <li>
                   <span className="check" />
-                  Filtrage par conditions météo en temps réel
+                  Estimation météo récente via Open-Meteo
                 </li>
                 <li>
                   <span className="check" />
-                  {"Guidage par caméra et capteurs d'orientation"}
+                  {"Aide caméra 2D et orientation approximative"}
                 </li>
                 <li>
                   <span className="check" />
@@ -415,7 +387,7 @@ export function LandingPage() {
               <img src={PRIVACY_IMAGE} alt="Personne observant les étoiles depuis une colline" />
               <div className="privacy-badge">
                 <span className="dot" />
-                On-device · Zero tracking
+                Journal local · Sans compte
               </div>
             </Reveal>
             <Reveal className="privacy-content">
@@ -458,7 +430,7 @@ export function LandingPage() {
                     <h3>Accès à la demande</h3>
                     <p>
                       {
-                        "Rien en arrière-plan. Les capteurs s'activent uniquement quand tu ouvres l'app — et se ferment quand tu la quittes."
+                        "La position est demandée avec Maintenant. La caméra et l'orientation ne démarrent que pendant un guidage."
                       }
                     </p>
                   </div>
@@ -509,8 +481,9 @@ export function LandingPage() {
               </div>
               <h3>Position</h3>
               <p>
-                Pour adapter le ciel à ton lieu exact et afficher les objets visibles depuis ta
-                position.
+                {
+                  "Pour calculer la position approximative des cibles depuis ton lieu au moment de l'analyse."
+                }
               </p>
               <span className="tag">À la demande</span>
             </Reveal>
@@ -523,8 +496,9 @@ export function LandingPage() {
               </div>
               <h3>Caméra</h3>
               <p>
-                Pour le guidage 2D en réalité augmentée — superposer les constellations sur le ciel
-                réel.
+                {
+                  "Pour afficher une aide visuelle 2D pendant le guidage. Aucune photo n'est envoyée."
+                }
               </p>
               <span className="tag">À la demande</span>
             </Reveal>
@@ -560,7 +534,7 @@ export function LandingPage() {
             </h2>
             <p>
               {
-                "Aucune installation, aucun compte. Ajoute SkyQuest à ton écran d'accueil et regarde vers le haut."
+                "Sans store et sans compte. Ajoute SkyQuest à ton écran d'accueil et regarde vers le haut."
               }
             </p>
             <div className="hero-cta">
@@ -611,9 +585,7 @@ export function LandingPage() {
             <span>© 2026 SkyQuest · Fait sous les étoiles</span>
             <div className="sky-state">
               <span className="dot" />
-              <span className={skyStatusVisible ? "status-visible" : "status-hidden"}>
-                {skyStatus}
-              </span>
+              <span className="status-visible">Estimations à vérifier sur place</span>
             </div>
           </div>
         </div>

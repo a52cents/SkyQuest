@@ -1,3 +1,5 @@
+import { createNetworkTimeoutSignal } from "./network.ts";
+
 export type IssVisiblePass = {
   startAzimuth: number;
   maxAzimuth: number;
@@ -23,6 +25,49 @@ export type N2yoVisualPassResponse = {
 };
 
 const MAX_MINUTES_UNTIL_PASS = 90;
+const ISS_GUIDANCE_LEAD_MS = 5 * 60 * 1000;
+
+export function getIssPassEndTime(pass: IssVisiblePass): Date {
+  return new Date(
+    Math.max(
+      pass.maxTime.getTime(),
+      pass.startTime.getTime() + Math.max(0, pass.durationSeconds) * 1000,
+    ),
+  );
+}
+
+export function isIssPassGuidable(pass: IssVisiblePass, now = new Date()): boolean {
+  const startsAt = pass.startTime.getTime();
+  const endsAt = getIssPassEndTime(pass).getTime();
+  const currentTime = now.getTime();
+
+  return (
+    Number.isFinite(startsAt) &&
+    Number.isFinite(endsAt) &&
+    Number.isFinite(currentTime) &&
+    currentTime >= startsAt - ISS_GUIDANCE_LEAD_MS &&
+    currentTime <= endsAt
+  );
+}
+
+export function isIssQuestGuidable(
+  startsAt: string | undefined,
+  endsAt: string | undefined,
+  now = new Date(),
+): boolean {
+  if (!startsAt || !endsAt) return false;
+
+  const startTime = new Date(startsAt).getTime();
+  const endTime = new Date(endsAt).getTime();
+  const currentTime = now.getTime();
+  return (
+    Number.isFinite(startTime) &&
+    Number.isFinite(endTime) &&
+    Number.isFinite(currentTime) &&
+    currentTime >= startTime - ISS_GUIDANCE_LEAD_MS &&
+    currentTime <= endTime
+  );
+}
 
 export async function fetchNextIssVisiblePass({
   latitude,
@@ -41,7 +86,10 @@ export async function fetchNextIssVisiblePass({
   url.searchParams.set("now", now.toISOString());
   url.searchParams.set("horizonMinutes", horizonMinutes.toString());
 
-  const response = await fetch(url.toString(), { cache: "no-store" });
+  const response = await fetch(url.toString(), {
+    cache: "no-store",
+    signal: createNetworkTimeoutSignal(),
+  });
 
   if (!response.ok) {
     return null;
@@ -80,7 +128,9 @@ export function findNextIssVisiblePass(
   const pass = data.passes
     ?.filter(
       (candidate) =>
-        typeof candidate.startUTC === "number" && candidate.startUTC <= maxStartSeconds,
+        typeof candidate.startUTC === "number" &&
+        candidate.startUTC <= maxStartSeconds &&
+        candidate.startUTC + Math.max(0, candidate.duration ?? 0) >= nowSeconds,
     )
     .find((candidate) => typeof candidate.maxEl === "number" && candidate.maxEl >= 15);
 

@@ -14,6 +14,10 @@ const landingCss = readFileSync(
   new URL("../components/marketing/LandingPage.css", import.meta.url),
   "utf8",
 );
+const landingSource = readFileSync(
+  new URL("../components/marketing/LandingPage.tsx", import.meta.url),
+  "utf8",
+);
 const onboardingSource = readFileSync(
   new URL("../components/Onboarding.tsx", import.meta.url),
   "utf8",
@@ -46,4 +50,24 @@ test("sky explanations share one compact disclosure below the condition tiles", 
   assert.match(dashboardSource, /Indice de visibilité · Qualité du ciel/);
   assert.equal((dashboardSource.match(/className="sky-quality-card"/g) ?? []).length, 1);
   assert.match(dashboardCss, /\.sky-dashboard \.sky-insights-details\s*\{/);
+});
+
+test("free observation replaces stale quests and remains usable without GPS", () => {
+  assert.match(dashboardSource, /if \(quest\.targetType === "free_observation"\) return true/);
+  assert.match(dashboardSource, /setQuests\(fallbackQuests\)/);
+  assert.doesNotMatch(
+    dashboardSource,
+    /setQuests\(\(currentQuests\) => \(currentQuests\.length > 0/,
+  );
+});
+
+test("the landing page makes only cautious and verifiable observation claims", () => {
+  assert.doesNotMatch(
+    landingSource,
+    /Conditions optimales|Nuit claire détectée|>88<|réellement visible|Ciel en temps réel|Carte du ciel|réalité augmentée/,
+  );
+  assert.match(landingSource, /Les conditions[\s\S]+restent toujours à vérifier sur place/);
+  assert.match(landingSource, /indice indicatif/);
+  assert.match(landingSource, /sans garantir que la cible sera visible/);
+  assert.match(landingSource, /Estimations à vérifier sur place/);
 });

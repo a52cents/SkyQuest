@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { findNextIssVisiblePass, type N2yoVisualPassResponse } from "@/lib/iss";
+import { createNetworkTimeoutSignal } from "@/lib/network";
 
 const ISS_NORAD_ID = 25544;
 
@@ -52,7 +53,10 @@ export async function GET(request: Request) {
   url.searchParams.set("apiKey", apiKey);
 
   try {
-    const response = await fetch(url.toString(), { cache: "no-store" });
+    const response = await fetch(url.toString(), {
+      cache: "no-store",
+      signal: createNetworkTimeoutSignal(),
+    });
 
     if (!response.ok) {
       return NextResponse.json({ pass: null });

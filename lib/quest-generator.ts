@@ -14,7 +14,7 @@
  * - `limit` permet à l'appelant d'adapter la quantité de résultats à son interface.
  */
 import { equatorialToHorizontal, getSkyObjects, getSunAltitude } from "@/lib/astro";
-import type { IssVisiblePass } from "@/lib/iss";
+import { getIssPassEndTime, isIssPassGuidable, type IssVisiblePass } from "@/lib/iss";
 import {
   getDefaultLightPollutionEstimate,
   type LightPollutionEstimate,
@@ -107,6 +107,7 @@ function createQuest(object: SkyObject, score: number, now: Date): SkyQuest {
     description: getDescription(object, score),
     tip: getTip(object),
     requiredGear: "naked_eye",
+    generatedAt: now.toISOString(),
   };
 }
 
@@ -126,6 +127,7 @@ function createFreeObservationQuest(now: Date): SkyQuest {
       "Le ciel n'est pas idéal maintenant. Observe la zone la plus dégagée et note ce que tu vois.",
     tip: "Choisis un point sombre, laisse tes yeux s'habituer, puis regarde lentement du Nord au Sud.",
     requiredGear: "naked_eye",
+    generatedAt: now.toISOString(),
   };
 }
 
@@ -156,6 +158,7 @@ function createCatalogQuest({
     description: object.description,
     tip: object.observationTip,
     requiredGear: object.requiredGear,
+    generatedAt: now.toISOString(),
     warning: object.warning,
   };
 }
@@ -187,6 +190,7 @@ function createMeteorShowerQuest({
     description: `${showerName} active maintenant. Le radiant est vers ${radiantName}, mais regarde surtout une zone sombre du ciel.`,
     tip: `${tip} Pas besoin de regarder exactement le radiant.`,
     requiredGear: "naked_eye",
+    generatedAt: now.toISOString(),
   };
 }
 
@@ -210,7 +214,10 @@ function createIssQuest(pass: IssVisiblePass, score: number, now: Date): SkyQues
     description: `Passage visible prévu vers ${startTime}, pendant environ ${durationMinutes} min si le ciel est dégagé.`,
     tip: "Elle ressemble à une étoile très brillante qui traverse lentement le ciel sans clignoter.",
     requiredGear: "naked_eye",
+    generatedAt: now.toISOString(),
     targetTime: pass.maxTime.toISOString(),
+    startsAt: pass.startTime.toISOString(),
+    endsAt: getIssPassEndTime(pass).toISOString(),
   };
 }
 
@@ -258,15 +265,6 @@ function selectQuestCandidates(candidates: QuestCandidate[], limit: number): Sky
   }
 
   return selected;
-}
-
-function isIssPassNearTime(pass: IssVisiblePass | null | undefined, date: Date): boolean {
-  if (!pass) {
-    return false;
-  }
-
-  const minutesUntilPass = (pass.startTime.getTime() - date.getTime()) / 60000;
-  return minutesUntilPass >= 0 && minutesUntilPass <= 45;
 }
 
 export function generateQuests({
@@ -382,14 +380,15 @@ export function generateQuests({
         ];
       });
 
-    const issCandidates: QuestCandidate[] = issPass
-      ? [
-          {
-            quest: createIssQuest(issPass, scoreIssPass(issPass, effectiveWeather), now),
-            score: scoreIssPass(issPass, effectiveWeather),
-          },
-        ].filter((candidate) => candidate.score >= 50)
-      : [];
+    const issCandidates: QuestCandidate[] =
+      issPass && isIssPassGuidable(issPass, now)
+        ? [
+            {
+              quest: createIssQuest(issPass, scoreIssPass(issPass, effectiveWeather), now),
+              score: scoreIssPass(issPass, effectiveWeather),
+            },
+          ].filter((candidate) => candidate.score >= 50)
+        : [];
 
     const candidates = [
       ...issCandidates,
@@ -432,15 +431,45 @@ export function generateFutureQuestSuggestions({
 }): FutureQuestSuggestion[] {
   const suggestions: FutureQuestSuggestion[] = [];
   const seenTargets = new Set<string>(excludedTargets);
+  let futureIssSuggestion: FutureQuestSuggestion | null = null;
 
-  for (let minutes = 30; minutes <= horizonMinutes; minutes += minutes < 24 * 60 ? 30 : 120) {
+  if (
+    issPass &&
+    !seenTargets.has("iss") &&
+    issPass.startTime.getTime() > now.getTime() &&
+    issPass.startTime.getTime() <= now.getTime() + horizonMinutes * 60_000
+  ) {
+    const issQuest = generateQuests({
+      latitude,
+      longitude,
+      weather,
+      now: issPass.startTime,
+      issPass,
+      lightPollution,
+      lightingPractice,
+      limit: 20,
+    }).find((quest) => quest.targetType === "satellite");
+
+    if (issQuest) {
+      futureIssSuggestion = {
+        availableAt: issPass.startTime.toISOString(),
+        quest: issQuest,
+      };
+    }
+  }
+
+  searchTimeline: for (
+    let minutes = 30;
+    minutes <= horizonMinutes;
+    minutes += minutes < 24 * 60 ? 30 : 120
+  ) {
     const date = new Date(now.getTime() + minutes * 60000);
     const quests = generateQuests({
       latitude,
       longitude,
       weather,
       now: date,
-      issPass: isIssPassNearTime(issPass, date) ? issPass : null,
+      issPass: null,
       lightPollution,
       lightingPractice,
       limit: 3,
@@ -453,12 +482,20 @@ export function generateFutureQuestSuggestions({
       }
 
       if (suggestions.length >= 5) {
-        return suggestions;
+        break searchTimeline;
       }
     }
   }
 
-  return suggestions;
+  if (futureIssSuggestion) {
+    suggestions.push(futureIssSuggestion);
+  }
+
+  return suggestions
+    .sort(
+      (left, right) => new Date(left.availableAt).getTime() - new Date(right.availableAt).getTime(),
+    )
+    .slice(0, 5);
 }
 
 export function recalculateQuestPosition({

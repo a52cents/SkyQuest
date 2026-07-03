@@ -1,4 +1,5 @@
 import type { AirQualityNow, QuestTargetType } from "./types";
+import { createNetworkTimeoutSignal } from "./network.ts";
 
 export type AirTransparencyLevel = "clear" | "slight-haze" | "hazy" | "very-hazy";
 
@@ -104,7 +105,10 @@ export async function fetchAirQualityNow(
   url.searchParams.set("current", "pm10,pm2_5,european_aqi,aerosol_optical_depth,dust");
   url.searchParams.set("timezone", "auto");
 
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetch(url, {
+    cache: "no-store",
+    signal: createNetworkTimeoutSignal(),
+  });
   if (!response.ok) throw new Error("Air quality unavailable");
   const data = (await response.json()) as OpenMeteoAirQualityResponse;
   if (!data.current) throw new Error("Air quality response is empty");

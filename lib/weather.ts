@@ -1,4 +1,5 @@
 import type { WeatherForecast, WeatherHour, WeatherNow } from "@/lib/types";
+import { createNetworkTimeoutSignal } from "./network.ts";
 
 type OpenMeteoCurrent = {
   current?: {
@@ -32,7 +33,10 @@ export async function fetchWeatherNow(latitude: number, longitude: number): Prom
   url.searchParams.set("current", "cloud_cover,is_day,temperature_2m");
   url.searchParams.set("timezone", "auto");
 
-  const response = await fetch(url.toString(), { cache: "no-store" });
+  const response = await fetch(url.toString(), {
+    cache: "no-store",
+    signal: createNetworkTimeoutSignal(),
+  });
 
   if (!response.ok) {
     throw new Error("Weather unavailable");
@@ -70,7 +74,10 @@ export async function fetchWeatherForecast(
   url.searchParams.set("timeformat", "unixtime");
   url.searchParams.set("timezone", "auto");
 
-  const response = await fetch(url.toString(), { cache: "no-store" });
+  const response = await fetch(url.toString(), {
+    cache: "no-store",
+    signal: createNetworkTimeoutSignal(),
+  });
   if (!response.ok) throw new Error("Weather forecast unavailable");
 
   const data = (await response.json()) as OpenMeteoForecast;

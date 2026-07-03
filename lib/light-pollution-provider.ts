@@ -5,6 +5,7 @@ import {
   type LightPollutionEstimate,
   type LightPollutionSource,
 } from "./light-pollution.ts";
+import { createNetworkTimeoutSignal } from "./network.ts";
 
 type ExternalPayload = Partial<LightPollutionEstimate> & {
   data?: Partial<LightPollutionEstimate>;
@@ -87,6 +88,7 @@ export async function fetchConfiguredLightPollutionEstimate({
     const response = await fetchImpl(url, {
       headers,
       next: { revalidate: 60 * 60 * 24 * 30 },
+      signal: createNetworkTimeoutSignal(),
     });
     if (!response.ok) throw new Error("Light pollution provider unavailable");
 

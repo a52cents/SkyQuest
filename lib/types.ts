@@ -106,8 +106,11 @@ export type SkyQuest = {
   description: string;
   tip: string;
   requiredGear: RequiredGear;
+  generatedAt: string;
   warning?: string;
   targetTime?: string;
+  startsAt?: string;
+  endsAt?: string;
   weather?: WeatherNow;
 };
 

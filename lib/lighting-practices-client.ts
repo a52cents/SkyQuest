@@ -1,4 +1,5 @@
 import { isLightingPracticeEstimate, type LightingPracticeEstimate } from "./lighting-practices";
+import { createNetworkTimeoutSignal } from "./network.ts";
 
 const CACHE_PREFIX = "skyquest.lighting-practice.v1";
 const CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -49,7 +50,9 @@ export async function fetchLightingPracticeEstimate(
 
   try {
     const query = new URLSearchParams({ lat: rounded(latitude), lon: rounded(longitude) });
-    const response = await fetch(`/api/lighting-practice?${query.toString()}`);
+    const response = await fetch(`/api/lighting-practice?${query.toString()}`, {
+      signal: createNetworkTimeoutSignal(),
+    });
     if (!response.ok) return null;
     const payload = (await response.json()) as { estimate?: LightingPracticeEstimate | null };
     if (!isLightingPracticeEstimate(payload.estimate)) return null;

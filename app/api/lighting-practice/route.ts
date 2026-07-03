@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getLightingPracticeEstimate } from "@/lib/lighting-practices-server";
+import { createNetworkTimeoutSignal } from "@/lib/network";
 
 type MunicipalityResponse = Array<{ code?: unknown; nom?: unknown }>;
 
@@ -29,7 +30,10 @@ export async function GET(request: Request) {
   url.searchParams.set("format", "json");
 
   try {
-    const response = await fetch(url, { next: { revalidate: 60 * 60 * 24 * 30 } });
+    const response = await fetch(url, {
+      next: { revalidate: 60 * 60 * 24 * 30 },
+      signal: createNetworkTimeoutSignal(),
+    });
     if (!response.ok) throw new Error("Municipality lookup unavailable");
     const data = (await response.json()) as MunicipalityResponse;
     const municipality = data[0];

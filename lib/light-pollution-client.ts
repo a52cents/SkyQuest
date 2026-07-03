@@ -1,4 +1,5 @@
 import { getDefaultLightPollutionEstimate, type LightPollutionEstimate } from "./light-pollution";
+import { createNetworkTimeoutSignal } from "./network.ts";
 
 const CACHE_PREFIX = "skyquest.light-pollution.v1";
 const CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
@@ -53,7 +54,9 @@ export async function fetchLightPollutionEstimate(
       lat: roundCoordinate(latitude).toFixed(2),
       lon: roundCoordinate(longitude).toFixed(2),
     });
-    const response = await fetch(`/api/light-pollution?${query.toString()}`);
+    const response = await fetch(`/api/light-pollution?${query.toString()}`, {
+      signal: createNetworkTimeoutSignal(),
+    });
     if (!response.ok) throw new Error("Light pollution estimate unavailable");
     const estimate = (await response.json()) as LightPollutionEstimate;
     if (typeof estimate.score !== "number" || typeof estimate.label !== "string") {

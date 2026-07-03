@@ -12,11 +12,14 @@ import { ProgressFeedback } from "@/components/ProgressFeedback";
 import { addObservation, getActiveQuest, getLastLocation, getProgressProfile } from "@/lib/storage";
 import { getRankProgress } from "@/lib/progression";
 import { haptic } from "@/lib/haptics";
+import { isIssQuestGuidable } from "@/lib/iss";
+import { isQuestFresh } from "@/lib/quest-freshness";
 import type { Observation, ObservationPhotoDraft, ProgressReward, SkyQuest } from "@/lib/types";
 
 export default function QuestGuidePage() {
   const params = useParams<{ id: string }>();
   const [quest, setQuest] = useState<SkyQuest | null>(null);
+  const [unavailableReason, setUnavailableReason] = useState<"expired" | "iss_window" | null>(null);
   const [reward, setReward] = useState<{
     reward: ProgressReward;
     previousRankName: string | null;
@@ -26,9 +29,21 @@ export default function QuestGuidePage() {
 
   useEffect(() => {
     const stored = getActiveQuest();
-    if (stored && stored.id === params.id) {
-      setQuest(stored);
-    }
+    if (!stored || stored.id !== params.id) return;
+
+    const refreshAvailability = () => {
+      const reason = !isQuestFresh(stored)
+        ? "expired"
+        : stored.targetType === "satellite" && !isIssQuestGuidable(stored.startsAt, stored.endsAt)
+          ? "iss_window"
+          : null;
+      setUnavailableReason(reason);
+      setQuest(reason ? null : stored);
+    };
+
+    refreshAvailability();
+    const intervalId = window.setInterval(refreshAvailability, 15_000);
+    return () => window.clearInterval(intervalId);
   }, [params.id]);
 
   async function logAndReturn(status: "seen" | "missed", photo?: ObservationPhotoDraft) {
@@ -73,7 +88,13 @@ export default function QuestGuidePage() {
       >
         <ErrorState
           tone="warning"
-          message="Quête introuvable. Relance Maintenant pour générer une nouvelle observation."
+          message={
+            unavailableReason === "expired"
+              ? "Cette quête a expiré car le ciel et la météo ont pu changer. Relancer Maintenant."
+              : unavailableReason === "iss_window"
+                ? "Le guidage ISS est disponible 5 minutes avant le passage et jusqu'à sa fin. Retrouve ce passage dans « À venir »."
+                : "Quête introuvable. Relancer Maintenant pour générer une nouvelle observation."
+          }
         />
         <Link href="/" className={getAppButtonClassName({ className: "mt-4" })}>
           Retour à {"l'accueil"}
