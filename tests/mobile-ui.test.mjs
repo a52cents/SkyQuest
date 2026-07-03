@@ -26,6 +26,15 @@ const pushCardSource = readFileSync(
   new URL("../components/PushPermissionCard.tsx", import.meta.url),
   "utf8",
 );
+const bottomNavigationSource = readFileSync(
+  new URL("../components/navigation/BottomNavigation.tsx", import.meta.url),
+  "utf8",
+);
+const appHeaderSource = readFileSync(
+  new URL("../components/AppHeader.tsx", import.meta.url),
+  "utf8",
+);
+const tonightSource = readFileSync(new URL("../app/tonight/page.tsx", import.meta.url), "utf8");
 
 test("screen styles do not erase reusable component spacing", () => {
   assert.doesNotMatch(dashboardCss, /\.sky-dashboard \*\s*\{[^}]*margin:\s*0[^}]*padding:\s*0/s);
@@ -70,4 +79,28 @@ test("the landing page makes only cautious and verifiable observation claims", (
   assert.match(landingSource, /indice indicatif/);
   assert.match(landingSource, /sans garantir que la cible sera visible/);
   assert.match(landingSource, /Estimations à vérifier sur place/);
+});
+
+test("primary navigation prioritizes Now, Tonight, Explore, and Journal", () => {
+  const labels = ["Maintenant", "Ce soir", "Explorer", "Journal"];
+  const positions = labels.map((label) => bottomNavigationSource.indexOf(`label: "${label}"`));
+  assert.ok(positions.every((position) => position >= 0));
+  assert.deepEqual(
+    positions,
+    [...positions].sort((left, right) => left - right),
+  );
+  assert.doesNotMatch(bottomNavigationSource, /label: "Profil"/);
+  assert.match(appHeaderSource, /href="\/profile"/);
+  assert.match(appHeaderSource, /Profil et progression/);
+});
+
+test("the Now dashboard stays focused on three quests and sky conditions", () => {
+  assert.match(dashboardSource, /const visibleQuests = quests\.slice\(0, 3\)/);
+  assert.doesNotMatch(
+    dashboardSource,
+    /Objets observables|Prochains événements|id="journal"|id="progression"|futureSuggestions/,
+  );
+  assert.match(dashboardCss, /\.camera-guide\s*\{\s*order: 1/);
+  assert.match(dashboardCss, /\.sky-insights-disclosure\s*\{\s*order: 6/);
+  assert.match(tonightSource, /<UpcomingSkyEvents \/>/);
 });

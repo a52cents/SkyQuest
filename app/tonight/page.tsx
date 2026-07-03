@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AppButton } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
 import { PageShell } from "@/components/PageShell";
-import { PushPermissionCard } from "@/components/PushPermissionCard";
+import { UpcomingSkyEvents } from "@/components/UpcomingSkyEvents";
 import { getCurrentPosition } from "@/lib/browser-support";
 import { calculateBestSkyWindow } from "@/lib/sky-window";
 import {
@@ -247,7 +247,7 @@ export default function TonightPage() {
         La position est demandée uniquement après ce clic.
       </p>
 
-      <PushPermissionCard className="my-6" />
+      <UpcomingSkyEvents />
     </PageShell>
   );
 }

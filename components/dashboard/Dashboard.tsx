@@ -5,16 +5,15 @@
  *
  * Orchestre le parcours « Maintenant » de la PWA installée : permission GPS, météo,
  * passage ISS optionnel, génération des quêtes, cache de l'analyse et navigation vers
- * le guidage. Il affiche aussi la progression, le journal récent et les événements à venir.
+ * le guidage. L'écran reste volontairement centré sur les trois meilleures quêtes du moment.
  *
  * Important :
  * - le GPS doit rester déclenché par une action utilisateur ;
  * - une panne météo ou ISS ne doit jamais bloquer les autres quêtes ;
  * - une analyse relue du cache peut être affichée, mais son guidage reste verrouillé jusqu'à
  *   une nouvelle analyse afin de ne pas utiliser silencieusement une position périmée ;
- * - l'interface classe les quêtes par pertinence et permet d'afficher progressivement la suite.
+ * - l'interface classe les quêtes par pertinence et n'affiche que les trois premières.
  */
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
@@ -22,10 +21,8 @@ import { fetchAirQualityNow, getAirTransparencyEstimate } from "@/lib/air-qualit
 import { AppHeader } from "@/components/AppHeader";
 import { BestSkyWindowCard } from "@/components/BestSkyWindowCard";
 import { Onboarding } from "@/components/Onboarding";
-import { PushPermissionCard } from "@/components/PushPermissionCard";
 import { VisibilityExplanationContent } from "@/components/VisibilityExplanationCard";
 import { getCurrentPosition, type GeoPosition } from "@/lib/browser-support";
-import { getUpcomingCelestialEvents, type CelestialEventType } from "@/lib/celestial-events";
 import { haptic } from "@/lib/haptics";
 import { fetchNextIssVisiblePass, isIssQuestGuidable } from "@/lib/iss";
 import { fetchLightPollutionEstimate } from "@/lib/light-pollution-client";
@@ -33,33 +30,11 @@ import type { LightPollutionEstimate } from "@/lib/light-pollution";
 import { fetchLightingPracticeEstimate } from "@/lib/lighting-practices-client";
 import type { LightingPracticeEstimate } from "@/lib/lighting-practices";
 import { getOnboardingCompleted, setOnboardingCompleted } from "@/lib/storage";
-import { meteorShowers } from "@/lib/meteor-showers";
-import { getNasaUpcomingEvents, type NasaHighlights, type NasaUpcomingEvent } from "@/lib/nasa";
-import { createNetworkTimeoutSignal } from "@/lib/network";
 import { calculateBestSkyWindow } from "@/lib/sky-window";
-import { getAchievementProgress, getRankProgress } from "@/lib/progression";
-import {
-  generateFutureQuestSuggestions,
-  generateQuests,
-  type FutureQuestSuggestion,
-} from "@/lib/quest-generator";
+import { generateQuests } from "@/lib/quest-generator";
 import { isGeneratedAtFresh, isQuestFresh, SKY_DATA_TTL_MS } from "@/lib/quest-freshness";
-import {
-  getObservations,
-  getProgressProfile,
-  saveActiveQuest,
-  saveBestSkyWindow,
-  saveLastLocation,
-} from "@/lib/storage";
-import type {
-  Observation,
-  AirQualityNow,
-  BestSkyWindow,
-  ProgressProfile,
-  QuestTargetType,
-  SkyQuest,
-  WeatherNow,
-} from "@/lib/types";
+import { saveActiveQuest, saveBestSkyWindow, saveLastLocation } from "@/lib/storage";
+import type { AirQualityNow, BestSkyWindow, SkyQuest, WeatherNow } from "@/lib/types";
 import {
   fetchWeatherForecast,
   fetchWeatherNow,
@@ -69,18 +44,6 @@ import {
 
 type LoadState = "idle" | "loading" | "ready";
 
-type TimelineEvent = {
-  id: string;
-  type: CelestialEventType | "meteor_shower" | NasaUpcomingEvent["type"];
-  title: string;
-  date: Date;
-  description: string;
-  timeLabel: "instant" | "peak" | "approximate_peak";
-  sourceUrl?: string;
-};
-
-const CELESTIAL_EVENT_WINDOW_DAYS = 60;
-const DAY_MS = 86_400_000;
 const DASHBOARD_ANALYSIS_KEY = "skyquest.dashboard-analysis.v1";
 let unlockedAnalysisForRuntime: number | null = null;
 
@@ -90,24 +53,10 @@ type DashboardAnalysis = {
   position: GeoPosition;
   weather: WeatherNow;
   quests: SkyQuest[];
-  futureSuggestions: FutureQuestSuggestion[];
   bestSkyWindow?: BestSkyWindow;
   lightPollution?: LightPollutionEstimate;
   lightingPractice?: LightingPracticeEstimate;
   airQuality?: AirQualityNow;
-};
-
-const QUEST_TARGET_LABELS: Record<QuestTargetType, string> = {
-  moon: "Lune",
-  planet: "Planète",
-  star: "Étoile",
-  asterism: "Astérisme",
-  constellation: "Constellation",
-  star_cluster: "Amas d'étoiles",
-  galaxy: "Galaxie",
-  meteor_shower: "Pluie de météores",
-  satellite: "Satellite",
-  free_observation: "Observation libre",
 };
 
 const pageVariants: Variants = {
@@ -120,76 +69,6 @@ const itemVariants: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: "easeOut" } },
 };
 
-function getMeteorShowerTimelineEvents(startDate: Date, limitDays: number): TimelineEvent[] {
-  const endDate = new Date(startDate.getTime() + limitDays * DAY_MS);
-  const events: TimelineEvent[] = [];
-
-  for (let year = startDate.getUTCFullYear(); year <= endDate.getUTCFullYear(); year += 1) {
-    meteorShowers.forEach((shower) => {
-      const [month, day] = shower.peakDate.split("-").map(Number);
-      // The source provides a calendar day but no exact peak hour. Noon UTC keeps
-      // the same displayed date in Europe/Paris without claiming false precision.
-      const peakDate = new Date(Date.UTC(year, month - 1, day, 12));
-      if (peakDate < startDate || peakDate > endDate) return;
-
-      events.push({
-        id: `meteor-shower-${shower.id}-${year}`,
-        type: "meteor_shower",
-        title: `Pic des ${shower.name}`,
-        date: peakDate,
-        description: `Radiant : ${shower.radiantName} · ${shower.recommendedViewingTip}`,
-        timeLabel: "approximate_peak",
-      });
-    });
-  }
-
-  return events;
-}
-
-function createEventTimeline(startDate: Date): TimelineEvent[] {
-  const celestialEvents = getUpcomingCelestialEvents(
-    startDate,
-    CELESTIAL_EVENT_WINDOW_DAYS,
-  ).map<TimelineEvent>((event) => ({
-    id: event.id,
-    type: event.type,
-    title: event.title,
-    date: event.date,
-    description: event.description,
-    timeLabel:
-      event.type === "lunar_eclipse" || event.type === "solar_eclipse" ? "peak" : "instant",
-  }));
-
-  return [
-    ...celestialEvents,
-    ...getMeteorShowerTimelineEvents(startDate, CELESTIAL_EVENT_WINDOW_DAYS),
-  ].sort((left, right) => left.date.getTime() - right.date.getTime());
-}
-
-function mergeNasaTimelineEvents(
-  timeline: TimelineEvent[],
-  highlights: NasaHighlights,
-  startDate: Date,
-): TimelineEvent[] {
-  const nasaEvents = getNasaUpcomingEvents(
-    highlights,
-    startDate,
-    CELESTIAL_EVENT_WINDOW_DAYS,
-  ).map<TimelineEvent>((event) => ({
-    id: event.id,
-    type: event.type,
-    title: event.title,
-    date: new Date(event.occursAt),
-    description: event.description,
-    timeLabel: "instant",
-    sourceUrl: event.sourceUrl,
-  }));
-
-  return [...timeline, ...nasaEvents].sort(
-    (left, right) => left.date.getTime() - right.date.getTime(),
-  );
-}
-
 function readCachedAnalysis(): DashboardAnalysis | null {
   try {
     const raw = window.localStorage.getItem(DASHBOARD_ANALYSIS_KEY);
@@ -201,8 +80,7 @@ function readCachedAnalysis(): DashboardAnalysis | null {
       !Number.isFinite(value.position.latitude) ||
       !Number.isFinite(value.position.longitude) ||
       !value.weather ||
-      !Array.isArray(value.quests) ||
-      !Array.isArray(value.futureSuggestions)
+      !Array.isArray(value.quests)
     ) {
       return null;
     }
@@ -369,14 +247,10 @@ export function Dashboard() {
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [weather, setWeather] = useState<WeatherNow | null>(null);
   const [quests, setQuests] = useState<SkyQuest[]>([]);
-  const [futureSuggestions, setFutureSuggestions] = useState<FutureQuestSuggestion[]>([]);
   const [bestSkyWindow, setBestSkyWindow] = useState<BestSkyWindow | null>(null);
   const [lightPollution, setLightPollution] = useState<LightPollutionEstimate | null>(null);
   const [lightingPractice, setLightingPractice] = useState<LightingPracticeEstimate | null>(null);
   const [airQuality, setAirQuality] = useState<AirQualityNow | null>(null);
-  const [eventTimeline, setEventTimeline] = useState<TimelineEvent[]>([]);
-  const [profile, setProfile] = useState<ProgressProfile | null>(null);
-  const [observations, setObservations] = useState<Observation[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [isOnboardingReady, setIsOnboardingReady] = useState(false);
@@ -385,7 +259,6 @@ export function Dashboard() {
   const [analysisGeneratedAt, setAnalysisGeneratedAt] = useState<string | null>(null);
   const [hasAnalysisExpired, setHasAnalysisExpired] = useState(false);
   const [isGuidanceUnlocked, setIsGuidanceUnlocked] = useState(false);
-  const [showAllQuests, setShowAllQuests] = useState(false);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -412,7 +285,6 @@ export function Dashboard() {
       currentWeather,
       forecast,
       currentIssPass,
-      futureIssPass,
       currentLightPollution,
       currentLightingPractice,
       currentAirQuality,
@@ -429,12 +301,6 @@ export function Dashboard() {
         latitude: coords.latitude,
         longitude: coords.longitude,
         now: currentDate,
-      }).catch(() => null),
-      fetchNextIssVisiblePass({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        now: currentDate,
-        horizonMinutes: 24 * 60,
       }).catch(() => null),
       fetchLightPollutionEstimate(coords.latitude, coords.longitude),
       fetchLightingPracticeEstimate(coords.latitude, coords.longitude),
@@ -460,17 +326,6 @@ export function Dashboard() {
       airQuality: currentAirQuality,
       limit: 20,
     });
-    const nextFutureSuggestions = generateFutureQuestSuggestions({
-      latitude: coords.latitude,
-      longitude: coords.longitude,
-      weather: currentWeather,
-      now: currentDate,
-      issPass: futureIssPass,
-      lightPollution: currentLightPollution,
-      lightingPractice: currentLightingPractice,
-      excludedTargets: new Set(nextQuests.map((quest) => quest.target)),
-      horizonMinutes: 7 * 24 * 60,
-    });
     const nextBestSkyWindow = calculateBestSkyWindow({
       latitude: coords.latitude,
       longitude: coords.longitude,
@@ -488,7 +343,6 @@ export function Dashboard() {
       position: coords,
       weather: currentWeather,
       quests: nextQuests,
-      futureSuggestions: nextFutureSuggestions,
       bestSkyWindow: nextBestSkyWindow,
       lightPollution: currentLightPollution,
       lightingPractice: currentLightingPractice ?? undefined,
@@ -497,7 +351,6 @@ export function Dashboard() {
 
     setWeather(currentWeather);
     setQuests(nextQuests);
-    setFutureSuggestions(nextFutureSuggestions);
     setBestSkyWindow(nextBestSkyWindow);
     setLightPollution(currentLightPollution);
     setLightingPractice(currentLightingPractice);
@@ -508,34 +361,12 @@ export function Dashboard() {
     setHasAnalysisExpired(false);
     setIsGuidanceUnlocked(true);
     unlockedAnalysisForRuntime = savedAt;
-    setShowAllQuests(false);
     setNotice(weatherNotice);
     setLoadState("ready");
     cacheAnalysis(analysis);
   }, []);
 
   useEffect(() => {
-    let isActive = true;
-    const currentDate = new Date();
-    const localTimeline = createEventTimeline(currentDate);
-    setEventTimeline(localTimeline);
-    void fetch("/api/nasa/highlights", { signal: createNetworkTimeoutSignal() })
-      .then((response) => {
-        if (!response.ok) throw new Error("NASA events unavailable");
-        return response.json() as Promise<NasaHighlights>;
-      })
-      .then((highlights) => {
-        if (isActive) {
-          setEventTimeline(mergeNasaTimelineEvents(localTimeline, highlights, currentDate));
-        }
-      })
-      .catch(() => {
-        // The locally calculated timeline remains complete when NASA is unavailable.
-      });
-    setProfile(getProgressProfile());
-    void getObservations().then((storedObservations) => {
-      if (isActive) setObservations(storedObservations);
-    });
     setShowOnboarding(!getOnboardingCompleted());
     setIsOnboardingReady(true);
 
@@ -544,7 +375,6 @@ export function Dashboard() {
       const isFresh = isGeneratedAtFresh(cachedAnalysis.generatedAt);
       setWeather(cachedAnalysis.weather);
       setQuests(cachedAnalysis.quests);
-      setFutureSuggestions(cachedAnalysis.futureSuggestions);
       setBestSkyWindow(cachedAnalysis.bestSkyWindow ?? null);
       setLightPollution(cachedAnalysis.lightPollution ?? null);
       setLightingPractice(cachedAnalysis.lightingPractice ?? null);
@@ -558,10 +388,6 @@ export function Dashboard() {
       }
       setLoadState("ready");
     }
-
-    return () => {
-      isActive = false;
-    };
   }, [loadDashboard]);
 
   useEffect(() => {
@@ -609,7 +435,6 @@ export function Dashboard() {
       });
       setWeather(fallbackWeather);
       setQuests(fallbackQuests);
-      setFutureSuggestions([]);
       setBestSkyWindow(null);
       setLightPollution(null);
       setLightingPractice(null);
@@ -617,7 +442,6 @@ export function Dashboard() {
       setAnalysisSavedAt(null);
       setAnalysisGeneratedAt(null);
       setHasAnalysisExpired(false);
-      setShowAllQuests(false);
       setLoadState("ready");
       setNotice(
         error instanceof Error
@@ -639,11 +463,6 @@ export function Dashboard() {
     router.push(`/quest/${quest.id}`);
   }
 
-  const rank = profile ? getRankProgress(profile.totalXp) : null;
-  const achievementProgress = profile ? getAchievementProgress(profile) : [];
-  const unlockedAchievementCount = achievementProgress.filter(
-    (achievement) => achievement.unlocked,
-  ).length;
   const averageVisibility =
     quests.length > 0
       ? Math.round(
@@ -651,12 +470,7 @@ export function Dashboard() {
         )
       : null;
   const guidableQuests = quests.filter((quest) => quest.targetType !== "free_observation");
-  const visibleQuests = showAllQuests ? quests : quests.slice(0, 3);
-  const currentTargets = new Set(quests.map((quest) => quest.target));
-  const distinctFutureSuggestions = futureSuggestions.filter(
-    (suggestion) => !currentTargets.has(suggestion.quest.target),
-  );
-  const recentObservations = observations.slice(0, 2);
+  const visibleQuests = quests.slice(0, 3);
   const airTransparency = airQuality ? getAirTransparencyEstimate(airQuality) : null;
   const conditionsLabel =
     analysisSavedAt && !isGuidanceUnlocked
@@ -686,20 +500,7 @@ export function Dashboard() {
         />
       ) : null}
 
-      <AppHeader
-        eyebrow="SkyQuest"
-        title="Maintenant"
-        action={
-          <Link
-            href="/glossary"
-            aria-label="Ouvrir le glossaire"
-            title="Glossaire"
-            className="flex h-10 w-10 items-center justify-center rounded-[13px] border border-white/10 bg-white/[0.045] text-base font-bold text-muted transition-colors hover:border-accent/40 hover:text-text"
-          >
-            ?
-          </Link>
-        }
-      />
+      <AppHeader eyebrow="SkyQuest" title="Maintenant" />
 
       <motion.main
         className="dashboard-main"
@@ -880,7 +681,7 @@ export function Dashboard() {
                 ? `${guidableQuests.length} cible${guidableQuests.length > 1 ? "s" : ""} guidable${guidableQuests.length > 1 ? "s" : ""} selon les conditions actuelles.`
                 : analysisSavedAt
                   ? "Une ancienne analyse est disponible ci-dessous, mais le ciel peut avoir changé depuis."
-                  : "Autorise la position pour calculer les objets réellement visibles et préparer tes quêtes."}
+                  : "Autorise la position pour estimer les cibles à tenter et préparer tes quêtes."}
             </p>
             <motion.button
               type="button"
@@ -901,10 +702,6 @@ export function Dashboard() {
                   : "Maintenant"}
             </motion.button>
           </div>
-        </MotionBlock>
-
-        <MotionBlock>
-          <BestSkyWindowCard window={bestSkyWindow} />
         </MotionBlock>
 
         <MotionBlock className="section-header">
@@ -928,15 +725,6 @@ export function Dashboard() {
             ))}
           </AnimatePresence>
         </motion.div>
-        {quests.length > 3 ? (
-          <button
-            type="button"
-            className="show-more-btn"
-            onClick={() => setShowAllQuests((current) => !current)}
-          >
-            {showAllQuests ? "Réduire la liste" : `Voir les ${quests.length - 3} autres quêtes`}
-          </button>
-        ) : null}
         {loadState === "idle" ? (
           <MotionBlock className="empty-state">
             <svg viewBox="0 0 24 24">
@@ -946,241 +734,9 @@ export function Dashboard() {
           </MotionBlock>
         ) : null}
 
-        <section id="objects">
-          <MotionBlock className="section-header spaced">
-            <h2 className="section-title">Objets observables</h2>
-            <span className="section-sub">
-              {guidableQuests.length} cible{guidableQuests.length > 1 ? "s" : ""}
-            </span>
-          </MotionBlock>
-          <motion.div className="upcoming-list" variants={rootVariants}>
-            {guidableQuests.map((quest) => (
-              <motion.button
-                key={quest.id}
-                type="button"
-                disabled={!isGuidanceUnlocked}
-                onClick={() => handleStart(quest)}
-                className={`upcoming-item ${!isGuidanceUnlocked ? "locked" : ""}`}
-                variants={itemVariants}
-                whileHover={
-                  prefersReducedMotion || !isGuidanceUnlocked ? undefined : { scale: 1.02 }
-                }
-              >
-                <div className="upcoming-date">
-                  <AnimatePresence mode="wait" initial={false}>
-                    <motion.div
-                      className="day"
-                      key={Math.round(quest.altitude ?? 0)}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                    >
-                      {quest.altitude === null ? "—" : `${Math.round(quest.altitude)}°`}
-                    </motion.div>
-                  </AnimatePresence>
-                  <div className="month">Alt.</div>
-                </div>
-                <div className="upcoming-info">
-                  <h4>{quest.title}</h4>
-                  <p>
-                    {QUEST_TARGET_LABELS[quest.targetType]} ·{" "}
-                    {quest.cardinalDirection ?? "Zone large"} · {quest.visibilityScore}/100
-                  </p>
-                </div>
-                <svg className="upcoming-arrow" viewBox="0 0 24 24">
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </motion.button>
-            ))}
-          </motion.div>
-          {loadState === "ready" && guidableQuests.length === 0 ? (
-            <div className="empty-state">
-              <p>
-                Aucun objet suffisamment fiable maintenant. Une observation libre reste possible.
-              </p>
-            </div>
-          ) : null}
-        </section>
-
-        <section id="observation-windows">
-          <MotionBlock className="section-header spaced">
-            <h2 className="section-title">À venir</h2>
-            <span className="section-sub">Informatif · non guidable</span>
-          </MotionBlock>
-          <motion.div className="upcoming-list" variants={rootVariants}>
-            {distinctFutureSuggestions.slice(0, 3).map((suggestion) => {
-              const date = new Date(suggestion.availableAt);
-              return (
-                <motion.article
-                  key={`${suggestion.quest.id}-${suggestion.availableAt}`}
-                  className="upcoming-item future-item"
-                  variants={itemVariants}
-                >
-                  <div className="upcoming-date">
-                    <div className="day">{date.getDate()}</div>
-                    <div className="month">
-                      {new Intl.DateTimeFormat("fr-FR", { month: "short" }).format(date)}
-                    </div>
-                  </div>
-                  <div className="upcoming-info">
-                    <h4>{suggestion.quest.title}</h4>
-                    <p>
-                      {new Intl.DateTimeFormat("fr-FR", {
-                        weekday: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      }).format(date)}{" "}
-                      · conditions à revérifier
-                    </p>
-                  </div>
-                  <svg className="upcoming-arrow" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M12 7v5l3 2" />
-                  </svg>
-                </motion.article>
-              );
-            })}
-          </motion.div>
-          {loadState === "ready" && distinctFutureSuggestions.length === 0 ? (
-            <div className="empty-state">
-              <p>Aucune cible différente trouvée dans les sept prochains jours.</p>
-            </div>
-          ) : null}
-        </section>
-
-        <section id="upcoming">
-          <MotionBlock className="section-header spaced">
-            <h2 className="section-title">Prochains événements</h2>
-            <span className="section-sub">Astronomie + NASA · 60 jours</span>
-          </MotionBlock>
-          <motion.div
-            className="upcoming-list"
-            variants={rootVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            {eventTimeline.map((event) => {
-              const localDate = new Intl.DateTimeFormat("fr-FR", {
-                day: "numeric",
-                month: "short",
-                timeZone: "Europe/Paris",
-              }).format(event.date);
-              const [day, ...monthParts] = localDate.replace(".", "").split(" ");
-              const localTime = new Intl.DateTimeFormat("fr-FR", {
-                hour: "2-digit",
-                minute: "2-digit",
-                timeZone: "Europe/Paris",
-              }).format(event.date);
-              const timing =
-                event.timeLabel === "approximate_peak"
-                  ? "Pic approximatif"
-                  : event.timeLabel === "peak"
-                    ? `Pic à ${localTime}`
-                    : `À ${localTime}`;
-
-              return (
-                <motion.article
-                  key={event.id}
-                  className="upcoming-item"
-                  variants={itemVariants}
-                  whileHover={prefersReducedMotion ? undefined : { scale: 1.02 }}
-                >
-                  <div className="upcoming-date">
-                    <div className="day">{day}</div>
-                    <div className="month">{monthParts.join(" ")}</div>
-                  </div>
-                  <div className="upcoming-info">
-                    <h4>{event.title}</h4>
-                    <p>
-                      {timing} · {event.description}
-                    </p>
-                    {event.sourceUrl ? (
-                      <a
-                        href={event.sourceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="nasa-event-link"
-                      >
-                        Fiche NASA JPL ↗
-                      </a>
-                    ) : null}
-                  </div>
-                  <svg className="upcoming-arrow event-star" viewBox="0 0 24 24">
-                    <path d="M12 2l1.7 6.3L20 10l-6.3 1.7L12 18l-1.7-6.3L4 10l6.3-1.7L12 2z" />
-                  </svg>
-                </motion.article>
-              );
-            })}
-          </motion.div>
-        </section>
-
-        <MotionBlock>
-          <PushPermissionCard className="my-6" />
+        <MotionBlock className="best-window-block">
+          <BestSkyWindowCard window={bestSkyWindow} />
         </MotionBlock>
-
-        <section id="journal">
-          <MotionBlock className="section-header spaced">
-            <h2 className="section-title">Journal</h2>
-            <span className="section-sub">Tes observations</span>
-          </MotionBlock>
-          <MotionBlock className="journal-preview">
-            {recentObservations.map((observation) => (
-              <Link href="/journal" className="journal-card" key={observation.id}>
-                <div className="date">
-                  {new Intl.DateTimeFormat("fr-FR", {
-                    day: "numeric",
-                    month: "long",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }).format(new Date(observation.createdAt))}
-                </div>
-                <h4>{observation.questTitle}</h4>
-                <p>
-                  {observation.status === "seen"
-                    ? `Observation confirmée · +${observation.xpEarned ?? 0} XP`
-                    : "Cible non aperçue · résultat enregistré"}
-                </p>
-              </Link>
-            ))}
-            <Link href="/journal" className="journal-card empty">
-              <svg viewBox="0 0 24 24">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              <span>{recentObservations.length ? "Voir le journal" : "Première observation"}</span>
-            </Link>
-          </MotionBlock>
-        </section>
-
-        <section id="progression">
-          <MotionBlock className="section-header spaced">
-            <h2 className="section-title">Progression</h2>
-            <span className="section-sub">
-              {unlockedAchievementCount}/{achievementProgress.length || 7} succès
-            </span>
-          </MotionBlock>
-          <MotionBlock className="progress-card">
-            <div className="progress-top">
-              <div className="progress-rank">{rank?.current.name ?? "Curieux du ciel"}</div>
-              <div className="progress-xp">{profile?.totalXp ?? 0} XP</div>
-            </div>
-            <div className="progress-track">
-              <motion.div
-                className="progress-fill"
-                initial={{ width: 0 }}
-                animate={{ width: `${rank?.progressPercent ?? 0}%` }}
-                transition={{ duration: prefersReducedMotion ? 0 : 0.8, ease: "easeOut" }}
-              />
-            </div>
-            <div className="progress-meta">
-              <span>
-                {profile?.currentStreak ?? 0} nuit{profile?.currentStreak === 1 ? "" : "s"} de suite
-              </span>
-              <span>
-                {rank?.next ? `${rank.xpToNext} XP avant ${rank.next.name}` : "Rang maximum"}
-              </span>
-            </div>
-          </MotionBlock>
-        </section>
       </motion.main>
     </div>
   );

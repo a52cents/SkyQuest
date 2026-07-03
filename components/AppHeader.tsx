@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { HapticsToggle } from "@/components/HapticsToggle";
 import { NightModeToggle } from "@/components/NightModeToggle";
@@ -51,8 +52,48 @@ export function AppHeader({ eyebrow, title, action, className }: AppHeaderProps)
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {action ? <div className="shrink-0">{action}</div> : null}
-          <HapticsToggle />
-          <NightModeToggle />
+          <details className="group relative">
+            <summary
+              aria-label="Ouvrir le profil et les réglages"
+              className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-[13px] border border-white/10 bg-white/[0.045] text-muted transition-colors marker:hidden hover:border-accent/40 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 [&::-webkit-details-marker]:hidden"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="h-5 w-5 fill-none stroke-current stroke-[1.8]"
+              >
+                <circle cx="12" cy="8" r="3.5" />
+                <path d="M5 20a7 7 0 0 1 14 0" />
+              </svg>
+            </summary>
+            <div className="absolute top-12 right-0 z-50 w-64 rounded-[18px] border border-white/10 bg-[#111218]/95 p-3 shadow-2xl backdrop-blur-xl">
+              <p className="px-2 pb-2 text-[0.68rem] font-semibold tracking-[0.1em] text-faint uppercase">
+                Profil et réglages
+              </p>
+              <Link
+                href="/profile"
+                className="flex min-h-11 items-center rounded-[12px] px-3 text-sm font-semibold text-text transition-colors hover:bg-white/[0.06]"
+              >
+                Profil et progression
+              </Link>
+              <Link
+                href="/glossary"
+                className="flex min-h-11 items-center rounded-[12px] px-3 text-sm font-semibold text-text transition-colors hover:bg-white/[0.06]"
+              >
+                Glossaire
+              </Link>
+              <div className="mt-2 border-t border-white/[0.07] pt-3">
+                <div className="flex items-center justify-between gap-3 px-2 py-1">
+                  <span className="text-xs text-muted">Mode nuit</span>
+                  <NightModeToggle />
+                </div>
+                <div className="flex items-center justify-between gap-3 px-2 py-1">
+                  <span className="text-xs text-muted">Vibrations</span>
+                  <HapticsToggle />
+                </div>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
     </header>

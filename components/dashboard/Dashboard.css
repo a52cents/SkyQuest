@@ -80,9 +80,32 @@ html.night-mode .sky-dashboard .analysis-banner {
 }
 
 .sky-dashboard .dashboard-main {
+  display: flex;
+  flex-direction: column;
   max-width: 600px;
   margin: 0 auto;
   padding: 20px;
+}
+.sky-dashboard .camera-guide {
+  order: 1;
+}
+.sky-dashboard .conditions-bar {
+  order: 2;
+}
+.sky-dashboard .analysis-banner,
+.sky-dashboard .dashboard-notice {
+  order: 3;
+}
+.sky-dashboard .section-header,
+.sky-dashboard .quest-list,
+.sky-dashboard .empty-state {
+  order: 4;
+}
+.sky-dashboard .best-window-block {
+  order: 5;
+}
+.sky-dashboard .sky-insights-disclosure {
+  order: 6;
 }
 .sky-dashboard section {
   scroll-margin-top: 78px;
@@ -309,10 +332,6 @@ html.night-mode .sky-dashboard .analysis-banner {
   font-size: 22px;
   font-weight: 400;
   letter-spacing: -0.5px;
-}
-.sky-dashboard .section-sub {
-  color: var(--dash-fg-muted);
-  font-size: 12px;
 }
 .sky-dashboard .status-pill {
   display: inline-flex;
@@ -580,24 +599,6 @@ html.night-mode .sky-dashboard .analysis-banner {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.sky-dashboard .show-more-btn {
-  width: 100%;
-  padding: 11px 16px;
-  border: 1px solid var(--dash-border);
-  border-radius: 100px;
-  background: transparent;
-  color: var(--dash-fg-dim);
-  cursor: pointer;
-  font-size: 13px;
-  transition:
-    border-color 0.3s,
-    color 0.3s;
-}
-.sky-dashboard .show-more-btn:hover {
-  border-color: var(--dash-border-hover);
-  color: var(--dash-fg);
-}
-
 .sky-dashboard .best-window-card {
   position: relative;
   display: block;
@@ -675,188 +676,6 @@ html.night-mode .sky-dashboard .analysis-banner {
   box-shadow: 0 0 16px var(--dash-accent-cyan);
 }
 
-.sky-dashboard .upcoming-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.sky-dashboard .upcoming-item {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  border: 1px solid var(--dash-border);
-  border-radius: var(--dash-radius-sm);
-  background: var(--dash-bg-card);
-  transition:
-    border-color 0.3s,
-    background-color 0.3s;
-}
-.sky-dashboard button.upcoming-item {
-  width: 100%;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.sky-dashboard button.upcoming-item:disabled,
-.sky-dashboard .upcoming-item.locked {
-  cursor: not-allowed;
-  opacity: 0.68;
-}
-.sky-dashboard .upcoming-item:hover {
-  border-color: var(--dash-border-hover);
-  background: var(--dash-bg-elev);
-}
-.sky-dashboard .upcoming-date {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 48px;
-}
-.sky-dashboard .upcoming-date .day {
-  color: var(--dash-fg);
-  font-family: var(--dash-font-mono);
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1;
-}
-.sky-dashboard .upcoming-date .month {
-  margin-top: 2px;
-  color: var(--dash-fg-muted);
-  font-size: 10px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-.sky-dashboard .upcoming-info {
-  min-width: 0;
-}
-.sky-dashboard .upcoming-info h4 {
-  margin-bottom: 2px;
-  overflow: hidden;
-  font-size: 15px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sky-dashboard .upcoming-info p {
-  color: var(--dash-fg-muted);
-  font-size: 13px;
-}
-.sky-dashboard .upcoming-info .nasa-event-link {
-  display: inline-flex;
-  margin-top: 5px;
-  color: var(--dash-accent-cyan);
-  font-size: 11px;
-  font-weight: 600;
-}
-.sky-dashboard .upcoming-info .nasa-event-link:hover {
-  text-decoration: underline;
-}
-.sky-dashboard .upcoming-arrow {
-  width: 16px;
-  height: 16px;
-  margin-left: auto;
-  flex: 0 0 auto;
-  fill: none;
-  stroke: var(--dash-fg-muted);
-  stroke-width: 1.5;
-}
-.sky-dashboard .upcoming-arrow.event-star {
-  stroke: var(--dash-accent);
-}
-
-.sky-dashboard .journal-preview {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-}
-.sky-dashboard .journal-card {
-  padding: 16px;
-  border: 1px solid var(--dash-border);
-  border-radius: var(--dash-radius-sm);
-  background: var(--dash-bg-card);
-  cursor: pointer;
-  transition: border-color 0.3s;
-}
-.sky-dashboard .journal-card:hover {
-  border-color: var(--dash-border-hover);
-}
-.sky-dashboard .journal-card .date {
-  margin-bottom: 8px;
-  color: var(--dash-fg-muted);
-  font-family: var(--dash-font-mono);
-  font-size: 11px;
-}
-.sky-dashboard .journal-card h4 {
-  margin-bottom: 4px;
-  font-family: var(--dash-font-display);
-  font-size: 15px;
-  font-weight: 400;
-}
-.sky-dashboard .journal-card p {
-  color: var(--dash-fg-muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-.sky-dashboard .journal-card.empty {
-  display: flex;
-  min-height: 100px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border-style: dashed;
-  color: var(--dash-fg-muted);
-}
-.sky-dashboard .journal-card.empty svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: var(--dash-fg-muted);
-  stroke-width: 1.5;
-}
-
-.sky-dashboard .progress-card {
-  padding: 20px;
-  border: 1px solid var(--dash-border);
-  border-radius: var(--dash-radius);
-  background: var(--dash-bg-card);
-}
-.sky-dashboard .progress-top {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-}
-.sky-dashboard .progress-rank {
-  font-family: var(--dash-font-display);
-  font-size: 19px;
-}
-.sky-dashboard .progress-xp {
-  color: var(--dash-fg-dim);
-  font-family: var(--dash-font-mono);
-  font-size: 12px;
-}
-.sky-dashboard .progress-track {
-  height: 5px;
-  margin: 16px 0;
-  overflow: hidden;
-  border-radius: 99px;
-  background: rgba(255, 255, 255, 0.06);
-}
-.sky-dashboard .progress-fill {
-  height: 100%;
-  border-radius: inherit;
-  background: var(--dash-accent);
-  box-shadow: 0 0 14px rgba(124, 92, 255, 0.35);
-}
-.sky-dashboard .progress-meta {
-  display: flex;
-  justify-content: space-between;
-  color: var(--dash-fg-muted);
-  font-size: 12px;
-}
-
 .sky-dashboard .dashboard-notice {
   margin-bottom: 20px;
   padding: 12px 14px;
@@ -926,9 +745,6 @@ html.night-mode .sky-dashboard .analysis-banner {
 }
 
 @media (min-width: 640px) {
-  .sky-dashboard .journal-preview {
-    grid-template-columns: repeat(3, 1fr);
-  }
   .sky-dashboard .conditions-bar {
     gap: 12px;
   }
@@ -948,9 +764,6 @@ html.night-mode .sky-dashboard .analysis-banner {
   }
   .sky-dashboard .quest-card h3 {
     font-size: 18px;
-  }
-  .sky-dashboard .journal-preview {
-    grid-template-columns: 1fr;
   }
   .sky-dashboard .analysis-banner {
     flex-direction: column;

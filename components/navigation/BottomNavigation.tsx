@@ -17,6 +17,17 @@ const items = [
     ),
   },
   {
+    href: "/tonight",
+    label: "Ce soir",
+    isActive: (pathname: string) => pathname.startsWith("/tonight"),
+    icon: (
+      <>
+        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" />
+        <path d="M18 3v3m-1.5-1.5h3" />
+      </>
+    ),
+  },
+  {
     href: "/explore",
     label: "Explorer",
     isActive: (pathname: string) => pathname.startsWith("/explore"),
@@ -35,17 +46,6 @@ const items = [
       <>
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
         <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
-      </>
-    ),
-  },
-  {
-    href: "/profile",
-    label: "Profil",
-    isActive: (pathname: string) => pathname.startsWith("/profile"),
-    icon: (
-      <>
-        <circle cx="12" cy="8" r="4" />
-        <path d="M4 22a8 8 0 0 1 16 0" />
       </>
     ),
   },
