@@ -34,6 +34,7 @@ import { fetchLightingPracticeEstimate } from "@/lib/lighting-practices-client";
 import type { LightingPracticeEstimate } from "@/lib/lighting-practices";
 import { getOnboardingCompleted, setOnboardingCompleted } from "@/lib/storage";
 import { meteorShowers } from "@/lib/meteor-showers";
+import { getNasaUpcomingEvents, type NasaHighlights, type NasaUpcomingEvent } from "@/lib/nasa";
 import { calculateBestSkyWindow } from "@/lib/sky-window";
 import { getAchievementProgress, getRankProgress } from "@/lib/progression";
 import {
@@ -68,11 +69,12 @@ type LoadState = "idle" | "loading" | "ready";
 
 type TimelineEvent = {
   id: string;
-  type: CelestialEventType | "meteor_shower";
+  type: CelestialEventType | "meteor_shower" | NasaUpcomingEvent["type"];
   title: string;
   date: Date;
   description: string;
   timeLabel: "instant" | "peak" | "approximate_peak";
+  sourceUrl?: string;
 };
 
 const CELESTIAL_EVENT_WINDOW_DAYS = 60;
@@ -159,6 +161,30 @@ function createEventTimeline(startDate: Date): TimelineEvent[] {
     ...celestialEvents,
     ...getMeteorShowerTimelineEvents(startDate, CELESTIAL_EVENT_WINDOW_DAYS),
   ].sort((left, right) => left.date.getTime() - right.date.getTime());
+}
+
+function mergeNasaTimelineEvents(
+  timeline: TimelineEvent[],
+  highlights: NasaHighlights,
+  startDate: Date,
+): TimelineEvent[] {
+  const nasaEvents = getNasaUpcomingEvents(
+    highlights,
+    startDate,
+    CELESTIAL_EVENT_WINDOW_DAYS,
+  ).map<TimelineEvent>((event) => ({
+    id: event.id,
+    type: event.type,
+    title: event.title,
+    date: new Date(event.occursAt),
+    description: event.description,
+    timeLabel: "instant",
+    sourceUrl: event.sourceUrl,
+  }));
+
+  return [...timeline, ...nasaEvents].sort(
+    (left, right) => left.date.getTime() - right.date.getTime(),
+  );
 }
 
 function readCachedAnalysis(): DashboardAnalysis | null {
@@ -460,7 +486,21 @@ export function Dashboard() {
   useEffect(() => {
     let isActive = true;
     const currentDate = new Date();
-    setEventTimeline(createEventTimeline(currentDate));
+    const localTimeline = createEventTimeline(currentDate);
+    setEventTimeline(localTimeline);
+    void fetch("/api/nasa/highlights")
+      .then((response) => {
+        if (!response.ok) throw new Error("NASA events unavailable");
+        return response.json() as Promise<NasaHighlights>;
+      })
+      .then((highlights) => {
+        if (isActive) {
+          setEventTimeline(mergeNasaTimelineEvents(localTimeline, highlights, currentDate));
+        }
+      })
+      .catch(() => {
+        // The locally calculated timeline remains complete when NASA is unavailable.
+      });
     setProfile(getProgressProfile());
     void getObservations().then((storedObservations) => {
       if (isActive) setObservations(storedObservations);
@@ -907,7 +947,7 @@ export function Dashboard() {
         <section id="upcoming">
           <MotionBlock className="section-header spaced">
             <h2 className="section-title">Prochains événements</h2>
-            <span className="section-sub">Dans les 60 jours</span>
+            <span className="section-sub">Astronomie + NASA · 60 jours</span>
           </MotionBlock>
           <motion.div
             className="upcoming-list"
@@ -950,6 +990,16 @@ export function Dashboard() {
                     <p>
                       {timing} · {event.description}
                     </p>
+                    {event.sourceUrl ? (
+                      <a
+                        href={event.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="nasa-event-link"
+                      >
+                        Fiche NASA JPL ↗
+                      </a>
+                    ) : null}
                   </div>
                   <svg className="upcoming-arrow event-star" viewBox="0 0 24 24">
                     <path d="M12 2l1.7 6.3L20 10l-6.3 1.7L12 18l-1.7-6.3L4 10l6.3-1.7L12 2z" />

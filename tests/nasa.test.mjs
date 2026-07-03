@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { parseApod, parseClosestAsteroid, summarizeSpaceWeather } from "../lib/nasa.ts";
+import {
+  getNasaUpcomingEvents,
+  parseApod,
+  parseClosestAsteroid,
+  summarizeSpaceWeather,
+} from "../lib/nasa.ts";
 
 test("APOD keeps a usable thumbnail for videos", () => {
   const apod = parseApod({
@@ -29,7 +34,11 @@ test("NeoWs summary selects the closest approach in the feed", () => {
             meters: { estimated_diameter_min: 10, estimated_diameter_max: 30 },
           },
           close_approach_data: [
-            { close_approach_date: "2026-07-03", miss_distance: { kilometers: "900000" } },
+            {
+              close_approach_date: "2026-07-03",
+              epoch_date_close_approach: Date.parse("2026-07-03T18:00:00Z"),
+              miss_distance: { kilometers: "900000" },
+            },
           ],
         },
         {
@@ -40,7 +49,11 @@ test("NeoWs summary selects the closest approach in the feed", () => {
             meters: { estimated_diameter_min: 20, estimated_diameter_max: 40 },
           },
           close_approach_data: [
-            { close_approach_date: "2026-07-04", miss_distance: { kilometers: "400000" } },
+            {
+              close_approach_date: "2026-07-04",
+              epoch_date_close_approach: Date.parse("2026-07-04T18:00:00Z"),
+              miss_distance: { kilometers: "400000" },
+            },
           ],
         },
       ],
@@ -50,6 +63,33 @@ test("NeoWs summary selects the closest approach in the feed", () => {
   assert.equal(asteroid?.name, "Near rock");
   assert.equal(asteroid?.diameterMeters, 30);
   assert.equal(asteroid?.missDistanceKm, 400_000);
+  assert.equal(asteroid?.approachAt, "2026-07-04T18:00:00.000Z");
+});
+
+test("dashboard NASA events include only future approaches inside its horizon", () => {
+  const startDate = new Date("2026-07-03T12:00:00Z");
+  const highlights = {
+    generatedAt: startDate.toISOString(),
+    apod: null,
+    spaceWeather: null,
+    aurora: { level: "unknown", label: "Indisponible", summary: "", maxKp: null },
+    asteroid: {
+      name: "2026 AB",
+      approachDate: "2026-07-04",
+      approachAt: "2026-07-04T18:00:00.000Z",
+      missDistanceKm: 1_200_000,
+      diameterMeters: 42,
+      potentiallyHazardous: false,
+      sourceUrl: "https://ssd.jpl.nasa.gov/example",
+    },
+  };
+
+  const events = getNasaUpcomingEvents(highlights, startDate, 60);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].type, "near_earth_asteroid");
+  assert.match(events[0].description, /non observable à l’œil nu/);
+
+  assert.deepEqual(getNasaUpcomingEvents(highlights, new Date("2026-07-05T00:00:00Z"), 60), []);
 });
 
 test("aurora wording stays cautious when DONKI reports a strong Kp index", () => {

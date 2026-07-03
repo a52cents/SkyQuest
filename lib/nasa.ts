@@ -11,9 +11,19 @@ export type NasaApodHighlight = {
 export type NasaAsteroidHighlight = {
   name: string;
   approachDate: string;
+  approachAt: string;
   missDistanceKm: number;
   diameterMeters: number;
   potentiallyHazardous: boolean;
+  sourceUrl: string;
+};
+
+export type NasaUpcomingEvent = {
+  id: string;
+  type: "near_earth_asteroid";
+  title: string;
+  occursAt: string;
+  description: string;
   sourceUrl: string;
 };
 
@@ -92,7 +102,10 @@ export function parseApod(value: unknown): NasaApodHighlight | null {
   };
 }
 
-export function parseClosestAsteroid(value: unknown): NasaAsteroidHighlight | null {
+export function parseClosestAsteroid(
+  value: unknown,
+  notBefore?: Date,
+): NasaAsteroidHighlight | null {
   if (!isRecord(value) || !isRecord(value.near_earth_objects)) return null;
 
   let closest: NasaAsteroidHighlight | null = null;
@@ -118,10 +131,17 @@ export function parseClosestAsteroid(value: unknown): NasaAsteroidHighlight | nu
         const missDistanceKm = readNumber(approach.miss_distance.kilometers);
         const approachDate = readString(approach, "close_approach_date");
         if (missDistanceKm === null || !approachDate) continue;
+        const approachEpoch = readNumber(approach.epoch_date_close_approach);
+        const approachAt =
+          approachEpoch !== null
+            ? new Date(approachEpoch).toISOString()
+            : `${approachDate}T12:00:00.000Z`;
+        if (notBefore && new Date(approachAt) < notBefore) continue;
 
         const candidate: NasaAsteroidHighlight = {
           name: name.replace(/^\((.+)\)$/, "$1"),
           approachDate,
+          approachAt,
           missDistanceKm,
           diameterMeters: (minDiameter + maxDiameter) / 2,
           potentiallyHazardous: asteroid.is_potentially_hazardous_asteroid === true,
@@ -133,6 +153,43 @@ export function parseClosestAsteroid(value: unknown): NasaAsteroidHighlight | nu
   }
 
   return closest;
+}
+
+function formatNasaDistance(distanceKm: number): string {
+  if (distanceKm >= 1_000_000) {
+    const millions = distanceKm / 1_000_000;
+    const unit = millions < 2 ? "million" : "millions";
+    return `${millions.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} ${unit} de km`;
+  }
+  return `${Math.round(distanceKm).toLocaleString("fr-FR")} km`;
+}
+
+export function getNasaUpcomingEvents(
+  highlights: NasaHighlights,
+  startDate: Date,
+  horizonDays: number,
+): NasaUpcomingEvent[] {
+  if (!Number.isFinite(startDate.getTime()) || !Number.isFinite(horizonDays) || horizonDays <= 0) {
+    return [];
+  }
+
+  const asteroid = highlights.asteroid;
+  if (!asteroid) return [];
+  const occursAt = new Date(asteroid.approachAt);
+  const horizonEnd = new Date(startDate.getTime() + horizonDays * 86_400_000);
+  if (!Number.isFinite(occursAt.getTime()) || occursAt < startDate || occursAt > horizonEnd)
+    return [];
+
+  return [
+    {
+      id: `nasa-neo-${asteroid.name}-${asteroid.approachAt}`,
+      type: "near_earth_asteroid",
+      title: `Passage de ${asteroid.name}`,
+      occursAt: asteroid.approachAt,
+      description: `À environ ${formatNasaDistance(asteroid.missDistanceKm)} de la Terre · information NASA, non observable à l’œil nu.`,
+      sourceUrl: asteroid.sourceUrl,
+    },
+  ];
 }
 
 function geomagneticEvents(value: unknown): Array<NasaSpaceWeatherHighlight & { maxKp: number }> {
@@ -279,7 +336,7 @@ export async function getNasaHighlights(now = new Date()): Promise<NasaHighlight
   return {
     generatedAt: now.toISOString(),
     apod: parseApod(apodValue),
-    asteroid: parseClosestAsteroid(asteroidsValue),
+    asteroid: parseClosestAsteroid(asteroidsValue, now),
     ...weather,
   };
 }
