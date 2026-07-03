@@ -38,6 +38,47 @@ export type WeatherNow = {
   temperature?: number;
 };
 
+export type WeatherHour = {
+  date: string;
+  cloudCover: number;
+  relativeHumidity: number;
+  temperature?: number;
+  dewPoint?: number;
+  visibilityMeters?: number;
+};
+
+export type WeatherForecast = {
+  hours: WeatherHour[];
+  timezone: string;
+  isEstimated: boolean;
+};
+
+export type FogRisk = "low" | "moderate" | "high";
+
+export type SkyWindowHour = {
+  date: string;
+  score: number;
+  cloudCover: number;
+  relativeHumidity: number;
+  fogRisk: FogRisk;
+  sunAltitude: number;
+  isAstronomicalDark: boolean;
+  bestTargets: string[];
+};
+
+export type BestSkyWindow = {
+  generatedAt: string;
+  startsAt: string;
+  endsAt: string;
+  score: number;
+  bestTargets: string[];
+  moonIlluminationPercent: number;
+  moonPhaseLabel: string;
+  hours: SkyWindowHour[];
+  timezone: string;
+  isEstimated: boolean;
+};
+
 export type VisibilityLabel = "Excellente chance" | "Bonne chance" | "Tentable" | "Pas conseillé";
 
 export type SkyQuest = {

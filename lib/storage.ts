@@ -21,6 +21,7 @@ export {
 } from "@/lib/onboarding";
 import type {
   AchievementId,
+  BestSkyWindow,
   Observation,
   ObservationPhotoDraft,
   ProgressProfile,
@@ -33,6 +34,7 @@ const OBSERVATIONS_KEY = "skyquest.observations.v0";
 const ACTIVE_QUEST_KEY = "skyquest.activeQuest.v0";
 const LAST_LOCATION_KEY = "skyquest.lastLocation.v0";
 const PROGRESS_PROFILE_KEY = "skyquest.progression.v1";
+const BEST_SKY_WINDOW_KEY = "skyquest.bestSkyWindow.v1";
 
 type StoredLocation = {
   latitude: number;
@@ -43,6 +45,7 @@ let memoryObservations: Observation[] = [];
 let memoryProfile = createEmptyProgressProfile();
 let memoryActiveQuest: SkyQuest | null = null;
 let memoryLastLocation: StoredLocation | null = null;
+let memoryBestSkyWindow: BestSkyWindow | null = null;
 let legacyMigrationPromise: Promise<Observation[]> | null = null;
 const failedStorageKeys = new Set<string>();
 
@@ -377,4 +380,26 @@ export function getLastLocation(): StoredLocation | null {
   const location = readJson<StoredLocation | null>(LAST_LOCATION_KEY, memoryLastLocation);
   memoryLastLocation = location;
   return location;
+}
+
+export function saveBestSkyWindow(window: BestSkyWindow): void {
+  memoryBestSkyWindow = window;
+  writeJson(BEST_SKY_WINDOW_KEY, window);
+}
+
+export function getBestSkyWindow(): BestSkyWindow | null {
+  const value = readJson<BestSkyWindow | null>(BEST_SKY_WINDOW_KEY, memoryBestSkyWindow);
+  if (
+    !value ||
+    typeof value.generatedAt !== "string" ||
+    typeof value.startsAt !== "string" ||
+    typeof value.endsAt !== "string" ||
+    typeof value.score !== "number" ||
+    !Array.isArray(value.hours) ||
+    !Array.isArray(value.bestTargets)
+  ) {
+    return null;
+  }
+  memoryBestSkyWindow = value;
+  return value;
 }

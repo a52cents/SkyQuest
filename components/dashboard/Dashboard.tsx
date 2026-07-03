@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 import { AppHeader } from "@/components/AppHeader";
+import { BestSkyWindowCard } from "@/components/BestSkyWindowCard";
 import { Onboarding } from "@/components/Onboarding";
 import { PushPermissionCard } from "@/components/PushPermissionCard";
 import { getCurrentPosition, type GeoPosition } from "@/lib/browser-support";
@@ -27,6 +28,7 @@ import { haptic } from "@/lib/haptics";
 import { fetchNextIssVisiblePass } from "@/lib/iss";
 import { getOnboardingCompleted, setOnboardingCompleted } from "@/lib/storage";
 import { meteorShowers } from "@/lib/meteor-showers";
+import { calculateBestSkyWindow } from "@/lib/sky-window";
 import { getAchievementProgress, getRankProgress } from "@/lib/progression";
 import {
   generateFutureQuestSuggestions,
@@ -37,16 +39,23 @@ import {
   getObservations,
   getProgressProfile,
   saveActiveQuest,
+  saveBestSkyWindow,
   saveLastLocation,
 } from "@/lib/storage";
 import type {
   Observation,
+  BestSkyWindow,
   ProgressProfile,
   QuestTargetType,
   SkyQuest,
   WeatherNow,
 } from "@/lib/types";
-import { fetchWeatherNow, getFallbackWeather } from "@/lib/weather";
+import {
+  fetchWeatherForecast,
+  fetchWeatherNow,
+  getFallbackWeather,
+  getFallbackWeatherForecast,
+} from "@/lib/weather";
 
 type LoadState = "idle" | "loading" | "ready";
 
@@ -70,6 +79,7 @@ type DashboardAnalysis = {
   weather: WeatherNow;
   quests: SkyQuest[];
   futureSuggestions: FutureQuestSuggestion[];
+  bestSkyWindow?: BestSkyWindow;
 };
 
 const QUEST_TARGET_LABELS: Record<QuestTargetType, string> = {
@@ -299,6 +309,7 @@ export function Dashboard() {
   const [weather, setWeather] = useState<WeatherNow | null>(null);
   const [quests, setQuests] = useState<SkyQuest[]>([]);
   const [futureSuggestions, setFutureSuggestions] = useState<FutureQuestSuggestion[]>([]);
+  const [bestSkyWindow, setBestSkyWindow] = useState<BestSkyWindow | null>(null);
   const [eventTimeline, setEventTimeline] = useState<TimelineEvent[]>([]);
   const [profile, setProfile] = useState<ProgressProfile | null>(null);
   const [observations, setObservations] = useState<Observation[]>([]);
@@ -328,13 +339,18 @@ export function Dashboard() {
     setLoadState("loading");
     setNotice(null);
 
-    let weatherNotice: string | null = null;
-    const currentWeather = await fetchWeatherNow(coords.latitude, coords.longitude).catch(() => {
-      weatherNotice = "Météo indisponible : une estimation prudente est utilisée.";
-      return getFallbackWeather();
-    });
     const currentDate = new Date();
-    const [currentIssPass, futureIssPass] = await Promise.all([
+    let currentWeatherFailed = false;
+    let forecastFailed = false;
+    const [currentWeather, forecast, currentIssPass, futureIssPass] = await Promise.all([
+      fetchWeatherNow(coords.latitude, coords.longitude).catch(() => {
+        currentWeatherFailed = true;
+        return getFallbackWeather();
+      }),
+      fetchWeatherForecast(coords.latitude, coords.longitude, 24).catch(() => {
+        forecastFailed = true;
+        return getFallbackWeatherForecast(currentDate);
+      }),
       fetchNextIssVisiblePass({
         latitude: coords.latitude,
         longitude: coords.longitude,
@@ -347,6 +363,14 @@ export function Dashboard() {
         horizonMinutes: 24 * 60,
       }).catch(() => null),
     ]);
+    const weatherNotice =
+      currentWeatherFailed && forecastFailed
+        ? "Météo indisponible : des estimations prudentes sont utilisées."
+        : currentWeatherFailed
+          ? "Météo actuelle indisponible : une estimation prudente est utilisée."
+          : forecastFailed
+            ? "Prévision horaire indisponible : le créneau est estimé prudemment."
+            : null;
 
     const nextQuests = generateQuests({
       latitude: coords.latitude,
@@ -365,6 +389,12 @@ export function Dashboard() {
       excludedTargets: new Set(nextQuests.map((quest) => quest.target)),
       horizonMinutes: 7 * 24 * 60,
     });
+    const nextBestSkyWindow = calculateBestSkyWindow({
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      forecast,
+      now: currentDate,
+    });
 
     const savedAt = Date.now();
     const analysis = {
@@ -373,11 +403,14 @@ export function Dashboard() {
       weather: currentWeather,
       quests: nextQuests,
       futureSuggestions: nextFutureSuggestions,
+      bestSkyWindow: nextBestSkyWindow,
     };
 
     setWeather(currentWeather);
     setQuests(nextQuests);
     setFutureSuggestions(nextFutureSuggestions);
+    setBestSkyWindow(nextBestSkyWindow);
+    saveBestSkyWindow(nextBestSkyWindow);
     setAnalysisSavedAt(savedAt);
     setIsGuidanceUnlocked(true);
     unlockedAnalysisForRuntime = savedAt;
@@ -403,6 +436,7 @@ export function Dashboard() {
       setWeather(cachedAnalysis.weather);
       setQuests(cachedAnalysis.quests);
       setFutureSuggestions(cachedAnalysis.futureSuggestions);
+      setBestSkyWindow(cachedAnalysis.bestSkyWindow ?? null);
       setAnalysisSavedAt(cachedAnalysis.savedAt);
       setIsGuidanceUnlocked(unlockedAnalysisForRuntime === cachedAnalysis.savedAt);
       setLoadState("ready");
@@ -644,6 +678,10 @@ export function Dashboard() {
                   : "Maintenant"}
             </motion.button>
           </div>
+        </MotionBlock>
+
+        <MotionBlock>
+          <BestSkyWindowCard window={bestSkyWindow} />
         </MotionBlock>
 
         <MotionBlock className="section-header">

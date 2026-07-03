@@ -145,3 +145,7 @@ export function getSunPosition(
   const observer = createObserver(latitude, longitude);
   return calculateHorizontalPosition(bodyByName.Sun, observer, date);
 }
+
+export function getMoonIllumination(date: Date): number {
+  return Astronomy.Illumination(Astronomy.Body.Moon, date).phase_fraction;
+}

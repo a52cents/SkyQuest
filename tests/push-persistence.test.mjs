@@ -48,3 +48,9 @@ test("scheduled opportunities are restricted to 19:00 through 03:59 local time",
   assert.match(cronRouteSource, /localHour >= 19 \|\| localHour < 4/);
   assert.match(cronRouteSource, /if \(!isNotificationWindow\) return null/);
 });
+
+test("scheduled clear-sky alerts can announce an approaching best window", () => {
+  assert.match(cronRouteSource, /fetchWeatherForecast/);
+  assert.match(cronRouteSource, /minutesUntilWindow >= 15 && minutesUntilWindow <= 75/);
+  assert.match(cronRouteSource, /url: "\/tonight"/);
+});

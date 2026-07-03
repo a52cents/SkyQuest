@@ -433,6 +433,83 @@ html.night-mode .sky-dashboard .analysis-banner {
   color: var(--dash-fg);
 }
 
+.sky-dashboard .best-window-card {
+  position: relative;
+  display: block;
+  margin: 0 0 28px;
+  padding: 22px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--dash-accent) 32%, transparent);
+  border-radius: var(--dash-radius);
+  background:
+    radial-gradient(
+      circle at 90% 5%,
+      color-mix(in srgb, var(--dash-accent) 22%, transparent),
+      transparent 38%
+    ),
+    var(--dash-bg-card);
+  transition:
+    border-color 0.25s ease,
+    transform 0.25s ease;
+}
+.sky-dashboard .best-window-card:hover {
+  border-color: var(--dash-accent);
+  transform: translateY(-2px);
+}
+.sky-dashboard .best-window-kicker {
+  color: var(--dash-accent-cyan);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.sky-dashboard .best-window-card h2 {
+  max-width: 420px;
+  margin-top: 8px;
+  font-family: var(--dash-font-display);
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.25;
+}
+.sky-dashboard .best-window-card h2 strong {
+  color: var(--dash-accent-cyan);
+  font-weight: 400;
+  white-space: nowrap;
+}
+.sky-dashboard .best-window-card p {
+  max-width: 430px;
+  margin-top: 8px;
+  color: var(--dash-fg-dim);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.sky-dashboard .best-window-link {
+  display: inline-block;
+  margin-top: 18px;
+  color: var(--dash-fg);
+  font-size: 12px;
+  font-weight: 600;
+}
+.sky-dashboard .best-window-orbit {
+  position: absolute;
+  top: -28px;
+  right: -26px;
+  width: 128px;
+  height: 128px;
+  border: 1px solid color-mix(in srgb, var(--dash-accent) 18%, transparent);
+  border-radius: 50%;
+}
+.sky-dashboard .best-window-orbit span {
+  position: absolute;
+  bottom: 20px;
+  left: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dash-accent-cyan);
+  box-shadow: 0 0 16px var(--dash-accent-cyan);
+}
+
 .sky-dashboard .upcoming-list {
   display: flex;
   flex-direction: column;

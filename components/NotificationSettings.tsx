@@ -5,8 +5,8 @@ import type { NotificationPreferences, NotificationTopic } from "@/lib/push-clie
 const TOPIC_LABELS: Array<{ topic: NotificationTopic; title: string; description: string }> = [
   {
     topic: "clear_sky_evening",
-    title: "Ciel clair",
-    description: "Quand la météo semble favorable.",
+    title: "Bon créneau",
+    description: "Quand une éclaircie intéressante approche.",
   },
   {
     topic: "moon_visible",

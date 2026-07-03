@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSkyObjects } from "@/lib/astro";
 import { getUpcomingCelestialEvents } from "@/lib/celestial-events";
+import { calculateBestSkyWindow } from "@/lib/sky-window";
 import { sendPushToMany, type SkyQuestPushPayload } from "@/lib/push-server";
 import {
   claimHourlyPushSlot,
@@ -8,7 +9,7 @@ import {
   isEligibleForHourlyPush,
   type StoredPushSubscription,
 } from "@/lib/push-store";
-import { fetchWeatherNow } from "@/lib/weather";
+import { fetchWeatherForecast, fetchWeatherNow } from "@/lib/weather";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,7 +65,32 @@ async function createOpportunity(
     };
   }
 
-  const weather = await fetchWeatherNow(latitude, longitude);
+  const [weather, forecast] = await Promise.all([
+    fetchWeatherNow(latitude, longitude),
+    subscription.topics.includes("clear_sky_evening")
+      ? fetchWeatherForecast(latitude, longitude, 24).catch(() => null)
+      : Promise.resolve(null),
+  ]);
+
+  if (forecast) {
+    const skyWindow = calculateBestSkyWindow({ latitude, longitude, forecast, now });
+    const minutesUntilWindow = Math.round(
+      (new Date(skyWindow.startsAt).getTime() - now.getTime()) / 60_000,
+    );
+    if (skyWindow.score >= 60 && minutesUntilWindow >= 15 && minutesUntilWindow <= 75) {
+      const targetText = skyWindow.bestTargets.length
+        ? ` À tenter : ${skyWindow.bestTargets.join(", ")}.`
+        : "";
+      return {
+        title: `Ciel plus favorable dans ${minutesUntilWindow} min`,
+        body: `Le meilleur créneau approche (indice ${skyWindow.score}/100).${targetText}`,
+        url: "/tonight",
+        tag: `best-sky-window-${skyWindow.startsAt.slice(0, 13)}`,
+        data: { type: "clear_sky_evening" },
+      };
+    }
+  }
+
   if (weather.isDay || weather.cloudCover > 65) return null;
 
   const skyObjects = getSkyObjects(latitude, longitude, now);
