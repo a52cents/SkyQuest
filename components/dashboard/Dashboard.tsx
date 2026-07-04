@@ -156,6 +156,27 @@ function isQuestGuidanceAvailable(quest: SkyQuest, isGuidanceUnlocked: boolean):
   return true;
 }
 
+type QuestEase = {
+  label: "Facile" | "Intermédiaire" | "Difficile";
+  tone: "easy" | "moderate" | "hard";
+};
+
+function getQuestEase(quest: SkyQuest): QuestEase {
+  if (quest.targetType === "free_observation") {
+    return { label: "Facile", tone: "easy" };
+  }
+
+  if (quest.visibilityScore >= 75 && quest.difficulty === "easy") {
+    return { label: "Facile", tone: "easy" };
+  }
+
+  if (quest.visibilityScore >= 60) {
+    return { label: "Intermédiaire", tone: "moderate" };
+  }
+
+  return { label: "Difficile", tone: "hard" };
+}
+
 function QuestCard({
   quest,
   onStart,
@@ -172,6 +193,7 @@ function QuestCard({
     quest.targetType === "satellite" &&
     quest.startsAt !== undefined &&
     new Date(quest.startsAt).getTime() > Date.now();
+  const questEase = getQuestEase(quest);
   return (
     <motion.article
       layout
@@ -189,19 +211,27 @@ function QuestCard({
         if (!locked) onStart(quest);
       }}
     >
-      <div
-        className={`quest-badge ${quest.altitude !== null && quest.altitude >= 10 ? "now" : "soon"}`}
-      >
-        <span className="dot" />
-        {locked
-          ? stale
-            ? "Dernière analyse"
-            : "Guidage indisponible"
-          : quest.altitude !== null && quest.altitude >= 10
-            ? isSatelliteUpcoming
-              ? "Passage imminent"
-              : "Visible maintenant"
-            : "Observation prudente"}
+      <div className="quest-badges">
+        <div
+          className={`quest-badge ${quest.altitude !== null && quest.altitude >= 10 ? "now" : "soon"}`}
+        >
+          <span className="dot" />
+          {locked
+            ? stale
+              ? "Dernière analyse"
+              : "Guidage indisponible"
+            : quest.altitude !== null && quest.altitude >= 10
+              ? isSatelliteUpcoming
+                ? "Passage imminent"
+                : "Visible maintenant"
+              : "Observation prudente"}
+        </div>
+        <div
+          className={`quest-badge difficulty ${questEase.tone}`}
+          aria-label={`Difficulté estimée : ${questEase.label}`}
+        >
+          {questEase.label}
+        </div>
       </div>
       <h3>{quest.title}</h3>
       <p>{quest.description}</p>

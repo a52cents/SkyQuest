@@ -143,3 +143,12 @@ test("the Now dashboard displays every generated quest and the sky conditions", 
   assert.match(tonightSource, /title="Plus tard"/);
   assert.match(dashboardSource, /<NasaHighlights compact \/>/);
 });
+
+test("dashboard quest cards show a condition-aware difficulty badge", () => {
+  assert.match(dashboardSource, /function getQuestEase\(quest: SkyQuest\)/);
+  assert.match(dashboardSource, /quest\.visibilityScore >= 75 && quest\.difficulty === "easy"/);
+  assert.match(dashboardSource, /Difficulté estimée : \$\{questEase\.label\}/);
+  assert.match(dashboardCss, /\.quest-badge\.difficulty\.easy/);
+  assert.match(dashboardCss, /\.quest-badge\.difficulty\.moderate/);
+  assert.match(dashboardCss, /\.quest-badge\.difficulty\.hard/);
+});

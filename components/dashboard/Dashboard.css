@@ -483,11 +483,17 @@ html.night-mode .sky-dashboard .analysis-banner {
 .sky-dashboard .quest-card:hover::before {
   opacity: 0.6;
 }
+.sky-dashboard .quest-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+}
 .sky-dashboard .quest-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 12px;
   padding: 4px 10px;
   border: 1px solid var(--dash-border);
   border-radius: 100px;
@@ -505,6 +511,24 @@ html.night-mode .sky-dashboard .analysis-banner {
   border-color: color-mix(in srgb, var(--warning) 20%, transparent);
   background: color-mix(in srgb, var(--warning) 8%, transparent);
   color: var(--dash-accent-warm);
+}
+.sky-dashboard .quest-badge.difficulty {
+  letter-spacing: 0.65px;
+}
+.sky-dashboard .quest-badge.difficulty.easy {
+  border-color: color-mix(in srgb, var(--dash-accent-cyan) 24%, transparent);
+  background: color-mix(in srgb, var(--dash-accent-cyan) 7%, transparent);
+  color: var(--dash-accent-cyan);
+}
+.sky-dashboard .quest-badge.difficulty.moderate {
+  border-color: color-mix(in srgb, var(--dash-accent) 24%, transparent);
+  background: color-mix(in srgb, var(--dash-accent) 7%, transparent);
+  color: color-mix(in srgb, var(--dash-accent) 78%, white);
+}
+.sky-dashboard .quest-badge.difficulty.hard {
+  border-color: color-mix(in srgb, var(--warning) 22%, transparent);
+  background: color-mix(in srgb, var(--warning) 7%, transparent);
+  color: var(--warning);
 }
 .sky-dashboard .quest-badge .dot {
   width: 5px;
