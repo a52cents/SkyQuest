@@ -9,7 +9,7 @@ Le projet privilégie un parcours simple — **Maintenant → quoi regarder → 
 - génération de quêtes selon la position GPS, l'heure et la couverture nuageuse ;
 - calcul local de la Lune, du Soleil et des planètes avec `astronomy-engine` ;
 - catalogue de repères accessibles : étoiles, constellations, astérismes, Pléiades et Andromède ;
-- pluies de météores, événements célestes à venir et passages visibles de l'ISS en option ;
+- pluies de météores, événements célestes à venir et passages estimés de l'ISS ;
 - score de visibilité et sélection prioritaire des cibles ayant un score d'au moins 50 ;
 - estimation de la qualité du ciel, avec une pénalité adaptée aux cibles faibles ;
 - estimation du voile atmosphérique avec Open-Meteo Air Quality et CAMS ;
@@ -33,7 +33,7 @@ La racine `/` affiche la page de présentation dans un navigateur classique et l
 - `astronomy-engine`
 - Open-Meteo
 - Supabase/Postgres pour les subscriptions Web Push
-- API N2YO facultative pour l'ISS
+- CelesTrak et `satellite.js` pour les passages de l'ISS
 - `localStorage` pour les données utilisateur
 
 Il n'y a ni compte utilisateur ni authentification. Supabase sert uniquement à persister les subscriptions Web Push côté serveur ; le journal et la progression restent locaux.
@@ -48,11 +48,10 @@ cd SkyQuest
 npm install
 ```
 
-Créez éventuellement un fichier `.env.local` pour activer les quêtes ISS ou le lien de
-soutien volontaire :
+Créez éventuellement un fichier `.env.local` pour activer le lien de soutien volontaire ou les
+services qui demandent une clé :
 
 ```dotenv
-N2YO_API_KEY=votre_cle_n2yo
 NEXT_PUBLIC_SUPPORT_URL=https://votre-prestataire.example/soutenir
 
 # Provider de qualité du ciel facultatif, appelé uniquement côté serveur
@@ -71,8 +70,8 @@ CRON_SECRET=un_secret_aleatoire
 PUSH_TEST_SECRET=un_autre_secret_aleatoire
 ```
 
-Sans ces variables, l'application continue normalement : elle omet les passages ISS, utilise une
-estimation prudente de qualité du ciel et indique
+Sans ces variables, l'application continue normalement : elle utilise une estimation prudente de
+qualité du ciel et indique
 simplement que le soutien financier ou les alertes ne sont pas encore configurés. L'URL de soutien
 doit utiliser HTTPS et n'est ouverte qu'après une action volontaire depuis la page de soutien. La
 configuration complète des alertes et le SQL Supabase sont décrits dans
@@ -129,7 +128,7 @@ app/
 ├── explore/page.tsx         # catalogue du ciel
 ├── profile/page.tsx         # progression locale
 ├── support/page.tsx         # soutien volontaire, hors du parcours principal
-├── api/iss-pass/route.ts    # proxy N2YO optionnel
+├── api/iss-pass/route.ts    # calcul serveur du prochain passage ISS
 ├── api/light-pollution/     # proxy et fallback de qualité du ciel
 └── api/lighting-practice/   # commune API Geo et signal Cerema
 components/
@@ -203,7 +202,7 @@ python scripts/generate-cerema-lighting-index.py chemin/vers/carte-extinction.gp
 - **Position** : demandée après action sur **Maintenant**. La dernière position et l'analyse mise en cache sont arrondies à deux décimales avant stockage local.
 - **Météo** : les coordonnées sont envoyées directement depuis le navigateur à Open-Meteo.
 - **Transparence de l'air** : les coordonnées arrondies à deux décimales sont envoyées à [Open-Meteo Air Quality](https://open-meteo.com/en/docs/air-quality-api). L'épaisseur optique des aérosols et les particules CAMS appliquent au maximum 10 points de pénalité aux objets faibles ; une panne du service n'affecte pas le reste de l'analyse. Données : CAMS ENSEMBLE via Open-Meteo.
-- **ISS** : si `N2YO_API_KEY` est définie, les coordonnées transitent par `/api/iss-pass` puis sont envoyées à N2YO.
+- **ISS** : `/api/iss-pass` récupère uniquement les [éléments orbitaux publics](https://celestrak.org/NORAD/documentation/gp-data-formats.php) de l'ISS auprès de CelesTrak, les met en cache deux heures, puis calcule le passage côté serveur. La position de l'utilisateur n'est jamais envoyée à CelesTrak.
 - **Qualité du ciel** : les coordonnées sont arrondies à deux décimales avant `/api/light-pollution`. Si un provider est configuré, il reçoit uniquement cette position approximative. Une mesure réussie est mise en cache 14 jours dans le navigateur et jusqu'à 30 jours côté serveur/CDN ; le fallback expire après un jour et aucun historique de position n'est créé.
 - **Pratiques d'éclairage** : une position arrondie à deux décimales est envoyée côté serveur à l'API Geo pour identifier la commune française. Le signal Cerema est mis en cache 30 jours et aucune adresse ni position précise n'est demandée ou conservée.
 - **Caméra et orientation** : demandées au lancement du guidage. Les pistes caméra sont arrêtées au démontage du composant.
@@ -216,7 +215,7 @@ En production, servez obligatoirement l'application en HTTPS pour rendre disponi
 
 ## PWA et hors ligne
 
-Le service worker est enregistré uniquement en production. Il met en cache une coquille minimale (`/`, `/journal`, le manifest et l'icône SVG) et utilise le réseau en priorité. Les nouvelles analyses nécessitent toujours un accès réseau pour Open-Meteo et, le cas échéant, N2YO.
+Le service worker est enregistré uniquement en production. Il met en cache une coquille minimale (`/`, `/journal`, le manifest et l'icône SVG) et utilise le réseau en priorité. Les nouvelles analyses nécessitent toujours un accès réseau pour Open-Meteo et CelesTrak.
 
 ## Tests
 

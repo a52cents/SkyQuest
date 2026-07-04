@@ -107,6 +107,9 @@ html.night-mode .sky-dashboard .analysis-banner {
 .sky-dashboard .sky-insights-disclosure {
   order: 6;
 }
+.sky-dashboard .space-news-block {
+  order: 7;
+}
 .sky-dashboard section {
   scroll-margin-top: 78px;
 }

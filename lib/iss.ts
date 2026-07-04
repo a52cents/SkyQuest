@@ -10,21 +10,6 @@ export type IssVisiblePass = {
   magnitude?: number;
 };
 
-type N2yoVisualPass = {
-  startAz?: number;
-  maxAz?: number;
-  maxEl?: number;
-  startUTC?: number;
-  maxUTC?: number;
-  duration?: number;
-  mag?: number;
-};
-
-export type N2yoVisualPassResponse = {
-  passes?: N2yoVisualPass[];
-};
-
-const MAX_MINUTES_UNTIL_PASS = 90;
 const ISS_GUIDANCE_LEAD_MS = 5 * 60 * 1000;
 
 export function getIssPassEndTime(pass: IssVisiblePass): Date {
@@ -115,42 +100,5 @@ export function parseIssVisiblePass(payload: IssVisiblePassPayload): IssVisibleP
     ...payload,
     startTime: new Date(payload.startTime),
     maxTime: new Date(payload.maxTime),
-  };
-}
-
-export function findNextIssVisiblePass(
-  data: N2yoVisualPassResponse,
-  now: Date,
-  horizonMinutes = MAX_MINUTES_UNTIL_PASS,
-): IssVisiblePassPayload | null {
-  const nowSeconds = Math.floor(now.getTime() / 1000);
-  const maxStartSeconds = nowSeconds + horizonMinutes * 60;
-  const pass = data.passes
-    ?.filter(
-      (candidate) =>
-        typeof candidate.startUTC === "number" &&
-        candidate.startUTC <= maxStartSeconds &&
-        candidate.startUTC + Math.max(0, candidate.duration ?? 0) >= nowSeconds,
-    )
-    .find((candidate) => typeof candidate.maxEl === "number" && candidate.maxEl >= 15);
-
-  if (
-    !pass ||
-    typeof pass.startAz !== "number" ||
-    typeof pass.maxAz !== "number" ||
-    typeof pass.maxEl !== "number" ||
-    typeof pass.startUTC !== "number"
-  ) {
-    return null;
-  }
-
-  return {
-    startAzimuth: pass.startAz,
-    maxAzimuth: pass.maxAz,
-    maxElevation: pass.maxEl,
-    startTime: new Date(pass.startUTC * 1000).toISOString(),
-    maxTime: new Date((pass.maxUTC ?? pass.startUTC) * 1000).toISOString(),
-    durationSeconds: pass.duration ?? 0,
-    magnitude: pass.mag,
   };
 }

@@ -12,7 +12,7 @@ UI client
   ├─ calculs locaux : astronomie, scoring, projection, progression
   ├─ Open-Meteo : météo actuelle
   ├─ Open-Meteo Air Quality / CAMS : voile atmosphérique actuel
-  ├─ /api/iss-pass → N2YO : passage ISS facultatif
+  ├─ /api/iss-pass → CelesTrak : éléments orbitaux ISS mis en cache 2 h
   ├─ /api/light-pollution → provider optionnel : qualité du ciel
   ├─ /api/lighting-practice → API Geo + index communal Cerema
   └─ /api/push/* → abonnement Web Push optionnel
@@ -27,7 +27,7 @@ UI client
 | `/journal`               | observations stockées localement              |
 | `/explore`               | catalogue pédagogique                         |
 | `/profile`               | progression locale et réglages d’alertes      |
-| `/api/iss-pass`          | proxy facultatif vers N2YO                    |
+| `/api/iss-pass`          | calcul serveur d'un passage ISS via CelesTrak |
 | `/api/light-pollution`   | estimation de qualité du ciel et fallback     |
 | `/api/lighting-practice` | commune française et pratique d'éclairage     |
 
@@ -64,7 +64,7 @@ Les lectures doivent tolérer un stockage indisponible, corrompu ou provenant d'
 
 - Open-Meteo est appelé directement par le navigateur ;
 - Open-Meteo Air Quality reçoit des coordonnées arrondies à `0,01°` et son échec reste non bloquant ;
-- N2YO est appelé côté serveur uniquement si `N2YO_API_KEY` existe ;
+- CelesTrak est appelé côté serveur au maximum toutes les deux heures ; la position reste sur le serveur ;
 - le provider de qualité du ciel est appelé côté serveur uniquement si `LIGHT_POLLUTION_API_URL` existe ;
 - l'API Geo reçoit côté serveur des coordonnées arrondies à `0,01°` et renvoie seulement la commune ;
 - les alertes sont activées uniquement après un clic explicite dans le Profil ; les thèmes et une

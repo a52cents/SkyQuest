@@ -28,7 +28,7 @@ test("every request blocking the Now analysis has a timeout signal", () => {
 
 test("server-side provider calls are bounded too", () => {
   for (const relativePath of [
-    "../app/api/iss-pass/route.ts",
+    "../lib/celestrak.ts",
     "../app/api/lighting-practice/route.ts",
     "../lib/light-pollution-provider.ts",
   ]) {

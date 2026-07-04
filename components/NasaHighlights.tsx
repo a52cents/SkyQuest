@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppCard } from "@/components/AppCard";
 import type { NasaHighlights as NasaHighlightsData } from "@/lib/nasa";
@@ -29,7 +30,73 @@ function LoadingCards() {
   );
 }
 
-export function NasaHighlights() {
+function CompactHighlight({
+  data,
+  isUnavailable,
+}: {
+  data: NasaHighlightsData | null;
+  isUnavailable: boolean;
+}) {
+  if (!data && !isUnavailable) {
+    return (
+      <div
+        className="h-28 animate-pulse rounded-[20px] border border-white/[0.06] bg-surface"
+        aria-label="Chargement des actualités spatiales"
+      />
+    );
+  }
+
+  const headline = data?.apod
+    ? { label: "Image astro du jour · NASA", title: data.apod.title, imageUrl: data.apod.imageUrl }
+    : data?.spaceWeather
+      ? { label: "Événement spatial récent", title: data.spaceWeather.title, imageUrl: null }
+      : data?.asteroid
+        ? { label: "Passage de la semaine", title: data.asteroid.name, imageUrl: null }
+        : data
+          ? { label: "Aurores · signal spatial", title: data.aurora.label, imageUrl: null }
+          : null;
+
+  return (
+    <AppCard as="article" variant="solid" padding="sm" className="overflow-hidden">
+      <div className="flex items-center gap-3">
+        {headline?.imageUrl ? (
+          // NASA APOD peut servir ses médias depuis plusieurs domaines partenaires.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={headline.imageUrl}
+            alt=""
+            className="h-20 w-20 shrink-0 rounded-[14px] bg-surface object-cover"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div
+            className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[14px] border border-accent/20 bg-accent/[0.08] text-2xl text-accent-cyan"
+            aria-hidden="true"
+          >
+            ✦
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold tracking-[0.1em] text-accent-cyan uppercase">
+            {headline?.label ?? "Actualités spatiales"}
+          </p>
+          <h3 className="mt-1 line-clamp-2 text-sm leading-5 font-semibold text-text">
+            {headline?.title ?? "Les nouvelles spatiales font une pause."}
+          </h3>
+          <Link
+            href="/explore#nasa-highlights-title"
+            className="mt-2 inline-flex min-h-8 items-center text-xs font-semibold text-accent-cyan"
+          >
+            Voir toutes les actualités →
+          </Link>
+        </div>
+      </div>
+    </AppCard>
+  );
+}
+
+export function NasaHighlights({ compact = false }: { compact?: boolean }) {
   const [data, setData] = useState<NasaHighlightsData | null>(null);
   const [isUnavailable, setIsUnavailable] = useState(false);
 
@@ -49,6 +116,8 @@ export function NasaHighlights() {
     void loadHighlights();
     return () => controller.abort();
   }, []);
+
+  if (compact) return <CompactHighlight data={data} isUnavailable={isUnavailable} />;
 
   if (!data && !isUnavailable) return <LoadingCards />;
 

@@ -5,14 +5,14 @@
  *
  * Orchestre le parcours « Maintenant » de la PWA installée : permission GPS, météo,
  * passage ISS optionnel, génération des quêtes, cache de l'analyse et navigation vers
- * le guidage. L'écran reste volontairement centré sur les trois meilleures quêtes du moment.
+ * le guidage. L'écran affiche toutes les quêtes fiables du moment, classées par pertinence.
  *
  * Important :
  * - le GPS doit rester déclenché par une action utilisateur ;
  * - une panne météo ou ISS ne doit jamais bloquer les autres quêtes ;
  * - une analyse relue du cache peut être affichée, mais son guidage reste verrouillé jusqu'à
  *   une nouvelle analyse afin de ne pas utiliser silencieusement une position périmée ;
- * - l'interface classe les quêtes par pertinence et n'affiche que les trois premières.
+ * - l'interface conserve le classement par pertinence et affiche toutes les quêtes générées.
  */
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -22,6 +22,7 @@ import { AppCard, getAppCardClassName } from "@/components/AppCard";
 import { fetchAirQualityNow, getAirTransparencyEstimate } from "@/lib/air-quality";
 import { AppHeader } from "@/components/AppHeader";
 import { BestSkyWindowCard } from "@/components/BestSkyWindowCard";
+import { NasaHighlights } from "@/components/NasaHighlights";
 import { Onboarding } from "@/components/Onboarding";
 import { VisibilityExplanationContent } from "@/components/VisibilityExplanationCard";
 import { getCurrentPosition, type GeoPosition } from "@/lib/browser-support";
@@ -480,7 +481,7 @@ export function Dashboard() {
         )
       : null;
   const guidableQuests = quests.filter((quest) => quest.targetType !== "free_observation");
-  const visibleQuests = quests.slice(0, 3);
+  const displayedQuests = quests;
   const airTransparency = airQuality ? getAirTransparencyEstimate(airQuality) : null;
   const conditionsLabel =
     analysisSavedAt && !isGuidanceUnlocked
@@ -756,7 +757,7 @@ export function Dashboard() {
 
         <motion.div className="quest-list" variants={rootVariants}>
           <AnimatePresence mode="popLayout">
-            {visibleQuests.map((quest) => (
+            {displayedQuests.map((quest) => (
               <QuestCard
                 key={quest.id}
                 quest={quest}
@@ -784,6 +785,26 @@ export function Dashboard() {
 
         <MotionBlock className="best-window-block">
           <BestSkyWindowCard window={bestSkyWindow} />
+        </MotionBlock>
+
+        <MotionBlock className="space-news-block mt-7">
+          <section aria-labelledby="dashboard-space-news-title">
+            <div className="mb-3 flex items-end justify-between gap-4">
+              <div>
+                <p className="premium-kicker">Actualités spatiales</p>
+                <h2
+                  id="dashboard-space-news-title"
+                  className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-xl font-normal text-text"
+                >
+                  Un œil dans l’espace
+                </h2>
+              </div>
+              <span className="text-xl text-accent" aria-hidden="true">
+                ✦
+              </span>
+            </div>
+            <NasaHighlights compact />
+          </section>
         </MotionBlock>
       </motion.main>
     </div>

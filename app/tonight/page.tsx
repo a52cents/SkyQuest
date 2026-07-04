@@ -107,7 +107,7 @@ export default function TonightPage() {
   }
 
   return (
-    <PageShell eyebrow="Prévision" title="Ce soir" contentClassName="pb-4">
+    <PageShell eyebrow="Prévision" title="Plus tard" contentClassName="pb-4">
       {skyWindow ? (
         <>
           <AppCard as="section" variant="glass" padding="lg" className="relative overflow-hidden">
@@ -246,7 +246,7 @@ export default function TonightPage() {
         </AppCard>
       ) : null}
       <AppButton fullWidth className="mt-4" isLoading={isLoading} onClick={() => void calculate()}>
-        {skyWindow ? "Actualiser mon créneau" : "Calculer ma soirée"}
+        {skyWindow ? "Actualiser mon créneau" : "Calculer mon créneau"}
       </AppButton>
       <p className="mt-2 text-center text-xs leading-5 text-faint">
         La position est demandée uniquement après ce clic.

@@ -166,16 +166,16 @@ Une modification des seuils doit être cohérente dans le scoring, les libellés
 
 SkyQuest doit toujours offrir une suite utile au parcours.
 
-| Échec                             | Comportement attendu                                                       |
-| --------------------------------- | -------------------------------------------------------------------------- |
-| GPS refusé ou indisponible        | expliquer le problème et proposer une observation libre                    |
-| Open-Meteo indisponible           | utiliser une météo prudente de secours et prévenir l'utilisateur           |
-| clé N2YO absente ou API en erreur | omettre silencieusement la quête ISS                                       |
-| caméra indisponible               | conserver le guidage textuel et directionnel                               |
-| orientation indisponible          | afficher les repères cardinaux et d'altitude                               |
-| stockage local bloqué             | garder l'expérience utilisable en mémoire pour la session lorsque possible |
-| quête active absente              | afficher une erreur actionnable et inviter à relancer « Maintenant »       |
-| aucune cible fiable               | générer une `FreeObservation`                                              |
+| Échec                                | Comportement attendu                                                       |
+| ------------------------------------ | -------------------------------------------------------------------------- |
+| GPS refusé ou indisponible           | expliquer le problème et proposer une observation libre                    |
+| Open-Meteo indisponible              | utiliser une météo prudente de secours et prévenir l'utilisateur           |
+| CelesTrak indisponible et cache vide | omettre silencieusement la quête ISS                                       |
+| caméra indisponible                  | conserver le guidage textuel et directionnel                               |
+| orientation indisponible             | afficher les repères cardinaux et d'altitude                               |
+| stockage local bloqué                | garder l'expérience utilisable en mémoire pour la session lorsque possible |
+| quête active absente                 | afficher une erreur actionnable et inviter à relancer « Maintenant »       |
+| aucune cible fiable                  | générer une `FreeObservation`                                              |
 
 Un échec de service externe ne doit pas provoquer un écran blanc, une exception non gérée ou bloquer les autres familles de quêtes.
 
@@ -235,7 +235,7 @@ Les photos sont redimensionnées côté navigateur puis enregistrées dans `loca
 ### Services externes
 
 - Open-Meteo reçoit les coordonnées nécessaires à la météo depuis le navigateur.
-- N2YO reçoit les coordonnées via la route serveur `/api/iss-pass` uniquement si `N2YO_API_KEY` est configurée.
+- CelesTrak fournit seulement les éléments orbitaux publics de l'ISS, mis en cache deux heures. La position reste dans `/api/iss-pass` pour le calcul SGP4 et n'est pas transmise au fournisseur.
 - Le flux **Maintenant** peut ouvrir une page publicitaire externe après consentement explicite. Un délai local de dix minutes limite les ouvertures répétées.
 
 Toute nouvelle intégration externe doit être documentée avec les données transmises, le moment de l'appel et son comportement en cas d'échec.
@@ -278,7 +278,7 @@ Le numéro de cache du service worker doit changer lors d'une évolution incompa
 | `/journal`      | historique local et suppression du journal                        |
 | `/explore`      | catalogue pédagogique des objets                                  |
 | `/profile`      | progression locale et réglages d’alertes optionnelles             |
-| `/api/iss-pass` | proxy facultatif vers N2YO                                        |
+| `/api/iss-pass` | calcul serveur du passage ISS à partir des GP CelesTrak           |
 
 ### Modules principaux
 

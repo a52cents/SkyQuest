@@ -18,7 +18,7 @@ const items = [
   },
   {
     href: "/tonight",
-    label: "Ce soir",
+    label: "Plus tard",
     isActive: (pathname: string) => pathname.startsWith("/tonight"),
     icon: (
       <>

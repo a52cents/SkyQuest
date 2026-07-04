@@ -100,8 +100,8 @@ test("the landing page makes only cautious and verifiable observation claims", (
   assert.match(landingSource, /Estimations à vérifier sur place/);
 });
 
-test("primary navigation prioritizes Now, Tonight, Explore, and Journal", () => {
-  const labels = ["Maintenant", "Ce soir", "Explorer", "Journal"];
+test("primary navigation prioritizes Now, Later, Explore, and Journal", () => {
+  const labels = ["Maintenant", "Plus tard", "Explorer", "Journal"];
   const positions = labels.map((label) => bottomNavigationSource.indexOf(`label: "${label}"`));
   assert.ok(positions.every((position) => position >= 0));
   assert.deepEqual(
@@ -122,8 +122,9 @@ test("Explore prioritizes the learning catalog and keeps space news secondary", 
   assert.match(exploreSource, /filteredObjects\.map/);
 });
 
-test("the Now dashboard stays focused on three quests and sky conditions", () => {
-  assert.match(dashboardSource, /const visibleQuests = quests\.slice\(0, 3\)/);
+test("the Now dashboard displays every generated quest and the sky conditions", () => {
+  assert.match(dashboardSource, /const displayedQuests = quests;/);
+  assert.doesNotMatch(dashboardSource, /quests\.slice\(0, 3\)/);
   assert.match(dashboardSource, /weather\?\.isDay \? "À observer maintenant" : "Quêtes du soir"/);
   assert.doesNotMatch(
     dashboardSource,
@@ -131,5 +132,8 @@ test("the Now dashboard stays focused on three quests and sky conditions", () =>
   );
   assert.match(dashboardCss, /\.camera-guide\s*\{\s*order: 1/);
   assert.match(dashboardCss, /\.sky-insights-disclosure\s*\{\s*order: 6/);
+  assert.match(dashboardCss, /\.space-news-block\s*\{\s*order: 7/);
   assert.match(tonightSource, /<UpcomingSkyEvents \/>/);
+  assert.match(tonightSource, /title="Plus tard"/);
+  assert.match(dashboardSource, /<NasaHighlights compact \/>/);
 });
