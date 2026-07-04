@@ -118,32 +118,31 @@ async function createOpportunity(
     diagnostics.calculations.push("forecast_requested");
   }
 
-  const [weather, forecast] = await Promise.all([
-    fetchWeatherNow(latitude, longitude).catch((error) => {
-      console.error("[sky-alerts] weather_now_failed", {
-        latitude,
-        longitude,
-        timezone: subscription.timezone,
-        error: error instanceof Error ? error.message : String(error),
-      });
+const forecast = await fetchWeatherForecast(latitude, longitude, 24).catch((error) => {
+  console.error("[sky-alerts] forecast_failed", {
+    latitude,
+    longitude,
+    timezone: subscription.timezone,
+    error: error instanceof Error ? error.message : String(error),
+  });
 
-      diagnostics.reason = "weather_unavailable";
-      return null;
-    }),
+  return null;
+});
 
-    wantsClearSkyForecast
-      ? fetchWeatherForecast(latitude, longitude, 24).catch((error) => {
-          console.error("[sky-alerts] forecast_failed", {
-            latitude,
-            longitude,
-            timezone: subscription.timezone,
-            error: error instanceof Error ? error.message : String(error),
-          });
+if (!forecast?.hours?.length) {
+  diagnostics.reason = "weather_unavailable";
+  return null;
+}
 
-          return null;
-        })
-      : Promise.resolve(null),
-  ]);
+diagnostics.calculations.push("forecast_available");
+
+const currentHour = forecast.hours[0];
+
+const weather = {
+  cloudCover: currentHour.cloudCover,
+  isDay: localHour >= 7 && localHour < 20,
+  temperature: currentHour.temperature,
+};
 
   if (!weather) {
     diagnostics.reason = "weather_unavailable";
