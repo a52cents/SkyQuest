@@ -15,14 +15,13 @@
  * - l'interface conserve le classement par pertinence et affiche toutes les quêtes générées.
  */
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 import { AppButton } from "@/components/AppButton";
 import { AppCard, getAppCardClassName } from "@/components/AppCard";
 import { fetchAirQualityNow, getAirTransparencyEstimate } from "@/lib/air-quality";
 import { AppHeader } from "@/components/AppHeader";
 import { BestSkyWindowCard } from "@/components/BestSkyWindowCard";
-import { NasaHighlights } from "@/components/NasaHighlights";
 import { Onboarding } from "@/components/Onboarding";
 import { VisibilityExplanationContent } from "@/components/VisibilityExplanationCard";
 import { getCurrentPosition, type GeoPosition } from "@/lib/browser-support";
@@ -33,12 +32,20 @@ import { fetchLightPollutionEstimate } from "@/lib/light-pollution-client";
 import type { LightPollutionEstimate } from "@/lib/light-pollution";
 import { fetchLightingPracticeEstimate } from "@/lib/lighting-practices-client";
 import type { LightingPracticeEstimate } from "@/lib/lighting-practices";
-import { getOnboardingCompleted, setOnboardingCompleted } from "@/lib/storage";
+import { rankQuestsForRecommendation } from "@/lib/quest-ranking";
 import { calculateBestSkyWindow } from "@/lib/sky-window";
 import { generateQuests } from "@/lib/quest-generator";
 import { isGeneratedAtFresh, isQuestFresh, SKY_DATA_TTL_MS } from "@/lib/quest-freshness";
-import { saveActiveQuest, saveBestSkyWindow, saveLastLocation } from "@/lib/storage";
-import type { AirQualityNow, BestSkyWindow, SkyQuest, WeatherNow } from "@/lib/types";
+import {
+  getOnboardingCompleted,
+  getObservations,
+  getProgressProfile,
+  saveActiveQuest,
+  saveBestSkyWindow,
+  saveLastLocation,
+  setOnboardingCompleted,
+} from "@/lib/storage";
+import type { AirQualityNow, BestSkyWindow, Observation, SkyQuest, WeatherNow } from "@/lib/types";
 import {
   fetchWeatherForecast,
   fetchWeatherNow,
@@ -182,11 +189,15 @@ function QuestCard({
   onStart,
   locked,
   stale,
+  featured = false,
+  personalizationBadge = null,
 }: {
   quest: SkyQuest;
   onStart: (quest: SkyQuest) => void;
   locked: boolean;
   stale: boolean;
+  featured?: boolean;
+  personalizationBadge?: "new_target" | "improved_retry" | null;
 }) {
   const prefersReducedMotion = useReducedMotion() ?? false;
   const isSatelliteUpcoming =
@@ -205,13 +216,21 @@ function QuestCard({
       className={getAppCardClassName({
         variant: "solid",
         padding: "lg",
-        className: `quest-card ${locked ? "locked" : ""}`,
+        className: `quest-card ${featured ? "featured" : ""} ${locked ? "locked" : ""}`,
       })}
       onClick={() => {
         if (!locked) onStart(quest);
       }}
     >
       <div className="quest-badges">
+        {featured ? <div className="quest-badge recommended">Recommandée</div> : null}
+        {personalizationBadge ? (
+          <div className="quest-badge personalized">
+            {personalizationBadge === "new_target"
+              ? "Nouvelle pour toi"
+              : "Bonne soirée pour réessayer"}
+          </div>
+        ) : null}
         <div
           className={`quest-badge ${quest.altitude !== null && quest.altitude >= 10 ? "now" : "soon"}`}
         >
@@ -301,6 +320,11 @@ export function Dashboard() {
   const [analysisGeneratedAt, setAnalysisGeneratedAt] = useState<string | null>(null);
   const [hasAnalysisExpired, setHasAnalysisExpired] = useState(false);
   const [isGuidanceUnlocked, setIsGuidanceUnlocked] = useState(false);
+  const [isRefining, setIsRefining] = useState(false);
+  const [discoveredTargets, setDiscoveredTargets] = useState<ReadonlySet<string>>(new Set());
+  const [observations, setObservations] = useState<Observation[]>([]);
+  const [totalXp, setTotalXp] = useState(0);
+  const activeAnalysisRequestRef = useRef(0);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -317,29 +341,25 @@ export function Dashboard() {
   }, []);
 
   const loadDashboard = useCallback(async (coords: GeoPosition) => {
+    const requestId = ++activeAnalysisRequestRef.current;
     setLoadState("loading");
+    setIsRefining(false);
     setNotice(null);
 
     const currentDate = new Date();
     let currentWeatherFailed = false;
     let forecastFailed = false;
-    const [
-      currentWeather,
-      forecast,
-      currentIssPass,
-      trackedSatellitePasses,
-      currentLightPollution,
-      currentLightingPractice,
-      currentAirQuality,
-    ] = await Promise.all([
-      fetchWeatherNow(coords.latitude, coords.longitude).catch(() => {
-        currentWeatherFailed = true;
-        return getFallbackWeather();
-      }),
-      fetchWeatherForecast(coords.latitude, coords.longitude, 24).catch(() => {
+    const currentWeatherPromise = fetchWeatherNow(coords.latitude, coords.longitude).catch(() => {
+      currentWeatherFailed = true;
+      return getFallbackWeather();
+    });
+    const forecastPromise = fetchWeatherForecast(coords.latitude, coords.longitude, 24).catch(
+      () => {
         forecastFailed = true;
         return getFallbackWeatherForecast(currentDate);
-      }),
+      },
+    );
+    const enrichmentPromise = Promise.all([
       fetchNextIssVisiblePass({
         latitude: coords.latitude,
         longitude: coords.longitude,
@@ -354,6 +374,9 @@ export function Dashboard() {
       fetchLightingPracticeEstimate(coords.latitude, coords.longitude),
       fetchAirQualityNow(coords.latitude, coords.longitude).catch(() => null),
     ]);
+    const [currentWeather, forecast] = await Promise.all([currentWeatherPromise, forecastPromise]);
+    if (requestId !== activeAnalysisRequestRef.current) return;
+
     const weatherNotice =
       currentWeatherFailed && forecastFailed
         ? "Météo indisponible : des estimations prudentes sont utilisées."
@@ -363,24 +386,17 @@ export function Dashboard() {
             ? "Prévision horaire indisponible : le créneau est estimé prudemment."
             : null;
 
-    const nextQuests = generateQuests({
+    const initialQuests = generateQuests({
       latitude: coords.latitude,
       longitude: coords.longitude,
       weather: currentWeather,
       now: currentDate,
-      issPass: currentIssPass,
-      satellitePasses: trackedSatellitePasses,
-      lightPollution: currentLightPollution,
-      lightingPractice: currentLightingPractice,
-      airQuality: currentAirQuality,
       limit: 20,
     });
-    const nextBestSkyWindow = calculateBestSkyWindow({
+    const initialBestSkyWindow = calculateBestSkyWindow({
       latitude: coords.latitude,
       longitude: coords.longitude,
       forecast,
-      lightPollution: currentLightPollution,
-      lightingPractice: currentLightingPractice,
       now: currentDate,
     });
 
@@ -391,20 +407,17 @@ export function Dashboard() {
       generatedAt,
       position: coords,
       weather: currentWeather,
-      quests: nextQuests,
-      bestSkyWindow: nextBestSkyWindow,
-      lightPollution: currentLightPollution,
-      lightingPractice: currentLightingPractice ?? undefined,
-      airQuality: currentAirQuality ?? undefined,
+      quests: initialQuests,
+      bestSkyWindow: initialBestSkyWindow,
     };
 
     setWeather(currentWeather);
-    setQuests(nextQuests);
-    setBestSkyWindow(nextBestSkyWindow);
-    setLightPollution(currentLightPollution);
-    setLightingPractice(currentLightingPractice);
-    setAirQuality(currentAirQuality);
-    saveBestSkyWindow(nextBestSkyWindow);
+    setQuests(initialQuests);
+    setBestSkyWindow(initialBestSkyWindow);
+    setLightPollution(null);
+    setLightingPractice(null);
+    setAirQuality(null);
+    saveBestSkyWindow(initialBestSkyWindow);
     setAnalysisSavedAt(savedAt);
     setAnalysisGeneratedAt(generatedAt);
     setHasAnalysisExpired(false);
@@ -413,10 +426,70 @@ export function Dashboard() {
     setNotice(weatherNotice);
     setLoadState("ready");
     cacheAnalysis(analysis);
+
+    setIsRefining(true);
+    void enrichmentPromise
+      .then(
+        ([
+          currentIssPass,
+          trackedSatellitePasses,
+          currentLightPollution,
+          currentLightingPractice,
+          currentAirQuality,
+        ]) => {
+          if (requestId !== activeAnalysisRequestRef.current) return;
+
+          const refinedQuests = generateQuests({
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            weather: currentWeather,
+            now: currentDate,
+            issPass: currentIssPass,
+            satellitePasses: trackedSatellitePasses,
+            lightPollution: currentLightPollution,
+            lightingPractice: currentLightingPractice,
+            airQuality: currentAirQuality,
+            limit: 20,
+          });
+          const refinedBestSkyWindow = calculateBestSkyWindow({
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            forecast,
+            lightPollution: currentLightPollution,
+            lightingPractice: currentLightingPractice,
+            now: currentDate,
+          });
+          const refinedAnalysis: DashboardAnalysis = {
+            ...analysis,
+            quests: refinedQuests,
+            bestSkyWindow: refinedBestSkyWindow,
+            lightPollution: currentLightPollution,
+            lightingPractice: currentLightingPractice ?? undefined,
+            airQuality: currentAirQuality ?? undefined,
+          };
+
+          setQuests(refinedQuests);
+          setBestSkyWindow(refinedBestSkyWindow);
+          setLightPollution(currentLightPollution);
+          setLightingPractice(currentLightingPractice);
+          setAirQuality(currentAirQuality);
+          saveBestSkyWindow(refinedBestSkyWindow);
+          cacheAnalysis(refinedAnalysis);
+        },
+      )
+      .catch(() => {
+        // The initial weather and astronomy results remain usable without enrichment.
+      })
+      .finally(() => {
+        if (requestId === activeAnalysisRequestRef.current) setIsRefining(false);
+      });
   }, []);
 
   useEffect(() => {
     setShowOnboarding(!getOnboardingCompleted());
+    const progressProfile = getProgressProfile();
+    setDiscoveredTargets(new Set(progressProfile.discoveredTargets.map((item) => item.target)));
+    setTotalXp(progressProfile.totalXp);
     setIsOnboardingReady(true);
 
     const cachedAnalysis = readCachedAnalysis();
@@ -438,6 +511,20 @@ export function Dashboard() {
       setLoadState("ready");
     }
   }, [loadDashboard]);
+
+  useEffect(() => {
+    let isActive = true;
+    void getObservations()
+      .then((storedObservations) => {
+        if (isActive) setObservations(storedObservations);
+      })
+      .catch(() => {
+        // Personalization gracefully falls back to the local progress profile.
+      });
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!analysisGeneratedAt || hasAnalysisExpired) return;
@@ -475,6 +562,8 @@ export function Dashboard() {
       saveLastLocation(coords);
       await loadDashboard(coords);
     } catch (error) {
+      activeAnalysisRequestRef.current += 1;
+      setIsRefining(false);
       const fallbackWeather = getFallbackWeather();
       const fallbackQuests = generateQuests({
         latitude: null,
@@ -519,7 +608,18 @@ export function Dashboard() {
         )
       : null;
   const guidableQuests = quests.filter((quest) => quest.targetType !== "free_observation");
-  const displayedQuests = quests;
+  const rankedQuests = useMemo(
+    () =>
+      rankQuestsForRecommendation(quests, {
+        discoveredTargets,
+        observations,
+        totalXp,
+      }),
+    [discoveredTargets, observations, quests, totalXp],
+  );
+  const recommendedQuest = rankedQuests[0] ?? null;
+  const alternativeQuests = rankedQuests.slice(1, 3);
+  const remainingQuests = rankedQuests.slice(3);
   const airTransparency = airQuality ? getAirTransparencyEstimate(airQuality) : null;
   const conditionsLabel =
     analysisSavedAt && !isGuidanceUnlocked
@@ -770,29 +870,87 @@ export function Dashboard() {
           </div>
         </MotionBlock>
 
-        <MotionBlock className="section-header">
-          <h2 className="section-title">
-            {weather?.isDay ? "À observer maintenant" : "Quêtes du soir"}
-          </h2>
-          <span className={`status-pill ${loadState === "loading" ? "loading" : ""}`}>
-            <span className="dot" />
-            {loadState === "loading" ? "Calcul…" : conditionsLabel}
-          </span>
-        </MotionBlock>
+        {recommendedQuest ? (
+          <MotionBlock className="quest-priority">
+            <div className="section-header">
+              <h2 className="section-title">Ta quête recommandée</h2>
+              <span
+                className={`status-pill ${loadState === "loading" || isRefining ? "loading" : ""}`}
+              >
+                <span className="dot" />
+                {loadState === "loading" ? "Calcul…" : isRefining ? "Affinage…" : conditionsLabel}
+              </span>
+            </div>
 
-        <motion.div className="quest-list" variants={rootVariants}>
-          <AnimatePresence mode="popLayout">
-            {displayedQuests.map((quest) => (
-              <QuestCard
-                key={quest.id}
-                quest={quest}
-                onStart={handleStart}
-                locked={!isQuestGuidanceAvailable(quest, isGuidanceUnlocked)}
-                stale={analysisSavedAt !== null}
-              />
-            ))}
-          </AnimatePresence>
-        </motion.div>
+            <motion.div className="quest-list quest-recommended" variants={rootVariants}>
+              <AnimatePresence mode="popLayout">
+                <QuestCard
+                  key={recommendedQuest.quest.id}
+                  quest={recommendedQuest.quest}
+                  onStart={handleStart}
+                  locked={!isQuestGuidanceAvailable(recommendedQuest.quest, isGuidanceUnlocked)}
+                  stale={analysisSavedAt !== null}
+                  featured
+                  personalizationBadge={recommendedQuest.personalizationBadge}
+                />
+              </AnimatePresence>
+            </motion.div>
+
+            {alternativeQuests.length > 0 ? (
+              <>
+                <div className="alternatives-header">
+                  <h3>
+                    {alternativeQuests.length === 1 ? "Une alternative" : "Deux alternatives"}
+                  </h3>
+                  <span>Si tu préfères une autre cible</span>
+                </div>
+                <motion.div className="quest-list quest-alternatives" variants={rootVariants}>
+                  <AnimatePresence mode="popLayout">
+                    {alternativeQuests.map(({ quest, personalizationBadge }) => (
+                      <QuestCard
+                        key={quest.id}
+                        quest={quest}
+                        onStart={handleStart}
+                        locked={!isQuestGuidanceAvailable(quest, isGuidanceUnlocked)}
+                        stale={analysisSavedAt !== null}
+                        personalizationBadge={personalizationBadge}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+              </>
+            ) : null}
+
+            {remainingQuests.length > 0 ? (
+              <details
+                className={getAppCardClassName({
+                  variant: "subtle",
+                  padding: "none",
+                  className: "all-quests-disclosure",
+                })}
+              >
+                <summary>
+                  <span>Voir toutes les quêtes</span>
+                  <small>
+                    {remainingQuests.length} autre{remainingQuests.length > 1 ? "s" : ""}
+                  </small>
+                </summary>
+                <motion.div className="quest-list all-quests-list" variants={rootVariants}>
+                  {remainingQuests.map(({ quest, personalizationBadge }) => (
+                    <QuestCard
+                      key={quest.id}
+                      quest={quest}
+                      onStart={handleStart}
+                      locked={!isQuestGuidanceAvailable(quest, isGuidanceUnlocked)}
+                      stale={analysisSavedAt !== null}
+                      personalizationBadge={personalizationBadge}
+                    />
+                  ))}
+                </motion.div>
+              </details>
+            ) : null}
+          </MotionBlock>
+        ) : null}
         {loadState === "idle" ? (
           <MotionBlock
             className={getAppCardClassName({
@@ -810,26 +968,6 @@ export function Dashboard() {
 
         <MotionBlock className="best-window-block">
           <BestSkyWindowCard window={bestSkyWindow} />
-        </MotionBlock>
-
-        <MotionBlock className="space-news-block mt-7">
-          <section aria-labelledby="dashboard-space-news-title">
-            <div className="mb-3 flex items-end justify-between gap-4">
-              <div>
-                <p className="premium-kicker">Actualités spatiales</p>
-                <h2
-                  id="dashboard-space-news-title"
-                  className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-xl font-normal text-text"
-                >
-                  Un œil dans l’espace
-                </h2>
-              </div>
-              <span className="text-xl text-accent" aria-hidden="true">
-                ✦
-              </span>
-            </div>
-            <NasaHighlights compact />
-          </section>
         </MotionBlock>
       </motion.main>
     </div>

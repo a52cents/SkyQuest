@@ -96,8 +96,7 @@ html.night-mode .sky-dashboard .analysis-banner {
 .sky-dashboard .dashboard-notice {
   order: 3;
 }
-.sky-dashboard .section-header,
-.sky-dashboard .quest-list,
+.sky-dashboard .quest-priority,
 .sky-dashboard .empty-state {
   order: 4;
 }
@@ -106,9 +105,6 @@ html.night-mode .sky-dashboard .analysis-banner {
 }
 .sky-dashboard .sky-insights-disclosure {
   order: 6;
-}
-.sky-dashboard .space-news-block {
-  order: 7;
 }
 .sky-dashboard section {
   scroll-margin-top: 78px;
@@ -448,6 +444,69 @@ html.night-mode .sky-dashboard .analysis-banner {
 .sky-dashboard .quest-list {
   display: grid;
 }
+.sky-dashboard .quest-recommended .quest-card.featured {
+  margin-bottom: 24px;
+  border-color: color-mix(in srgb, var(--dash-accent) 42%, transparent);
+  background:
+    radial-gradient(
+      circle at 92% 8%,
+      color-mix(in srgb, var(--dash-accent) 22%, transparent),
+      transparent 42%
+    ),
+    var(--dash-bg-card);
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--dash-accent) 12%, transparent);
+}
+.sky-dashboard .quest-recommended .quest-card.featured::before {
+  height: 2px;
+  opacity: 0.85;
+}
+.sky-dashboard .quest-recommended .quest-card.featured h3 {
+  font-size: 25px;
+}
+.sky-dashboard .alternatives-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 4px 0 12px;
+}
+.sky-dashboard .alternatives-header h3 {
+  font-family: var(--dash-font-display);
+  font-size: 18px;
+  font-weight: 400;
+}
+.sky-dashboard .alternatives-header span {
+  color: var(--dash-fg-muted);
+  font-size: 11px;
+}
+.sky-dashboard .all-quests-disclosure {
+  margin-top: 4px;
+  overflow: hidden;
+}
+.sky-dashboard .all-quests-disclosure > summary {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--dash-fg);
+  font-size: 14px;
+  font-weight: 600;
+}
+.sky-dashboard .all-quests-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.sky-dashboard .all-quests-disclosure > summary small {
+  color: var(--dash-fg-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.sky-dashboard .all-quests-list {
+  padding: 0 12px 4px;
+}
 .sky-dashboard .quest-card {
   position: relative;
   overflow: hidden;
@@ -514,6 +573,16 @@ html.night-mode .sky-dashboard .analysis-banner {
 }
 .sky-dashboard .quest-badge.difficulty {
   letter-spacing: 0.65px;
+}
+.sky-dashboard .quest-badge.recommended {
+  border-color: color-mix(in srgb, var(--dash-accent) 35%, transparent);
+  background: color-mix(in srgb, var(--dash-accent) 14%, transparent);
+  color: color-mix(in srgb, var(--dash-accent) 72%, white);
+}
+.sky-dashboard .quest-badge.personalized {
+  border-color: color-mix(in srgb, var(--dash-accent-cyan) 30%, transparent);
+  background: color-mix(in srgb, var(--dash-accent-cyan) 9%, transparent);
+  color: var(--dash-accent-cyan);
 }
 .sky-dashboard .quest-badge.difficulty.easy {
   border-color: color-mix(in srgb, var(--dash-accent-cyan) 24%, transparent);
@@ -726,6 +795,13 @@ html.night-mode .sky-dashboard .analysis-banner {
   .sky-dashboard .condition-item {
     padding: 16px 12px;
   }
+  .sky-dashboard .quest-alternatives {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .sky-dashboard .quest-alternatives .quest-card {
+    height: calc(100% - 12px);
+  }
 }
 @media (max-width: 380px) {
   .sky-dashboard .conditions-bar {
@@ -739,6 +815,16 @@ html.night-mode .sky-dashboard .analysis-banner {
   }
   .sky-dashboard .quest-card h3 {
     font-size: 18px;
+  }
+  .sky-dashboard .quest-recommended .quest-card.featured h3 {
+    font-size: 22px;
+  }
+  .sky-dashboard .alternatives-header {
+    display: block;
+  }
+  .sky-dashboard .alternatives-header span {
+    display: block;
+    margin-top: 2px;
   }
   .sky-dashboard .analysis-banner {
     flex-direction: column;

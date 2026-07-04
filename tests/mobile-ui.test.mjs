@@ -138,20 +138,38 @@ test("Explore prioritizes the learning catalog and keeps space news secondary", 
   assert.match(exploreSource, /filteredObjects\.map/);
 });
 
-test("the Now dashboard displays every generated quest and the sky conditions", () => {
-  assert.match(dashboardSource, /const displayedQuests = quests;/);
-  assert.doesNotMatch(dashboardSource, /quests\.slice\(0, 3\)/);
-  assert.match(dashboardSource, /weather\?\.isDay \? "À observer maintenant" : "Quêtes du soir"/);
+test("the Now dashboard prioritizes one quest, two alternatives, and keeps the full list secondary", () => {
+  assert.match(dashboardSource, /rankQuestsForRecommendation/);
+  assert.match(dashboardSource, /const alternativeQuests = rankedQuests\.slice\(1, 3\)/);
+  assert.match(dashboardSource, /const remainingQuests = rankedQuests\.slice\(3\)/);
+  assert.match(dashboardSource, /Ta quête recommandée/);
+  assert.match(dashboardSource, /Voir toutes les quêtes/);
+  assert.match(dashboardSource, /Nouvelle pour toi/);
+  assert.match(dashboardSource, /Bonne soirée pour réessayer/);
   assert.doesNotMatch(
     dashboardSource,
     /Objets observables|Prochains événements|id="journal"|id="progression"|futureSuggestions/,
   );
   assert.match(dashboardCss, /\.camera-guide\s*\{\s*order: 1/);
+  assert.match(dashboardCss, /\.quest-priority,\s*\.sky-dashboard \.empty-state\s*\{\s*order: 4/);
   assert.match(dashboardCss, /\.sky-insights-disclosure\s*\{\s*order: 6/);
-  assert.match(dashboardCss, /\.space-news-block\s*\{\s*order: 7/);
   assert.match(tonightSource, /<UpcomingSkyEvents \/>/);
   assert.match(tonightSource, /title="Plus tard"/);
-  assert.match(dashboardSource, /<NasaHighlights compact \/>/);
+  assert.doesNotMatch(dashboardSource, /NasaHighlights/);
+  assert.match(exploreSource, /<NasaHighlights \/>/);
+});
+
+test("the Now analysis renders weather and astronomy before network enrichment", () => {
+  const initialResultsPosition = dashboardSource.indexOf("setQuests(initialQuests)");
+  const readyPosition = dashboardSource.indexOf('setLoadState("ready")', initialResultsPosition);
+  const enrichmentPosition = dashboardSource.indexOf("void enrichmentPromise", readyPosition);
+
+  assert.match(dashboardSource, /const enrichmentPromise = Promise\.all\(/);
+  assert.ok(initialResultsPosition >= 0);
+  assert.ok(readyPosition > initialResultsPosition);
+  assert.ok(enrichmentPosition > readyPosition);
+  assert.match(dashboardSource, /requestId !== activeAnalysisRequestRef\.current/);
+  assert.match(dashboardSource, /isRefining \? "Affinage…"/);
 });
 
 test("dashboard quest cards show a condition-aware difficulty badge", () => {
