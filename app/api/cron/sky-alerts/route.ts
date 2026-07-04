@@ -19,6 +19,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+const CRON_ROUTE_VERSION = "sky-alerts-hybrid-weather-v6";
+
 const PLANET_NAMES: Record<string, string> = {
   Venus: "Vénus",
   Jupiter: "Jupiter",
@@ -118,39 +120,54 @@ async function createOpportunity(
     diagnostics.calculations.push("forecast_requested");
   }
 
-const forecast = await fetchWeatherForecast(latitude, longitude, 24).catch((error) => {
-  console.error("[sky-alerts] forecast_failed", {
-    latitude,
-    longitude,
-    timezone: subscription.timezone,
-    error: error instanceof Error ? error.message : String(error),
-  });
+  const [weatherNow, forecast] = await Promise.all([
+    fetchWeatherNow(latitude, longitude).catch((error) => {
+      console.error("[sky-alerts] weather_now_failed", {
+        latitude,
+        longitude,
+        timezone: subscription.timezone,
+        error: error instanceof Error ? error.message : String(error),
+      });
 
-  return null;
-});
+      return null;
+    }),
 
-if (!forecast?.hours?.length) {
-  diagnostics.reason = "weather_unavailable";
-  return null;
-}
+    wantsClearSkyForecast
+      ? fetchWeatherForecast(latitude, longitude, 24).catch((error) => {
+          console.error("[sky-alerts] forecast_failed", {
+            latitude,
+            longitude,
+            timezone: subscription.timezone,
+            error: error instanceof Error ? error.message : String(error),
+          });
 
-diagnostics.calculations.push("forecast_available");
+          return null;
+        })
+      : Promise.resolve(null),
+  ]);
 
-const currentHour = forecast.hours[0];
+  if (forecast?.hours?.length) {
+    diagnostics.calculations.push("forecast_available");
+  }
 
-const weather = {
-  cloudCover: currentHour.cloudCover,
-  isDay: localHour >= 7 && localHour < 20,
-  temperature: currentHour.temperature,
-};
+  const forecastCurrentHour = forecast?.hours?.[0];
+
+  const weather =
+    weatherNow ??
+    (forecastCurrentHour
+      ? {
+          cloudCover: forecastCurrentHour.cloudCover,
+          isDay: localHour >= 7 && localHour < 20,
+          temperature: forecastCurrentHour.temperature,
+        }
+      : null);
 
   if (!weather) {
     diagnostics.reason = "weather_unavailable";
     return null;
   }
 
-  if (forecast) {
-
+  if (forecast?.hours?.length) {
     const skyWindow = calculateBestSkyWindow({
       latitude,
       longitude,
@@ -297,6 +314,7 @@ export async function GET(request: Request) {
   }
 
   const totals = {
+    version: CRON_ROUTE_VERSION,
     checked: subscriptions.length,
     opportunities: 0,
     sent: 0,
