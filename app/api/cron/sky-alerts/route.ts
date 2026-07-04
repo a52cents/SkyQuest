@@ -150,7 +150,6 @@ const weather = {
   }
 
   if (forecast) {
-    diagnostics.calculations.push("forecast_available");
 
     const skyWindow = calculateBestSkyWindow({
       latitude,
