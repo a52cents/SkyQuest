@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
+import { useDisplayMode } from "@/lib/use-display-mode";
 
 const items = [
   {
@@ -53,6 +54,7 @@ const items = [
 
 export function BottomNavigation() {
   const pathname = usePathname();
+  const displayMode = useDisplayMode();
   const prefersReducedMotion = useReducedMotion() ?? false;
 
   return (
@@ -60,6 +62,7 @@ export function BottomNavigation() {
       <div className="app-bottom-nav-inner">
         {items.map((item) => {
           const active = item.isActive(pathname);
+          const href = item.href === "/" && displayMode === "browser" ? "/?app=1" : item.href;
           return (
             <motion.div
               key={item.href}
@@ -67,7 +70,7 @@ export function BottomNavigation() {
               whileTap={prefersReducedMotion ? undefined : { scale: 0.9 }}
             >
               <Link
-                href={item.href}
+                href={href}
                 className={`app-bottom-nav-item ${active ? "active" : ""}`}
                 aria-current={active ? "page" : undefined}
               >

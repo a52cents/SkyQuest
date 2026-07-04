@@ -37,6 +37,7 @@ const appHeaderSource = readFileSync(
 );
 const tonightSource = readFileSync(new URL("../app/tonight/page.tsx", import.meta.url), "utf8");
 const exploreSource = readFileSync(new URL("../app/explore/page.tsx", import.meta.url), "utf8");
+const homeSource = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
 
 test("screen styles do not erase reusable component spacing", () => {
   assert.doesNotMatch(dashboardCss, /\.sky-dashboard \*\s*\{[^}]*margin:\s*0[^}]*padding:\s*0/s);
@@ -104,6 +105,15 @@ test("the landing page makes only cautious and verifiable observation claims", (
   assert.match(landingSource, /indice indicatif/);
   assert.match(landingSource, /sans garantir que la cible sera visible/);
   assert.match(landingSource, /Estimations à vérifier sur place/);
+});
+
+test("the landing page offers a browser trial before installation", () => {
+  assert.match(landingSource, /href="\/\?app=1"[\s\S]+Essayer maintenant/);
+  assert.ok(
+    landingSource.indexOf("Essayer maintenant") < landingSource.indexOf("Installer l'application"),
+  );
+  assert.match(homeSource, /displayMode === "standalone" \|\| isBrowserTrial/);
+  assert.match(bottomNavigationSource, /displayMode === "browser" \? "\/\?app=1"/);
 });
 
 test("primary navigation prioritizes Now, Later, Explore, and Journal", () => {

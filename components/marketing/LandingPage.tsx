@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
+import Link from "next/link";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 
 const HERO_IMAGE = "/HERO_IMAGE.webp";
@@ -171,9 +172,9 @@ export function LandingPage() {
             <a href="#observation">Observation</a>
             <a href="#privacy">Confidentialité</a>
             <a href="#access">Accès</a>
-            <a href="#cta" className="nav-cta">
-              Commencer
-            </a>
+            <Link href="/?app=1" className="nav-cta">
+              Essayer maintenant
+            </Link>
           </div>
         </div>
       </motion.nav>
@@ -203,11 +204,11 @@ export function LandingPage() {
             }
           </motion.p>
           <motion.div className="hero-cta" variants={heroItemVariants}>
-            <a href="#cta" className="btn btn-primary" onClick={showInstallInstructions}>
-              {"Ajouter à l'écran d'accueil"} <ArrowIcon />
-            </a>
-            <a href="#features" className="btn btn-secondary">
-              Découvrir
+            <Link href="/?app=1" className="btn btn-primary">
+              Essayer maintenant <ArrowIcon />
+            </Link>
+            <a href="#cta" className="btn btn-secondary" onClick={showInstallInstructions}>
+              {"Installer l'application"}
             </a>
           </motion.div>
         </motion.div>
@@ -534,11 +535,11 @@ export function LandingPage() {
               }
             </p>
             <div className="hero-cta">
-              <a href="#" className="btn btn-primary" onClick={showInstallInstructions}>
-                {"Ajouter à l'écran d'accueil"} <ArrowIcon />
-              </a>
-              <a href="#features" className="btn btn-secondary">
-                En savoir plus
+              <Link href="/?app=1" className="btn btn-primary">
+                Essayer maintenant <ArrowIcon />
+              </Link>
+              <a href="#" className="btn btn-secondary" onClick={showInstallInstructions}>
+                {"Installer l'application"}
               </a>
             </div>
           </Reveal>

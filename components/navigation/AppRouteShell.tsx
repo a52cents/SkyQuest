@@ -1,16 +1,19 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BottomNavigation } from "@/components/navigation/BottomNavigation";
 import { useDisplayMode } from "@/lib/use-display-mode";
 
 export function AppRouteShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const displayMode = useDisplayMode();
   const prefersReducedMotion = useReducedMotion() ?? false;
   const isImmersiveGuide = pathname.startsWith("/quest/");
-  const showNavigation = !isImmersiveGuide && (pathname !== "/" || displayMode === "standalone");
+  const isBrowserTrial = pathname === "/" && searchParams.get("app") === "1";
+  const showNavigation =
+    !isImmersiveGuide && (pathname !== "/" || displayMode === "standalone" || isBrowserTrial);
 
   return (
     <>
