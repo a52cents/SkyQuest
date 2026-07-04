@@ -27,7 +27,11 @@ const PLANET_NAMES: Record<string, string> = {
 };
 
 type CalculationName =
-  "celestial_events" | "weather" | "forecast_requested" | "forecast_available" | "astronomy";
+  | "celestial_events"
+  | "weather"
+  | "forecast_requested"
+  | "forecast_available"
+  | "astronomy";
 
 type NoOpportunityReason =
   | "missing_location"
@@ -35,6 +39,7 @@ type NoOpportunityReason =
   | "outside_notification_window"
   | "daylight"
   | "cloud_cover_too_high"
+  | "weather_unavailable"
   | "no_enabled_topics"
   | "no_matching_opportunity";
 
@@ -55,6 +60,7 @@ function getLocalHour(date: Date, timezone?: string): number | null {
       hourCycle: "h23",
       timeZone: timezone,
     }).format(date);
+
     return Number(hour);
   } catch {
     return null;
@@ -68,26 +74,32 @@ async function createOpportunity(
 ): Promise<SkyQuestPushPayload | null> {
   const latitude = subscription.latitudeRounded;
   const longitude = subscription.longitudeRounded;
+
   if (latitude === undefined || longitude === undefined) {
     diagnostics.reason = "missing_location";
     return null;
   }
 
   const localHour = getLocalHour(now, subscription.timezone);
+
   if (localHour === null) {
     diagnostics.reason = "invalid_timezone";
     return null;
   }
-  const isNotificationWindow = localHour !== null && (localHour >= 19 || localHour < 4);
+
+  const isNotificationWindow = localHour >= 19 || localHour < 4;
+
   if (!isNotificationWindow) {
     diagnostics.reason = "outside_notification_window";
     return null;
   }
 
   diagnostics.calculations.push("celestial_events");
+
   const rareEvent = subscription.topics.includes("celestial_event")
     ? getUpcomingCelestialEvents(now, 1)[0]
     : undefined;
+
   if (rareEvent) {
     return {
       title: `${rareEvent.title} approche`,
@@ -99,26 +111,69 @@ async function createOpportunity(
   }
 
   diagnostics.calculations.push("weather");
-  if (subscription.topics.includes("clear_sky_evening")) {
+
+  const wantsClearSkyForecast = subscription.topics.includes("clear_sky_evening");
+
+  if (wantsClearSkyForecast) {
     diagnostics.calculations.push("forecast_requested");
   }
+
   const [weather, forecast] = await Promise.all([
-    fetchWeatherNow(latitude, longitude),
-    subscription.topics.includes("clear_sky_evening")
-      ? fetchWeatherForecast(latitude, longitude, 24).catch(() => null)
+    fetchWeatherNow(latitude, longitude).catch((error) => {
+      console.error("[sky-alerts] weather_now_failed", {
+        latitude,
+        longitude,
+        timezone: subscription.timezone,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      diagnostics.reason = "weather_unavailable";
+      return null;
+    }),
+
+    wantsClearSkyForecast
+      ? fetchWeatherForecast(latitude, longitude, 24).catch((error) => {
+          console.error("[sky-alerts] forecast_failed", {
+            latitude,
+            longitude,
+            timezone: subscription.timezone,
+            error: error instanceof Error ? error.message : String(error),
+          });
+
+          return null;
+        })
       : Promise.resolve(null),
   ]);
 
+  if (!weather) {
+    diagnostics.reason = "weather_unavailable";
+    return null;
+  }
+
   if (forecast) {
     diagnostics.calculations.push("forecast_available");
-    const skyWindow = calculateBestSkyWindow({ latitude, longitude, forecast, now });
+
+    const skyWindow = calculateBestSkyWindow({
+      latitude,
+      longitude,
+      forecast,
+      now,
+    });
+
     const minutesUntilWindow = Math.round(
       (new Date(skyWindow.startsAt).getTime() - now.getTime()) / 60_000,
     );
-    if (isInterestingApproachingSkyWindow({ score: skyWindow.score, minutesUntilWindow })) {
+
+    if (
+      isInterestingApproachingSkyWindow({
+        score: skyWindow.score,
+        minutesUntilWindow,
+      })
+    ) {
       const targetText = skyWindow.bestTargets.length
         ? ` À tenter : ${skyWindow.bestTargets.join(", ")}.`
         : "";
+
       return {
         title:
           minutesUntilWindow <= 5
@@ -136,13 +191,16 @@ async function createOpportunity(
     diagnostics.reason = "daylight";
     return null;
   }
+
   if (weather.cloudCover > 65) {
     diagnostics.reason = "cloud_cover_too_high";
     return null;
   }
 
   diagnostics.calculations.push("astronomy");
+
   const skyObjects = getSkyObjects(latitude, longitude, now);
+
   const planet = skyObjects
     .filter(
       (object) =>
@@ -153,6 +211,7 @@ async function createOpportunity(
         }),
     )
     .sort((left, right) => right.altitude - left.altitude)[0];
+
   if (planet && subscription.topics.includes("planet_visible")) {
     return {
       title: `${PLANET_NAMES[planet.name] ?? planet.name} est tentable ce soir`,
@@ -171,6 +230,7 @@ async function createOpportunity(
         altitude: object.altitude,
       }),
   );
+
   if (moon && subscription.topics.includes("moon_visible")) {
     return {
       title: "La Lune est bien placée ce soir",
@@ -203,8 +263,10 @@ async function createOpportunity(
       data: { type: "daily_mission" },
     };
   }
+
   diagnostics.reason =
     subscription.topics.length === 0 ? "no_enabled_topics" : "no_matching_opportunity";
+
   return null;
 }
 
@@ -214,12 +276,28 @@ export async function GET(request: Request) {
   }
 
   const now = new Date();
+
   let subscriptions: StoredPushSubscription[];
+
   try {
     subscriptions = await listPushSubscriptions();
-  } catch {
+  } catch (error) {
+    console.error("[sky-alerts] push_storage_unavailable", {
+      error:
+        error instanceof Error
+          ? {
+              name: error.name,
+              message: error.message,
+              stack: error.stack,
+            }
+          : {
+              message: String(error),
+            },
+    });
+
     return NextResponse.json({ error: "Stockage push indisponible." }, { status: 503 });
   }
+
   const totals = {
     checked: subscriptions.length,
     opportunities: 0,
@@ -234,42 +312,85 @@ export async function GET(request: Request) {
     counters[name] = (counters[name] ?? 0) + amount;
   };
 
+  const incrementCalculation = (name: CalculationName) => {
+    totals.calculations[name] = (totals.calculations[name] ?? 0) + 1;
+  };
+
   for (const subscription of subscriptions) {
     const diagnostics: OpportunityDiagnostics = { calculations: [] };
     let calculationsRecorded = false;
     let phase: "evaluation" | "hourly_claim" | "delivery" = "evaluation";
+
     const recordCalculations = () => {
       if (calculationsRecorded) return;
+
       for (const calculation of diagnostics.calculations) {
-        increment(totals.calculations, calculation);
+        incrementCalculation(calculation);
       }
+
       calculationsRecorded = true;
     };
+
     try {
       const payload = await createOpportunity(subscription, now, diagnostics);
+
       recordCalculations();
+
       if (!payload) {
         increment(totals.reasons, diagnostics.reason ?? "unknown");
         continue;
       }
+
       // This atomic database claim prevents overlapping cron runs from sending twice this hour.
       phase = "hourly_claim";
+
       if (!(await claimHourlyPushSlot(subscription.endpoint, now))) {
         increment(totals.reasons, "hourly_slot_already_claimed");
         continue;
       }
+
       totals.opportunities += 1;
+
       phase = "delivery";
+
       const result = await sendPushToMany([subscription], payload);
+
       totals.sent += result.sent;
       totals.failed += result.failed;
       totals.expired += result.expired;
-      if (result.failed > 0) increment(totals.reasons, "delivery_failed", result.failed);
-      if (result.expired > 0) increment(totals.reasons, "subscription_expired", result.expired);
-    } catch {
+
+      if (result.failed > 0) {
+        increment(totals.reasons, "delivery_failed", result.failed);
+      }
+
+      if (result.expired > 0) {
+        increment(totals.reasons, "subscription_expired", result.expired);
+      }
+    } catch (error) {
       recordCalculations();
+
       totals.failed += 1;
       increment(totals.reasons, `${phase}_error`);
+
+      console.error("[sky-alerts] subscription_failed", {
+        phase,
+        reason: diagnostics.reason,
+        calculations: diagnostics.calculations,
+        timezone: subscription.timezone,
+        latitude: subscription.latitudeRounded,
+        longitude: subscription.longitudeRounded,
+        topics: subscription.topics,
+        error:
+          error instanceof Error
+            ? {
+                name: error.name,
+                message: error.message,
+                stack: error.stack,
+              }
+            : {
+                message: String(error),
+              },
+      });
     }
   }
 
