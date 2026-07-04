@@ -49,7 +49,28 @@ type OpportunityDiagnostics = {
   calculations: CalculationName[];
   reason?: NoOpportunityReason;
 };
+function serializeError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return { message: String(error) };
+  }
 
+  const cause = (error as Error & { cause?: unknown }).cause;
+
+  return {
+    name: error.name,
+    message: error.message,
+    stack: error.stack,
+    cause:
+      cause instanceof Error
+        ? {
+            name: cause.name,
+            message: cause.message,
+            stack: cause.stack,
+            code: (cause as Error & { code?: string }).code,
+          }
+        : cause,
+  };
+}
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
   return Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`);
@@ -123,11 +144,11 @@ async function createOpportunity(
   const [weatherNow, forecast] = await Promise.all([
     fetchWeatherNow(latitude, longitude).catch((error) => {
       console.error("[sky-alerts] weather_now_failed", {
-        latitude,
-        longitude,
-        timezone: subscription.timezone,
-        error: error instanceof Error ? error.message : String(error),
-      });
+  latitude,
+  longitude,
+  timezone: subscription.timezone,
+  error: serializeError(error),
+});
 
       return null;
     }),
@@ -138,7 +159,8 @@ async function createOpportunity(
             latitude,
             longitude,
             timezone: subscription.timezone,
-            error: error instanceof Error ? error.message : String(error),
+              error: serializeError(error),
+
           });
 
           return null;
