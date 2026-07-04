@@ -7,6 +7,7 @@ const criticalRequestFiles = [
   "../lib/weather.ts",
   "../lib/air-quality.ts",
   "../lib/iss.ts",
+  "../lib/satellites.ts",
   "../lib/light-pollution-client.ts",
   "../lib/lighting-practices-client.ts",
 ];

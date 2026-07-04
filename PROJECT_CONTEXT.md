@@ -170,7 +170,7 @@ SkyQuest doit toujours offrir une suite utile au parcours.
 | ------------------------------------ | -------------------------------------------------------------------------- |
 | GPS refusé ou indisponible           | expliquer le problème et proposer une observation libre                    |
 | Open-Meteo indisponible              | utiliser une météo prudente de secours et prévenir l'utilisateur           |
-| CelesTrak indisponible et cache vide | omettre silencieusement la quête ISS                                       |
+| CelesTrak indisponible et cache vide | omettre silencieusement les quêtes satellite                               |
 | caméra indisponible                  | conserver le guidage textuel et directionnel                               |
 | orientation indisponible             | afficher les repères cardinaux et d'altitude                               |
 | stockage local bloqué                | garder l'expérience utilisable en mémoire pour la session lorsque possible |
@@ -235,7 +235,7 @@ Les photos sont redimensionnées côté navigateur puis enregistrées dans `loca
 ### Services externes
 
 - Open-Meteo reçoit les coordonnées nécessaires à la météo depuis le navigateur.
-- CelesTrak fournit seulement les éléments orbitaux publics de l'ISS, mis en cache deux heures. La position reste dans `/api/iss-pass` pour le calcul SGP4 et n'est pas transmise au fournisseur.
+- CelesTrak fournit seulement les éléments orbitaux publics de l'ISS, des satellites brillants et des lancements Starlink récents, mis en cache deux heures. La position reste dans les routes SkyQuest pour le calcul SGP4 et n'est pas transmise au fournisseur.
 - Le flux **Maintenant** peut ouvrir une page publicitaire externe après consentement explicite. Un délai local de dix minutes limite les ouvertures répétées.
 
 Toute nouvelle intégration externe doit être documentée avec les données transmises, le moment de l'appel et son comportement en cas d'échec.
@@ -271,14 +271,15 @@ Le numéro de cache du service worker doit changer lors d'une évolution incompa
 
 ### Routes
 
-| Route           | Responsabilité                                                    |
-| --------------- | ----------------------------------------------------------------- |
-| `/`             | vitrine dans le navigateur, tableau de bord dans la PWA installée |
-| `/quest/[id]`   | guidage de la quête active stockée localement                     |
-| `/journal`      | historique local et suppression du journal                        |
-| `/explore`      | catalogue pédagogique des objets                                  |
-| `/profile`      | progression locale et réglages d’alertes optionnelles             |
-| `/api/iss-pass` | calcul serveur du passage ISS à partir des GP CelesTrak           |
+| Route                   | Responsabilité                                                    |
+| ----------------------- | ----------------------------------------------------------------- |
+| `/`                     | vitrine dans le navigateur, tableau de bord dans la PWA installée |
+| `/quest/[id]`           | guidage de la quête active stockée localement                     |
+| `/journal`              | historique local et suppression du journal                        |
+| `/explore`              | catalogue pédagogique des objets                                  |
+| `/profile`              | progression locale et réglages d’alertes optionnelles             |
+| `/api/iss-pass`         | calcul serveur du passage ISS à partir des GP CelesTrak           |
+| `/api/satellite-passes` | satellites brillants et trains Starlink récents                   |
 
 ### Modules principaux
 

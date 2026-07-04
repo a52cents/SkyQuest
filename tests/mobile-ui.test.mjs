@@ -56,7 +56,7 @@ test("the dashboard composes shared button and card primitives", () => {
   assert.match(dashboardSource, /import \{ AppButton \} from "@\/components\/AppButton"/);
   assert.match(dashboardSource, /import \{ AppCard, getAppCardClassName \}/);
   assert.equal((dashboardSource.match(/<AppButton/g) ?? []).length, 2);
-  assert.ok((dashboardSource.match(/<AppCard/g) ?? []).length >= 5);
+  assert.ok((dashboardSource.match(/<AppCard/g) ?? []).length >= 4);
   assert.doesNotMatch(dashboardSource, /className="(?:camera-btn|quest-btn)"/);
   assert.doesNotMatch(dashboardCss, /\.sky-dashboard \.(?:camera-btn|quest-btn)/);
 });
@@ -74,10 +74,16 @@ test("notification preferences are hidden behind an explicit disclosure", () => 
 });
 
 test("sky explanations share one compact disclosure below the condition tiles", () => {
-  assert.match(dashboardSource, /<details[\s\S]+className: "sky-insights-details"/);
-  assert.match(dashboardSource, /Indice de visibilité · Qualité du ciel/);
-  assert.equal((dashboardSource.match(/className="sky-quality-card"/g) ?? []).length, 1);
+  assert.match(
+    dashboardSource,
+    /<details[\s\S]+className: "sky-insights-details sky-quality-card"/,
+  );
+  assert.match(dashboardSource, /className="sky-quality-kicker">Qualité du ciel/);
+  assert.match(dashboardSource, /className="sky-insights-toggle-label">Comprendre ton ciel/);
+  assert.doesNotMatch(dashboardSource, /<AppCard[^>]+className="sky-quality-card"/);
   assert.match(dashboardCss, /\.sky-dashboard \.sky-insights-details\s*\{/);
+  assert.match(dashboardCss, /\.sky-insights-details::before[\s\S]+conic-gradient\(/);
+  assert.match(dashboardCss, /transparent 118deg 286deg/);
 });
 
 test("free observation replaces stale quests and remains usable without GPS", () => {

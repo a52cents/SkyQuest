@@ -22,6 +22,7 @@ import {
 import type { LightingPracticeEstimate } from "@/lib/lighting-practices";
 import { isMeteorShowerActive, isNearMeteorShowerPeak, meteorShowers } from "@/lib/meteor-showers";
 import { azimuthToCardinal } from "@/lib/orientation";
+import type { TrackedSatellitePass } from "@/lib/satellites";
 import { catalogSkyObjects } from "@/lib/sky-catalog";
 import {
   calculateCatalogVisibilityScore,
@@ -37,6 +38,7 @@ type GenerateQuestsInput = {
   weather: WeatherNow;
   now: Date;
   issPass?: IssVisiblePass | null;
+  satellitePasses?: TrackedSatellitePass[];
   lightPollution?: LightPollutionEstimate;
   lightingPractice?: LightingPracticeEstimate | null;
   airQuality?: AirQualityNow | null;
@@ -243,6 +245,43 @@ function scoreIssPass(pass: IssVisiblePass, weather: WeatherNow): number {
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
+function createTrackedSatelliteQuest(
+  pass: TrackedSatellitePass,
+  score: number,
+  now: Date,
+): SkyQuest {
+  const startTime = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(
+    pass.startTime,
+  );
+  const durationMinutes = Math.max(1, Math.round(pass.durationSeconds / 60));
+  const isTrain = pass.kind === "starlink_train";
+
+  return {
+    id: `${pass.target}-${now.getTime()}`,
+    target: pass.target,
+    targetType: "satellite",
+    title: isTrain ? "Cherche un train Starlink" : `Repère ${pass.name}`,
+    difficulty: isTrain ? "medium" : "easy",
+    azimuth: pass.maxAzimuth,
+    altitude: pass.maxElevation,
+    cardinalDirection: azimuthToCardinal(pass.maxAzimuth),
+    visibilityScore: score,
+    visibilityLabel: getVisibilityLabel(score),
+    description: isTrain
+      ? `Passage groupé estimé vers ${startTime}, avec environ ${pass.memberCount ?? 3} satellites calculés. À confirmer sur place.`
+      : `Passage estimé vers ${startTime}, pendant environ ${durationMinutes} min si le ciel est dégagé.`,
+    tip: isTrain
+      ? "Cherche une suite de points lumineux avançant dans la même direction. Ils peuvent être très discrets."
+      : "Cherche un point lumineux en mouvement régulier, sans promettre qu'il sera visible à l'œil nu.",
+    requiredGear: "naked_eye",
+    generatedAt: now.toISOString(),
+    warning: "La trajectoire est calculée, mais la luminosité réelle reste incertaine.",
+    targetTime: pass.maxTime.toISOString(),
+    startsAt: pass.startTime.toISOString(),
+    endsAt: getIssPassEndTime(pass).toISOString(),
+  };
+}
+
 function shouldSkipDuplicate(candidate: SkyQuest, selected: SkyQuest[]): boolean {
   return selected.some(
     (quest) =>
@@ -273,6 +312,7 @@ export function generateQuests({
   weather,
   now,
   issPass,
+  satellitePasses = [],
   lightPollution = getDefaultLightPollutionEstimate(),
   lightingPractice,
   airQuality,
@@ -390,8 +430,17 @@ export function generateQuests({
           ].filter((candidate) => candidate.score >= 50)
         : [];
 
+    const trackedSatelliteCandidates = satellitePasses
+      .filter((pass) => isIssPassGuidable(pass, now))
+      .map<QuestCandidate>((pass) => {
+        const score = scoreIssPass(pass, effectiveWeather);
+        return { quest: createTrackedSatelliteQuest(pass, score, now), score };
+      })
+      .filter((candidate) => candidate.score >= 50);
+
     const candidates = [
       ...issCandidates,
+      ...trackedSatelliteCandidates,
       ...planetCandidates,
       ...catalogCandidates,
       ...meteorCandidates,

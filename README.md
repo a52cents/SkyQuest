@@ -9,7 +9,7 @@ Le projet privilégie un parcours simple — **Maintenant → quoi regarder → 
 - génération de quêtes selon la position GPS, l'heure et la couverture nuageuse ;
 - calcul local de la Lune, du Soleil et des planètes avec `astronomy-engine` ;
 - catalogue de repères accessibles : étoiles, constellations, astérismes, Pléiades et Andromède ;
-- pluies de météores, événements célestes à venir et passages estimés de l'ISS ;
+- pluies de météores, événements célestes à venir, ISS, satellites brillants et certains trains Starlink récents ;
 - score de visibilité et sélection prioritaire des cibles ayant un score d'au moins 50 ;
 - estimation de la qualité du ciel, avec une pénalité adaptée aux cibles faibles ;
 - estimation du voile atmosphérique avec Open-Meteo Air Quality et CAMS ;
@@ -33,7 +33,7 @@ La racine `/` affiche la page de présentation dans un navigateur classique et l
 - `astronomy-engine`
 - Open-Meteo
 - Supabase/Postgres pour les subscriptions Web Push
-- CelesTrak et `satellite.js` pour les passages de l'ISS
+- CelesTrak et `satellite.js` pour les passages de satellites
 - `localStorage` pour les données utilisateur
 
 Il n'y a ni compte utilisateur ni authentification. Supabase sert uniquement à persister les subscriptions Web Push côté serveur ; le journal et la progression restent locaux.
@@ -202,7 +202,7 @@ python scripts/generate-cerema-lighting-index.py chemin/vers/carte-extinction.gp
 - **Position** : demandée après action sur **Maintenant**. La dernière position et l'analyse mise en cache sont arrondies à deux décimales avant stockage local.
 - **Météo** : les coordonnées sont envoyées directement depuis le navigateur à Open-Meteo.
 - **Transparence de l'air** : les coordonnées arrondies à deux décimales sont envoyées à [Open-Meteo Air Quality](https://open-meteo.com/en/docs/air-quality-api). L'épaisseur optique des aérosols et les particules CAMS appliquent au maximum 10 points de pénalité aux objets faibles ; une panne du service n'affecte pas le reste de l'analyse. Données : CAMS ENSEMBLE via Open-Meteo.
-- **ISS** : `/api/iss-pass` récupère uniquement les [éléments orbitaux publics](https://celestrak.org/NORAD/documentation/gp-data-formats.php) de l'ISS auprès de CelesTrak, les met en cache deux heures, puis calcule le passage côté serveur. La position de l'utilisateur n'est jamais envoyée à CelesTrak.
+- **Satellites** : `/api/iss-pass` et `/api/satellite-passes` récupèrent les [éléments orbitaux publics](https://celestrak.org/NORAD/documentation/gp-data-formats.php) de l'ISS, du groupe `VISUAL` et des lancements Starlink récents. Les données sont mises en cache deux heures puis les passages sont calculés côté serveur. Un train Starlink n'est proposé qu'à partir de trois trajectoires groupées ; sa luminosité reste incertaine. La position de l'utilisateur n'est jamais envoyée à CelesTrak.
 - **Qualité du ciel** : les coordonnées sont arrondies à deux décimales avant `/api/light-pollution`. Si un provider est configuré, il reçoit uniquement cette position approximative. Une mesure réussie est mise en cache 14 jours dans le navigateur et jusqu'à 30 jours côté serveur/CDN ; le fallback expire après un jour et aucun historique de position n'est créé.
 - **Pratiques d'éclairage** : une position arrondie à deux décimales est envoyée côté serveur à l'API Geo pour identifier la commune française. Le signal Cerema est mis en cache 30 jours et aucune adresse ni position précise n'est demandée ou conservée.
 - **Caméra et orientation** : demandées au lancement du guidage. Les pistes caméra sont arrêtées au démontage du composant.

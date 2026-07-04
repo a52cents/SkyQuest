@@ -20,7 +20,9 @@ import type { Observation, ObservationPhotoDraft, ProgressReward, SkyQuest } fro
 export default function QuestGuidePage() {
   const params = useParams<{ id: string }>();
   const [quest, setQuest] = useState<SkyQuest | null>(null);
-  const [unavailableReason, setUnavailableReason] = useState<"expired" | "iss_window" | null>(null);
+  const [unavailableReason, setUnavailableReason] = useState<"expired" | "satellite_window" | null>(
+    null,
+  );
   const [reward, setReward] = useState<{
     reward: ProgressReward;
     previousRankName: string | null;
@@ -37,7 +39,7 @@ export default function QuestGuidePage() {
       const reason = !isQuestFresh(stored)
         ? "expired"
         : stored.targetType === "satellite" && !isIssQuestGuidable(stored.startsAt, stored.endsAt)
-          ? "iss_window"
+          ? "satellite_window"
           : null;
       setUnavailableReason(reason);
       setQuest(reason ? null : stored);
@@ -130,8 +132,8 @@ export default function QuestGuidePage() {
           message={
             unavailableReason === "expired"
               ? "Cette quête a expiré car le ciel et la météo ont pu changer. Relancer Maintenant."
-              : unavailableReason === "iss_window"
-                ? "Le guidage ISS est disponible 5 minutes avant le passage et jusqu'à sa fin. Retrouve ce passage dans « À venir »."
+              : unavailableReason === "satellite_window"
+                ? "Le guidage satellite est disponible 5 minutes avant le passage et jusqu'à sa fin. Relance « Maintenant » près de l'heure prévue."
                 : "Quête introuvable. Relancer Maintenant pour générer une nouvelle observation."
           }
         />

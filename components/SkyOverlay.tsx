@@ -27,7 +27,7 @@ type OverlayPoint = {
 };
 
 type OverlayScene = {
-  kind: "point" | "figure" | "cluster" | "galaxy" | "meteor" | "iss";
+  kind: "point" | "figure" | "cluster" | "galaxy" | "meteor" | "satellite";
   label: string;
   points: OverlayPoint[];
   segments: Array<readonly [string, string]>;
@@ -123,7 +123,12 @@ function buildScene(
     if (!Number.isFinite(targetTime) || Math.abs(targetTime - date.getTime()) > 45 * 60_000) {
       return null;
     }
-    return { kind: "iss", label: "Passage prévu dans cette zone", points: [point], segments: [] };
+    return {
+      kind: "satellite",
+      label: "Passage prévu dans cette zone",
+      points: [point],
+      segments: [],
+    };
   }
 
   const kind =
@@ -222,9 +227,9 @@ function drawScene(
       context.fill();
     }
 
-    if (scene.kind === "meteor" || scene.kind === "iss") {
+    if (scene.kind === "meteor" || scene.kind === "satellite") {
       context.save();
-      context.setLineDash(scene.kind === "iss" ? [7, 7] : [3, 8]);
+      context.setLineDash(scene.kind === "satellite" ? [7, 7] : [3, 8]);
       context.strokeStyle = "rgba(125, 211, 252, 0.72)";
       context.lineWidth = 1.4;
       context.beginPath();

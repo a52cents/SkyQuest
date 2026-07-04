@@ -27,7 +27,7 @@ test("quests without generatedAt from older storage versions are expired", () =>
 });
 
 test("every quest constructor records generatedAt", () => {
-  assert.equal((generatorSource.match(/generatedAt: now\.toISOString\(\)/g) ?? []).length, 5);
+  assert.equal((generatorSource.match(/generatedAt: now\.toISOString\(\)/g) ?? []).length, 6);
 });
 
 test("expired analyses and quest pages ask the user to relaunch Now", () => {

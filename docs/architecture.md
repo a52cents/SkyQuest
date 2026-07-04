@@ -13,6 +13,7 @@ UI client
   ├─ Open-Meteo : météo actuelle
   ├─ Open-Meteo Air Quality / CAMS : voile atmosphérique actuel
   ├─ /api/iss-pass → CelesTrak : éléments orbitaux ISS mis en cache 2 h
+  ├─ /api/satellite-passes → CelesTrak : satellites brillants et Starlink récents
   ├─ /api/light-pollution → provider optionnel : qualité du ciel
   ├─ /api/lighting-practice → API Geo + index communal Cerema
   └─ /api/push/* → abonnement Web Push optionnel
@@ -20,16 +21,17 @@ UI client
 
 ## Routes
 
-| Route                    | Responsabilité                                |
-| ------------------------ | --------------------------------------------- |
-| `/`                      | vitrine web ou dashboard en mode PWA installé |
-| `/quest/[id]`            | guidage de la quête active                    |
-| `/journal`               | observations stockées localement              |
-| `/explore`               | catalogue pédagogique                         |
-| `/profile`               | progression locale et réglages d’alertes      |
-| `/api/iss-pass`          | calcul serveur d'un passage ISS via CelesTrak |
-| `/api/light-pollution`   | estimation de qualité du ciel et fallback     |
-| `/api/lighting-practice` | commune française et pratique d'éclairage     |
+| Route                    | Responsabilité                                 |
+| ------------------------ | ---------------------------------------------- |
+| `/`                      | vitrine web ou dashboard en mode PWA installé  |
+| `/quest/[id]`            | guidage de la quête active                     |
+| `/journal`               | observations stockées localement               |
+| `/explore`               | catalogue pédagogique                          |
+| `/profile`               | progression locale et réglages d’alertes       |
+| `/api/iss-pass`          | calcul serveur d'un passage ISS via CelesTrak  |
+| `/api/satellite-passes`  | passages brillants et trains Starlink prudents |
+| `/api/light-pollution`   | estimation de qualité du ciel et fallback      |
+| `/api/lighting-practice` | commune française et pratique d'éclairage      |
 
 ## Flux « Maintenant »
 
