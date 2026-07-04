@@ -1,8 +1,43 @@
 import type { SkyQuest } from "@/lib/types";
-import type { CameraCapabilities, CameraSettings, CameraZoomRange } from "./types";
+import type {
+  CameraCapabilities,
+  CameraSettings,
+  CameraZoomRange,
+  GuidanceReliability,
+  OrientationConfidence,
+  OrientationStatus,
+} from "./types";
 
 export const DIRECTION_ALIGNMENT_THRESHOLD_DEGREES = 15;
 export const ALTITUDE_ALIGNMENT_THRESHOLD_DEGREES = 10;
+export const MAX_HORIZONTAL_CALIBRATION_DEGREES = 45;
+
+export function applyHorizontalCalibration(
+  targetAzimuth: number | null,
+  horizontalOffset: number,
+): number | null {
+  if (targetAzimuth === null) return null;
+  const safeOffset = Math.max(
+    -MAX_HORIZONTAL_CALIBRATION_DEGREES,
+    Math.min(MAX_HORIZONTAL_CALIBRATION_DEGREES, horizontalOffset),
+  );
+  return (((targetAzimuth + safeOffset) % 360) + 360) % 360;
+}
+
+export function getGuidanceReliability(
+  orientationStatus: OrientationStatus,
+  orientationConfidence: OrientationConfidence,
+  currentAzimuth: number | null,
+): GuidanceReliability {
+  if (
+    orientationStatus !== "active" ||
+    currentAzimuth === null ||
+    orientationConfidence === "low"
+  ) {
+    return "text_recommended";
+  }
+  return orientationConfidence === "high" ? "reliable" : "approximate";
+}
 
 export function getDirectionArrow(delta: number | null): string {
   if (delta === null) return "";

@@ -122,7 +122,7 @@ export default function ExplorePage() {
             {filteredObjects.length} repère{filteredObjects.length > 1 ? "s" : ""} à découvrir
           </p>
         </AppCard>
-        <motion.div className="grid gap-3" variants={container} initial="hidden" animate="show">
+        <motion.div className="grid gap-3" variants={container} initial={false} animate="show">
           {filteredObjects.map((object) => (
             <motion.div
               key={object.id}

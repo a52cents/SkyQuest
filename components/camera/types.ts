@@ -3,6 +3,7 @@ import type { ObservationPhotoDraft, SkyQuest } from "@/lib/types";
 export type CameraStatus = "idle" | "starting" | "active" | "error";
 export type OrientationStatus = "idle" | "active" | "denied" | "unsupported";
 export type OrientationConfidence = "high" | "medium" | "low";
+export type GuidanceReliability = "reliable" | "approximate" | "text_recommended";
 export type PhotoCaptureStatus = "idle" | "capturing" | "ready" | "error";
 
 export type CameraGuideProps = {

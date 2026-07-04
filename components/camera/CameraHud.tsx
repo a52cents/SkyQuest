@@ -5,12 +5,13 @@ import { NightModeToggle } from "@/components/NightModeToggle";
 import type { SkyQuest } from "@/lib/types";
 import { getGearLabel } from "./camera-utils";
 import { CameraDirectionHint } from "./CameraDirectionHint";
-import type { CameraGuidanceState, OrientationConfidence, OrientationStatus } from "./types";
+import type { CameraGuidanceState, GuidanceReliability } from "./types";
 
 type CameraHudProps = {
   quest: SkyQuest;
   guidance: CameraGuidanceState;
-  orientation: { status: OrientationStatus; confidence: OrientationConfidence };
+  reliability: GuidanceReliability;
+  isCalibrated: boolean;
   onOpenDetails: () => void;
   children: ReactNode;
 };
@@ -18,7 +19,8 @@ type CameraHudProps = {
 export function CameraHud({
   quest,
   guidance,
-  orientation,
+  reliability,
+  isCalibrated,
   onOpenDetails,
   children,
 }: CameraHudProps) {
@@ -60,11 +62,22 @@ export function CameraHud({
           <p className="rounded-[16px] border border-white/[0.08] bg-[#0a0a0b]/75 px-5 py-3 text-center font-[Georgia,'Times_New_Roman',serif] text-lg font-normal shadow-[0_12px_42px_rgba(0,0,0,0.25)] backdrop-blur-[24px]">
             {guidance.mainHint}
           </p>
-          {orientation.status === "active" && orientation.confidence === "medium" ? (
-            <p className="rounded-full border border-warning/20 bg-[#0a0a0b]/75 px-3 py-2 text-center text-xs font-semibold text-warning backdrop-blur-xl">
-              Boussole imprécise — utilise surtout la direction indiquée.
-            </p>
-          ) : null}
+          <p
+            className={`rounded-full border bg-[#0a0a0b]/75 px-3 py-2 text-center text-xs font-semibold backdrop-blur-xl ${
+              reliability === "reliable"
+                ? "border-success/25 text-success"
+                : reliability === "approximate"
+                  ? "border-warning/25 text-warning"
+                  : "border-white/10 text-muted"
+            }`}
+          >
+            {reliability === "reliable"
+              ? "Guidage fiable"
+              : reliability === "approximate"
+                ? "Guidage approximatif — vérifie aussi la direction texte"
+                : "Guidage texte conseillé"}
+            {isCalibrated ? " · correction active" : ""}
+          </p>
           <div className="flex max-w-full flex-wrap justify-center gap-2">
             {[
               quest.cardinalDirection ?? "Zone libre",

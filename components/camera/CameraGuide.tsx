@@ -13,6 +13,7 @@ import {
 import { recalculateQuestPosition } from "@/lib/quest-generator";
 import { getLastLocation } from "@/lib/storage";
 import { CameraControls } from "./CameraControls";
+import { CameraCalibrationPanel } from "./CameraCalibrationPanel";
 import { CameraDetailsPanel, type CameraDetailsState } from "./CameraDetailsPanel";
 import { CameraHud } from "./CameraHud";
 import { CameraPhotoPanel } from "./CameraPhotoPanel";
@@ -21,11 +22,13 @@ import { CameraVideoScene } from "./CameraVideoScene";
 import {
   ALTITUDE_ALIGNMENT_THRESHOLD_DEGREES,
   DIRECTION_ALIGNMENT_THRESHOLD_DEGREES,
+  applyHorizontalCalibration,
   formatZoom,
   getAltitudeArrow,
   getCameraErrorMessage,
   getCameraSettings,
   getDirectionArrow,
+  getGuidanceReliability,
   readCameraCapabilities,
   readCameraZoomRange,
 } from "./camera-utils";
@@ -69,6 +72,8 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [currentZoom, setCurrentZoom] = useState<number | null>(null);
   const [zoomError, setZoomError] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [calibrationOpen, setCalibrationOpen] = useState(false);
+  const [horizontalCalibration, setHorizontalCalibration] = useState(0);
   const [isHudVisible, setIsHudVisible] = useState(true);
   const [setupModalOpen, setSetupModalOpen] = useState(true);
   const [setupStarting, setSetupStarting] = useState(false);
@@ -107,7 +112,10 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     if (sensorPointing.altitude !== null) setCurrentAltitude(sensorPointing.altitude);
   }, [sensorPointing]);
 
-  useEffect(() => setLiveQuest(quest), [quest]);
+  useEffect(() => {
+    setLiveQuest(quest);
+    setHorizontalCalibration(0);
+  }, [quest]);
 
   useEffect(() => {
     const location = getLastLocation();
@@ -352,17 +360,26 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     setPhotoCaptureStatus("idle");
   }
 
+  const calibratedTargetAzimuth = applyHorizontalCalibration(
+    liveQuest.azimuth,
+    horizontalCalibration,
+  );
+  const guidanceReliability = getGuidanceReliability(
+    orientationStatus,
+    orientationConfidence,
+    currentAzimuth,
+  );
   const directionHint =
-    liveQuest.azimuth !== null && currentAzimuth !== null
-      ? getDirectionHint(currentAzimuth, liveQuest.azimuth)
+    calibratedTargetAzimuth !== null && currentAzimuth !== null
+      ? getDirectionHint(currentAzimuth, calibratedTargetAzimuth)
       : null;
   const altitudeHint =
     liveQuest.altitude !== null && currentAltitude !== null
       ? getAltitudeHint(currentAltitude, liveQuest.altitude)
       : null;
   const directionDelta =
-    liveQuest.azimuth !== null && currentAzimuth !== null
-      ? angleDifference(currentAzimuth, liveQuest.azimuth)
+    calibratedTargetAzimuth !== null && currentAzimuth !== null
+      ? angleDifference(currentAzimuth, calibratedTargetAzimuth)
       : null;
   const altitudeDelta =
     liveQuest.altitude !== null && currentAltitude !== null
@@ -410,6 +427,8 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     orientationStatus,
     orientationConfidence,
     orientationError,
+    guidanceReliability,
+    horizontalCalibration,
   };
 
   return (
@@ -423,7 +442,8 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         <CameraHud
           quest={liveQuest}
           guidance={guidance}
-          orientation={{ status: orientationStatus, confidence: orientationConfidence }}
+          reliability={guidanceReliability}
+          isCalibrated={horizontalCalibration !== 0}
           onOpenDetails={() => setDetailsOpen(true)}
         >
           <CameraControls
@@ -431,6 +451,8 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             zoom={{ range: zoomRange, value: currentZoom, error: zoomError }}
             photoStatus={photoCaptureStatus}
             nativePhotoError={!photoSheetOpen ? photoError : null}
+            guidanceReliability={guidanceReliability}
+            isCalibrated={horizontalCalibration !== 0}
             onZoomChange={(value) => {
               setCurrentZoom(value);
               void applyCameraSetting({ zoom: value });
@@ -439,6 +461,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             onMissed={handleMissed}
             onNativePhoto={openNativePhotoCapture}
             onStartCamera={() => void startCamera()}
+            onRecalibrate={() => setCalibrationOpen(true)}
           />
         </CameraHud>
       ) : null}
@@ -464,6 +487,14 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         quest={liveQuest}
         state={detailsState}
         onClose={() => setDetailsOpen(false)}
+      />
+      <CameraCalibrationPanel
+        open={calibrationOpen}
+        horizontalOffset={horizontalCalibration}
+        reliability={guidanceReliability}
+        onOffsetChange={setHorizontalCalibration}
+        onReset={() => setHorizontalCalibration(0)}
+        onClose={() => setCalibrationOpen(false)}
       />
       <CameraPhotoPanel
         open={photoSheetOpen}

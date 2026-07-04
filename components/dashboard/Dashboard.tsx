@@ -654,7 +654,7 @@ export function Dashboard() {
       <motion.main
         className="dashboard-main"
         variants={rootVariants}
-        initial="hidden"
+        initial={false}
         animate="visible"
       >
         <MotionBlock className="conditions-bar">

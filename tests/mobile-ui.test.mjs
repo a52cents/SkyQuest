@@ -35,6 +35,10 @@ const appHeaderSource = readFileSync(
   new URL("../components/AppHeader.tsx", import.meta.url),
   "utf8",
 );
+const appRouteShellSource = readFileSync(
+  new URL("../components/navigation/AppRouteShell.tsx", import.meta.url),
+  "utf8",
+);
 const tonightSource = readFileSync(new URL("../app/tonight/page.tsx", import.meta.url), "utf8");
 const exploreSource = readFileSync(new URL("../app/explore/page.tsx", import.meta.url), "utf8");
 const homeSource = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
@@ -51,6 +55,12 @@ test("application chrome and dashboard accents follow theme tokens", () => {
   assert.doesNotMatch(appHeaderSource, /bg-\[#/);
   assert.match(globalsCss, /\.app-bottom-nav[\s\S]+var\(--background\)/);
   assert.doesNotMatch(dashboardCss, /rgba\(124, 92, 255/);
+});
+
+test("route content stays visible even when client animation cannot hydrate", () => {
+  assert.match(appRouteShellSource, /<div className=\{showNavigation/);
+  assert.doesNotMatch(appRouteShellSource, /initial=\{[^}]*opacity:\s*0/);
+  assert.doesNotMatch(appRouteShellSource, /AnimatePresence/);
 });
 
 test("the dashboard composes shared button and card primitives", () => {
@@ -136,6 +146,7 @@ test("Explore prioritizes the learning catalog and keeps space news secondary", 
   assert.match(exploreSource, /typeFilter/);
   assert.match(exploreSource, /difficultyFilter/);
   assert.match(exploreSource, /filteredObjects\.map/);
+  assert.match(exploreSource, /variants=\{container\} initial=\{false\} animate="show"/);
 });
 
 test("the Now dashboard prioritizes one quest, two alternatives, and keeps the full list secondary", () => {

@@ -1,7 +1,7 @@
 import { AppButton } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
 import { InlineTerm } from "@/components/InlineTerm";
-import type { OrientationConfidence, OrientationStatus } from "./types";
+import type { GuidanceReliability, OrientationConfidence, OrientationStatus } from "./types";
 import type { SkyQuest } from "@/lib/types";
 
 export type CameraDetailsState = {
@@ -15,6 +15,8 @@ export type CameraDetailsState = {
   orientationStatus: OrientationStatus;
   orientationConfidence: OrientationConfidence;
   orientationError: string | null;
+  guidanceReliability: GuidanceReliability;
+  horizontalCalibration: number;
 };
 
 function DetailsRow({ label, value }: { label: string; value: string }) {
@@ -65,6 +67,20 @@ export function CameraDetailsPanel({
     ["Zoom reel", state.zoomLabel],
     ["Orientation", state.orientationStatus === "active" ? "Active" : "Inactive"],
     ["Capteur", sensorLabel],
+    [
+      "Fiabilité",
+      state.guidanceReliability === "reliable"
+        ? "Fiable"
+        : state.guidanceReliability === "approximate"
+          ? "Approximative"
+          : "Texte conseillé",
+    ],
+    [
+      "Correction horiz.",
+      state.horizontalCalibration === 0
+        ? "Aucune"
+        : `${state.horizontalCalibration > 0 ? "+" : ""}${state.horizontalCalibration}°`,
+    ],
   ];
   return (
     <div
