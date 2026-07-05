@@ -71,7 +71,14 @@ test("scheduled push logs explain skipped notifications and executed calculation
 test("scheduled clear-sky alerts only announce an imminent strong window", () => {
   assert.match(cronRouteSource, /fetchWeatherForecast/);
   assert.match(cronRouteSource, /isInterestingApproachingSkyWindow/);
-  assert.match(cronRouteSource, /url: "\/tonight"/);
+  assert.match(cronRouteSource, /analysisUrl\("approaching_sky_window"/);
+});
+
+test("intentional sky-window reminders are claimed once and open a fresh analysis", () => {
+  assert.match(migrationSource, /claim_due_sky_window_reminder/i);
+  assert.match(storeSource, /reminder_window_starts_at/);
+  assert.match(cronRouteSource, /type: "sky_window_reminder"/);
+  assert.match(cronRouteSource, /analysisUrl\("sky_window_reminder"/);
 });
 
 test("a sky window 59 minutes away is not worth a notification", () => {

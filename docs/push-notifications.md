@@ -24,6 +24,10 @@ concurrents ne puissent pas envoyer deux alertes pendant la même heure. Il ne r
 atteint 75/100 et qu’il commence dans 10 minutes au maximum ; un ciel générique doit avoir au plus
 15 % de nuages.
 
+La fonction `claim_due_sky_window_reminder` réserve et efface atomiquement le rappel « Me prévenir »
+créé depuis l’écran **Plus tard**. Un rappel est donc envoyé une seule fois. Réexécuter le fichier SQL
+sur une installation existante pour ajouter les colonnes `reminder_*` et cette fonction.
+
 Si la table existait déjà avec l’ancienne limite quotidienne, réexécuter le fichier SQL : le
 `create or replace function` mettra le verrou à jour sans supprimer les subscriptions.
 
@@ -118,12 +122,12 @@ Hobby. Pour obtenir le contrôle horaire demandé, utiliser un Cloudflare Worker
 suivant :
 
 ```text
-0 0-2,17-23 * * *
+*/5 * * * *
 ```
 
-Cette plage UTC couvre `19:00 → 03:59` en France aussi bien en heure d’hiver qu’en heure d’été. Le
-code serveur vérifie ensuite l’heure locale exacte de chaque subscription et ne traite rien hors de
-la plage 19 h–3 h 59.
+Le passage toutes les cinq minutes permet d’envoyer les rappels intentionnels près du début du
+créneau. Le code serveur vérifie lui-même l’heure locale de chaque subscription pour les alertes
+éditoriales et ne les traite pas hors de la plage 19 h–3 h 59.
 
 Le Worker Cloudflare peut appeler la route avec :
 
@@ -182,6 +186,7 @@ le réglage, sans redemander automatiquement la permission.
 - `POST /api/push/subscribe` valide puis fait un upsert Supabase sur `endpoint` ;
 - `POST /api/push/unsubscribe` désactive la row de façon idempotente ;
 - `POST /api/push/test` relit une subscription Supabase active et est protégé en production ;
+- `POST /api/push/reminder` programme un rappel unique pour le meilleur créneau des prochaines 24 h ;
 - `GET /api/cron/sky-alerts` lit seulement les rows actives et exige `CRON_SECRET` ;
 - une réponse Web Push 404/410 désactive la subscription expirée ;
 - les coordonnées sont réarrondies à `0.1°` côté route et côté store ;

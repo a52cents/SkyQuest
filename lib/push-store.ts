@@ -16,6 +16,11 @@ export type StoredPushSubscription = {
   longitudeRounded?: number;
   topics: NotificationTopic[];
   lastNotificationSentAt?: string;
+  reminderAt?: string;
+  reminderWindowStartsAt?: string;
+  reminderWindowEndsAt?: string;
+  reminderTarget?: string;
+  reminderScore?: number;
 };
 
 type PushSubscriptionRow = {
@@ -29,6 +34,11 @@ type PushSubscriptionRow = {
   longitude_rounded: number | string | null;
   last_seen_at: string;
   last_notification_sent_at: string | null;
+  reminder_at: string | null;
+  reminder_window_starts_at: string | null;
+  reminder_window_ends_at: string | null;
+  reminder_target: string | null;
+  reminder_score: number | string | null;
   created_at: string;
   updated_at: string;
 };
@@ -42,7 +52,7 @@ type UpsertPushSubscriptionInput = Pick<
   >;
 
 const SELECT_FIELDS =
-  "endpoint,p256dh,auth,enabled,topics,timezone,latitude_rounded,longitude_rounded,last_seen_at,last_notification_sent_at,created_at,updated_at";
+  "endpoint,p256dh,auth,enabled,topics,timezone,latitude_rounded,longitude_rounded,last_seen_at,last_notification_sent_at,reminder_at,reminder_window_starts_at,reminder_window_ends_at,reminder_target,reminder_score,created_at,updated_at";
 const ACTIVE_SUBSCRIPTIONS_PAGE_SIZE = 1_000;
 const VALID_TOPICS = new Set<string>(NOTIFICATION_TOPICS);
 
@@ -80,9 +90,50 @@ function fromRow(row: PushSubscriptionRow): StoredPushSubscription {
     longitudeRounded: parseCoordinate(row.longitude_rounded),
     lastSeenAt: row.last_seen_at,
     lastNotificationSentAt: row.last_notification_sent_at ?? undefined,
+    reminderAt: row.reminder_at ?? undefined,
+    reminderWindowStartsAt: row.reminder_window_starts_at ?? undefined,
+    reminderWindowEndsAt: row.reminder_window_ends_at ?? undefined,
+    reminderTarget: row.reminder_target ?? undefined,
+    reminderScore: parseCoordinate(row.reminder_score),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+export async function scheduleSkyWindowReminder({
+  endpoint,
+  reminderAt,
+  windowStartsAt,
+  windowEndsAt,
+  target,
+  score,
+}: {
+  endpoint: string;
+  reminderAt: Date;
+  windowStartsAt: Date;
+  windowEndsAt: Date;
+  target?: string;
+  score: number;
+}): Promise<boolean> {
+  const supabase = createSupabaseAdminClient();
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("push_subscriptions")
+    .update({
+      reminder_at: reminderAt.toISOString(),
+      reminder_window_starts_at: windowStartsAt.toISOString(),
+      reminder_window_ends_at: windowEndsAt.toISOString(),
+      reminder_target: target?.slice(0, 100) || null,
+      reminder_score: Math.max(0, Math.min(100, Math.round(score))),
+      updated_at: now,
+    })
+    .eq("endpoint", endpoint)
+    .eq("enabled", true)
+    .select("endpoint")
+    .maybeSingle();
+
+  if (error) throwStoreError("schedule reminder", error);
+  return Boolean(data);
 }
 
 export async function upsertPushSubscription(
@@ -195,5 +246,19 @@ export async function claimHourlyPushSlot(endpoint: string, now = new Date()): P
   });
 
   if (error) throwStoreError("claim hourly slot", error);
+  return data === true;
+}
+
+export async function claimDueSkyWindowReminder(
+  endpoint: string,
+  now = new Date(),
+): Promise<boolean> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc("claim_due_sky_window_reminder", {
+    p_endpoint: endpoint,
+    p_now: now.toISOString(),
+  });
+
+  if (error) throwStoreError("claim reminder", error);
   return data === true;
 }

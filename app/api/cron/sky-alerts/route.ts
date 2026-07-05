@@ -4,6 +4,7 @@ import { getUpcomingCelestialEvents } from "@/lib/celestial-events";
 import { calculateBestSkyWindow } from "@/lib/sky-window";
 import { sendPushToMany, type SkyQuestPushPayload } from "@/lib/push-server";
 import {
+  claimDueSkyWindowReminder,
   claimHourlyPushSlot,
   listPushSubscriptions,
   type StoredPushSubscription,
@@ -61,6 +62,12 @@ function getLocalHour(date: Date, timezone?: string): number | null {
   }
 }
 
+function analysisUrl(intent: string, target?: string): string {
+  const params = new URLSearchParams({ app: "1", intent });
+  if (target) params.set("target", target);
+  return `/?${params.toString()}`;
+}
+
 async function createOpportunity(
   subscription: StoredPushSubscription,
   now: Date,
@@ -71,6 +78,29 @@ async function createOpportunity(
   if (latitude === undefined || longitude === undefined) {
     diagnostics.reason = "missing_location";
     return null;
+  }
+
+  const reminderAt = subscription.reminderAt
+    ? new Date(subscription.reminderAt).getTime()
+    : Number.NaN;
+  const reminderEndsAt = subscription.reminderWindowEndsAt
+    ? new Date(subscription.reminderWindowEndsAt).getTime()
+    : Number.POSITIVE_INFINITY;
+  if (reminderAt <= now.getTime() && reminderEndsAt >= now.getTime()) {
+    const targetText = subscription.reminderTarget
+      ? ` Commence par ${subscription.reminderTarget}.`
+      : "";
+    return {
+      title: "Ton meilleur créneau commence",
+      body: `Les conditions peuvent avoir changé : ouvre SkyQuest pour les recalculer.${targetText}`,
+      url: analysisUrl("sky_window_reminder", subscription.reminderTarget),
+      tag: `sky-window-reminder-${subscription.reminderWindowStartsAt ?? subscription.reminderAt}`,
+      data: {
+        type: "sky_window_reminder",
+        target: subscription.reminderTarget,
+        score: subscription.reminderScore,
+      },
+    };
   }
 
   const localHour = getLocalHour(now, subscription.timezone);
@@ -125,7 +155,7 @@ async function createOpportunity(
             ? "Très bon ciel maintenant"
             : `Très bon ciel dans ${minutesUntilWindow} min`,
         body: `Le meilleur créneau approche (indice ${skyWindow.score}/100).${targetText}`,
-        url: "/tonight",
+        url: analysisUrl("approaching_sky_window", skyWindow.bestTargets[0]),
         tag: `best-sky-window-${skyWindow.startsAt.slice(0, 13)}`,
         data: { type: "clear_sky_evening" },
       };
@@ -157,7 +187,7 @@ async function createOpportunity(
     return {
       title: `${PLANET_NAMES[planet.name] ?? planet.name} est tentable ce soir`,
       body: "Une mission simple est disponible. La visibilité reste à confirmer sur place.",
-      url: "/",
+      url: analysisUrl("planet_visible", planet.name),
       tag: `planet-visible-${planet.name.toLowerCase()}`,
       data: { type: "planet_visible", target: planet.name },
     };
@@ -175,7 +205,7 @@ async function createOpportunity(
     return {
       title: "La Lune est bien placée ce soir",
       body: "Les conditions semblent favorables. Ouvre SkyQuest pour préparer ton observation.",
-      url: "/",
+      url: analysisUrl("moon_visible", "Moon"),
       tag: "moon-visible",
       data: { type: "moon_visible" },
     };
@@ -185,12 +215,23 @@ async function createOpportunity(
     isExceptionalClearSky(weather.cloudCover) &&
     subscription.topics.includes("clear_sky_evening")
   ) {
+    const brightTarget = skyObjects
+      .filter((object) => object.altitude >= 10)
+      .sort((left, right) => right.altitude - left.altitude)[0];
+    const targetName = brightTarget
+      ? (PLANET_NAMES[brightTarget.name] ??
+        (brightTarget.name === "Moon" ? "la Lune" : brightTarget.name))
+      : undefined;
     return {
-      title: "Ciel exceptionnellement clair maintenant",
-      body: "Très peu de nuages sont estimés. C’est un bon moment pour vérifier le ciel.",
-      url: "/",
-      tag: "clear-sky-evening",
-      data: { type: "clear_sky_evening" },
+      title: targetName
+        ? `Ciel très clair : ${targetName} à tenter`
+        : "Le ciel est très clair maintenant",
+      body: targetName
+        ? `${Math.round(weather.cloudCover)} % de nuages estimés. Ouvre SkyQuest pour confirmer la mission.`
+        : `${Math.round(weather.cloudCover)} % de nuages estimés. Relance l’analyse avant de sortir.`,
+      url: analysisUrl("clear_sky_evening", brightTarget?.name),
+      tag: `clear-sky-evening-${now.toISOString().slice(0, 13)}`,
+      data: { type: "clear_sky_evening", target: brightTarget?.name },
     };
   }
 
@@ -198,7 +239,7 @@ async function createOpportunity(
     return {
       title: "Mission du soir disponible",
       body: "Ouvre SkyQuest et tente de trouver un astre visible maintenant.",
-      url: "/",
+      url: analysisUrl("daily_mission"),
       tag: "daily-mission",
       data: { type: "daily_mission" },
     };
@@ -254,8 +295,15 @@ export async function GET(request: Request) {
       }
       // This atomic database claim prevents overlapping cron runs from sending twice this hour.
       phase = "hourly_claim";
-      if (!(await claimHourlyPushSlot(subscription.endpoint, now))) {
-        increment(totals.reasons, "hourly_slot_already_claimed");
+      const isIntentionalReminder = payload.data?.type === "sky_window_reminder";
+      const claimed = isIntentionalReminder
+        ? await claimDueSkyWindowReminder(subscription.endpoint, now)
+        : await claimHourlyPushSlot(subscription.endpoint, now);
+      if (!claimed) {
+        increment(
+          totals.reasons,
+          isIntentionalReminder ? "reminder_already_claimed" : "hourly_slot_already_claimed",
+        );
         continue;
       }
       totals.opportunities += 1;

@@ -38,6 +38,7 @@ import { generateQuests } from "@/lib/quest-generator";
 import { isGeneratedAtFresh, isQuestFresh, SKY_DATA_TTL_MS } from "@/lib/quest-freshness";
 import {
   getOnboardingCompleted,
+  getLastLocation,
   getObservations,
   getProgressProfile,
   saveActiveQuest,
@@ -302,7 +303,13 @@ function QuestCard({
   );
 }
 
-export function Dashboard() {
+export function Dashboard({
+  notificationIntent,
+  preferredTarget,
+}: {
+  notificationIntent?: string;
+  preferredTarget?: string;
+} = {}) {
   const router = useRouter();
   const prefersReducedMotion = useReducedMotion() ?? false;
   const [loadState, setLoadState] = useState<LoadState>("idle");
@@ -325,6 +332,7 @@ export function Dashboard() {
   const [observations, setObservations] = useState<Observation[]>([]);
   const [totalXp, setTotalXp] = useState(0);
   const activeAnalysisRequestRef = useRef(0);
+  const notificationAnalysisStartedRef = useRef(false);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -510,7 +518,23 @@ export function Dashboard() {
       }
       setLoadState("ready");
     }
-  }, [loadDashboard]);
+
+    if (notificationIntent && !notificationAnalysisStartedRef.current) {
+      notificationAnalysisStartedRef.current = true;
+      const storedLocation = getLastLocation();
+      if (storedLocation) {
+        void loadDashboard(storedLocation).then(() => {
+          setNotice(
+            preferredTarget
+              ? `Analyse actualisée. ${preferredTarget} est prioritaire si les conditions le permettent.`
+              : "Analyse actualisée depuis la notification.",
+          );
+        });
+      } else {
+        setNotice("Appuie sur « Maintenant » pour actualiser le ciel avec ta position.");
+      }
+    }
+  }, [loadDashboard, notificationIntent, preferredTarget]);
 
   useEffect(() => {
     let isActive = true;
@@ -608,15 +632,21 @@ export function Dashboard() {
         )
       : null;
   const guidableQuests = quests.filter((quest) => quest.targetType !== "free_observation");
-  const rankedQuests = useMemo(
-    () =>
-      rankQuestsForRecommendation(quests, {
-        discoveredTargets,
-        observations,
-        totalXp,
-      }),
-    [discoveredTargets, observations, quests, totalXp],
-  );
+  const rankedQuests = useMemo(() => {
+    const ranked = rankQuestsForRecommendation(quests, {
+      discoveredTargets,
+      observations,
+      totalXp,
+    });
+    if (!preferredTarget) return ranked;
+    const normalizedTarget = preferredTarget.toLocaleLowerCase("fr-FR");
+    return [...ranked].sort((left, right) => {
+      const matches = (quest: SkyQuest) =>
+        quest.target.toLocaleLowerCase("fr-FR") === normalizedTarget ||
+        quest.title.toLocaleLowerCase("fr-FR").includes(normalizedTarget);
+      return Number(matches(right.quest)) - Number(matches(left.quest));
+    });
+  }, [discoveredTargets, observations, preferredTarget, quests, totalXp]);
   const recommendedQuest = rankedQuests[0] ?? null;
   const alternativeQuests = rankedQuests.slice(1, 3);
   const remainingQuests = rankedQuests.slice(3);

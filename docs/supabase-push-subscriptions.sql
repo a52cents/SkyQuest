@@ -20,6 +20,12 @@ create table if not exists public.push_subscriptions (
   last_seen_at timestamptz not null default now(),
   last_notification_sent_at timestamptz,
 
+  reminder_at timestamptz,
+  reminder_window_starts_at timestamptz,
+  reminder_window_ends_at timestamptz,
+  reminder_target text,
+  reminder_score smallint,
+
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
@@ -28,8 +34,18 @@ create table if not exists public.push_subscriptions (
   constraint push_subscriptions_latitude_check
     check (latitude_rounded is null or latitude_rounded between -90 and 90),
   constraint push_subscriptions_longitude_check
-    check (longitude_rounded is null or longitude_rounded between -180 and 180)
+    check (longitude_rounded is null or longitude_rounded between -180 and 180),
+  constraint push_subscriptions_reminder_score_check
+    check (reminder_score is null or reminder_score between 0 and 100)
 );
+
+-- Safe to run again on an existing installation.
+alter table public.push_subscriptions
+  add column if not exists reminder_at timestamptz,
+  add column if not exists reminder_window_starts_at timestamptz,
+  add column if not exists reminder_window_ends_at timestamptz,
+  add column if not exists reminder_target text,
+  add column if not exists reminder_score smallint;
 
 alter table public.push_subscriptions enable row level security;
 
@@ -45,6 +61,10 @@ create index if not exists push_subscriptions_last_notification_idx
 
 create index if not exists push_subscriptions_location_idx
   on public.push_subscriptions (latitude_rounded, longitude_rounded);
+
+create index if not exists push_subscriptions_reminder_idx
+  on public.push_subscriptions (reminder_at)
+  where enabled = true and reminder_at is not null;
 
 -- Atomically reserves the current UTC hour. This prevents overlapping cron runs
 -- from sending two notifications to the same subscription during the same hour.
@@ -79,6 +99,45 @@ $$;
 revoke all on function public.claim_push_notification_slot(text, timestamptz)
   from public, anon, authenticated;
 grant execute on function public.claim_push_notification_slot(text, timestamptz)
+  to service_role;
+
+-- Claims and clears one intentional reminder atomically. Clearing it here makes
+-- reminders one-shot even when two scheduler invocations overlap.
+create or replace function public.claim_due_sky_window_reminder(
+  p_endpoint text,
+  p_now timestamptz default now()
+)
+returns boolean
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  claimed boolean;
+begin
+  update public.push_subscriptions
+  set
+    reminder_at = null,
+    reminder_window_starts_at = null,
+    reminder_window_ends_at = null,
+    reminder_target = null,
+    reminder_score = null,
+    last_notification_sent_at = p_now,
+    updated_at = p_now
+  where endpoint = p_endpoint
+    and enabled = true
+    and reminder_at is not null
+    and reminder_at <= p_now
+    and (reminder_window_ends_at is null or reminder_window_ends_at >= p_now)
+  returning true into claimed;
+
+  return coalesce(claimed, false);
+end;
+$$;
+
+revoke all on function public.claim_due_sky_window_reminder(text, timestamptz)
+  from public, anon, authenticated;
+grant execute on function public.claim_due_sky_window_reminder(text, timestamptz)
   to service_role;
 
 comment on table public.push_subscriptions is

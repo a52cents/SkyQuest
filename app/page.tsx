@@ -9,6 +9,12 @@ export default function HomePage() {
   const displayMode = useDisplayMode();
   const searchParams = useSearchParams();
   const isBrowserTrial = searchParams.get("app") === "1";
+  const notificationIntent = searchParams.get("intent") ?? undefined;
+  const preferredTarget = searchParams.get("target") ?? undefined;
 
-  return displayMode === "standalone" || isBrowserTrial ? <Dashboard /> : <LandingPage />;
+  return displayMode === "standalone" || isBrowserTrial ? (
+    <Dashboard notificationIntent={notificationIntent} preferredTarget={preferredTarget} />
+  ) : (
+    <LandingPage />
+  );
 }

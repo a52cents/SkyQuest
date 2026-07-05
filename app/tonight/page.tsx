@@ -15,6 +15,7 @@ import {
 } from "@/lib/storage";
 import type { BestSkyWindow, FogRisk } from "@/lib/types";
 import { fetchWeatherForecast, getFallbackWeatherForecast } from "@/lib/weather";
+import { scheduleSkyWindowReminder } from "@/lib/push-client";
 
 const FOG_LABELS: Record<FogRisk, string> = {
   low: "faible",
@@ -46,6 +47,7 @@ function scoreLabel(score: number): string {
 export default function TonightPage() {
   const [skyWindow, setSkyWindow] = useState<BestSkyWindow | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSchedulingReminder, setIsSchedulingReminder] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => setSkyWindow(getBestSkyWindow()), []);
@@ -104,6 +106,28 @@ export default function TonightPage() {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  async function handleReminder() {
+    if (!skyWindow || isSchedulingReminder) return;
+    const startsAt = new Date(skyWindow.startsAt);
+    const reminderAt = new Date(Math.max(Date.now(), startsAt.getTime() - 15 * 60 * 1_000));
+    setIsSchedulingReminder(true);
+    setNotice(null);
+    const scheduled = await scheduleSkyWindowReminder({
+      reminderAt: reminderAt.toISOString(),
+      windowStartsAt: skyWindow.startsAt,
+      windowEndsAt: skyWindow.endsAt,
+      target: skyWindow.bestTargets[0],
+      score: skyWindow.score,
+      location: getLastLocation(),
+    });
+    setIsSchedulingReminder(false);
+    setNotice(
+      scheduled
+        ? `Rappel prévu vers ${formatTime(reminderAt.toISOString(), skyWindow.timezone)}. Un toucher relancera l’analyse du ciel.`
+        : "Le rappel n’a pas pu être activé. Vérifie que les notifications sont autorisées sur cet appareil.",
+    );
   }
 
   return (
@@ -220,6 +244,27 @@ export default function TonightPage() {
               </p>
             </div>
           </AppCard>
+
+          {new Date(skyWindow.endsAt).getTime() > Date.now() ? (
+            <AppCard as="section" variant="glass" padding="md" className="mt-4">
+              <p className="premium-kicker">Au bon moment</p>
+              <h2 className="mt-1 text-base font-semibold text-text">
+                Ne laisse pas passer ce créneau
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-muted">
+                SkyQuest te préviendra environ 15 minutes avant, puis recalculera les conditions à
+                l’ouverture.
+              </p>
+              <AppButton
+                fullWidth
+                className="mt-4"
+                isLoading={isSchedulingReminder}
+                onClick={() => void handleReminder()}
+              >
+                Me prévenir
+              </AppButton>
+            </AppCard>
+          ) : null}
         </>
       ) : (
         <AppCard as="section" variant="glass" padding="lg" className="text-center">

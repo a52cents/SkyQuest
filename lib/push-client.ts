@@ -21,6 +21,15 @@ export type PushSubscriptionOptions = {
   location?: { latitude: number; longitude: number } | null;
 };
 
+export type SkyWindowReminderInput = {
+  reminderAt: string;
+  windowStartsAt: string;
+  windowEndsAt: string;
+  target?: string;
+  score: number;
+  location?: PushSubscriptionOptions["location"];
+};
+
 const PREFERENCES_STORAGE_KEY = "skyquest.notification-preferences.v1";
 
 export function isPushSupported(): boolean {
@@ -148,6 +157,37 @@ export async function subscribeToPush(
     return subscription;
   } catch {
     return null;
+  }
+}
+
+export async function scheduleSkyWindowReminder(input: SkyWindowReminderInput): Promise<boolean> {
+  let subscription = await getExistingPushSubscription();
+  if (!subscription) {
+    subscription = await subscribeToPush({
+      preferences: getNotificationPreferences(),
+      location: input.location,
+    });
+  } else if (input.location) {
+    await saveSubscriptionOnServer(subscription, { location: input.location });
+  }
+  if (!subscription) return false;
+
+  try {
+    const response = await fetch("/api/push/reminder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        endpoint: subscription.endpoint,
+        reminderAt: input.reminderAt,
+        windowStartsAt: input.windowStartsAt,
+        windowEndsAt: input.windowEndsAt,
+        target: input.target,
+        score: input.score,
+      }),
+    });
+    return response.ok;
+  } catch {
+    return false;
   }
 }
 
