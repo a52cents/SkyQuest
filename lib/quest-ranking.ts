@@ -84,6 +84,11 @@ export function rankQuestsForRecommendation(
   return quests
     .map((quest, originalIndex) => ({ ...personalizeQuest(quest, context), originalIndex }))
     .sort((left, right) => {
+      const satelliteDifference =
+        Number(left.quest.targetType === "satellite") -
+        Number(right.quest.targetType === "satellite");
+      if (satelliteDifference !== 0) return satelliteDifference;
+
       const scoreDifference = right.recommendationScore - left.recommendationScore;
       if (scoreDifference !== 0) return scoreDifference;
 

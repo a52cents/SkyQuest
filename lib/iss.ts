@@ -1,4 +1,5 @@
 import { createNetworkTimeoutSignal } from "./network.ts";
+import type { SatelliteTrajectoryPoint } from "./types.ts";
 
 export type IssVisiblePass = {
   startAzimuth: number;
@@ -8,6 +9,7 @@ export type IssVisiblePass = {
   maxTime: Date;
   durationSeconds: number;
   magnitude?: number;
+  trajectory?: SatelliteTrajectoryPoint[];
 };
 
 const ISS_GUIDANCE_LEAD_MS = 5 * 60 * 1000;
@@ -93,6 +95,7 @@ export type IssVisiblePassPayload = {
   maxTime: string;
   durationSeconds: number;
   magnitude?: number;
+  trajectory?: SatelliteTrajectoryPoint[];
 };
 
 export function parseIssVisiblePass(payload: IssVisiblePassPayload): IssVisiblePass {

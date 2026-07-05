@@ -23,6 +23,7 @@ import type { LightingPracticeEstimate } from "@/lib/lighting-practices";
 import { isMeteorShowerActive, isNearMeteorShowerPeak, meteorShowers } from "@/lib/meteor-showers";
 import { azimuthToCardinal } from "@/lib/orientation";
 import type { TrackedSatellitePass } from "@/lib/satellites";
+import { getSatellitePositionAt } from "@/lib/satellite-guidance";
 import { catalogSkyObjects } from "@/lib/sky-catalog";
 import {
   calculateCatalogVisibilityScore,
@@ -208,9 +209,9 @@ function createIssQuest(pass: IssVisiblePass, score: number, now: Date): SkyQues
     targetType: "satellite",
     title: "Repère l'ISS",
     difficulty: "easy",
-    azimuth: pass.maxAzimuth,
-    altitude: pass.maxElevation,
-    cardinalDirection: azimuthToCardinal(pass.maxAzimuth),
+    azimuth: pass.startAzimuth,
+    altitude: pass.trajectory?.[0]?.altitude ?? 10,
+    cardinalDirection: azimuthToCardinal(pass.startAzimuth),
     visibilityScore: score,
     visibilityLabel: getVisibilityLabel(score),
     description: `Passage visible prévu vers ${startTime}, pendant environ ${durationMinutes} min si le ciel est dégagé.`,
@@ -220,6 +221,7 @@ function createIssQuest(pass: IssVisiblePass, score: number, now: Date): SkyQues
     targetTime: pass.maxTime.toISOString(),
     startsAt: pass.startTime.toISOString(),
     endsAt: getIssPassEndTime(pass).toISOString(),
+    satelliteTrajectory: pass.trajectory,
   };
 }
 
@@ -262,9 +264,9 @@ function createTrackedSatelliteQuest(
     targetType: "satellite",
     title: isTrain ? "Cherche un train Starlink" : `Repère ${pass.name}`,
     difficulty: isTrain ? "medium" : "easy",
-    azimuth: pass.maxAzimuth,
-    altitude: pass.maxElevation,
-    cardinalDirection: azimuthToCardinal(pass.maxAzimuth),
+    azimuth: pass.startAzimuth,
+    altitude: pass.trajectory?.[0]?.altitude ?? 10,
+    cardinalDirection: azimuthToCardinal(pass.startAzimuth),
     visibilityScore: score,
     visibilityLabel: getVisibilityLabel(score),
     description: isTrain
@@ -279,6 +281,7 @@ function createTrackedSatelliteQuest(
     targetTime: pass.maxTime.toISOString(),
     startsAt: pass.startTime.toISOString(),
     endsAt: getIssPassEndTime(pass).toISOString(),
+    satelliteTrajectory: pass.trajectory,
   };
 }
 
@@ -565,11 +568,16 @@ export function recalculateQuestPosition({
       (skyObject) => skyObject.name === quest.target,
     );
     position = object ? { azimuth: object.azimuth, altitude: object.altitude } : null;
-  } else if (
-    quest.targetType !== "satellite" &&
-    quest.targetType !== "meteor_shower" &&
-    quest.targetType !== "free_observation"
-  ) {
+  } else if (quest.targetType === "satellite") {
+    position = getSatellitePositionAt(quest.satelliteTrajectory, now);
+    if (!position) {
+      return {
+        ...quest,
+        azimuth: null,
+        altitude: null,
+      };
+    }
+  } else if (quest.targetType !== "meteor_shower" && quest.targetType !== "free_observation") {
     const object = catalogSkyObjects.find((catalogObject) => catalogObject.id === quest.target);
 
     if (

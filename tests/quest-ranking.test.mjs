@@ -84,3 +84,16 @@ test("experience breaks equal recommendations toward a suitable difficulty", () 
     "medium",
   );
 });
+
+test("satellites stay behind fixed targets even with a higher score", () => {
+  const satellite = { ...quest("starlink", 100), targetType: "satellite" };
+  const fixedTarget = quest("polaris", 55);
+  const ranked = rankQuestsForRecommendation([satellite, fixedTarget], {
+    discoveredTargets: new Set(),
+    observations: [],
+    totalXp: 150,
+  });
+
+  assert.equal(ranked[0].quest.target, "polaris");
+  assert.equal(ranked[1].quest.target, "starlink");
+});

@@ -92,6 +92,12 @@ export type BestSkyWindow = {
 
 export type VisibilityLabel = "Excellente chance" | "Bonne chance" | "Tentable" | "Pas conseillé";
 
+export type SatelliteTrajectoryPoint = {
+  at: string;
+  azimuth: number;
+  altitude: number;
+};
+
 export type SkyQuest = {
   id: string;
   target: string;
@@ -111,6 +117,7 @@ export type SkyQuest = {
   targetTime?: string;
   startsAt?: string;
   endsAt?: string;
+  satelliteTrajectory?: SatelliteTrajectoryPoint[];
   weather?: WeatherNow;
 };
 

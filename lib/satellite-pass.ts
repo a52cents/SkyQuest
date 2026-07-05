@@ -89,6 +89,11 @@ function toPayload(samples: VisibleSample[]): IssVisiblePassPayload | null {
     startTime: first.date.toISOString(),
     maxTime: maximum.date.toISOString(),
     durationSeconds: Math.max(0, Math.round((last.date.getTime() - first.date.getTime()) / 1000)),
+    trajectory: samples.map((sample) => ({
+      at: sample.date.toISOString(),
+      azimuth: sample.azimuth,
+      altitude: sample.altitude,
+    })),
   };
 }
 

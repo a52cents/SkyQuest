@@ -74,6 +74,8 @@ test("CelesTrak orbital elements produce a plausible sunlit ISS pass", () => {
   assert.equal(result?.startTime, "2026-07-04T22:31:20.000Z");
   assert.ok((result?.maxElevation ?? 0) >= 40);
   assert.ok((result?.durationSeconds ?? 0) >= 4 * 60);
+  assert.ok((result?.trajectory?.length ?? 0) >= 12);
+  assert.equal(result?.trajectory?.[0].at, result?.startTime);
 });
 
 test("the quest page rechecks ISS availability until the pass ends", () => {

@@ -67,7 +67,9 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [orientationConfidence, setOrientationConfidence] = useState<OrientationConfidence>("low");
   const [currentAzimuth, setCurrentAzimuth] = useState<number | null>(null);
   const [currentAltitude, setCurrentAltitude] = useState<number | null>(null);
-  const [liveQuest, setLiveQuest] = useState(quest);
+  const [liveQuest, setLiveQuest] = useState(() =>
+    quest.targetType === "satellite" ? { ...quest, azimuth: null, altitude: null } : quest,
+  );
   const [zoomRange, setZoomRange] = useState<CameraZoomRange | null>(null);
   const [currentZoom, setCurrentZoom] = useState<number | null>(null);
   const [zoomError, setZoomError] = useState<string | null>(null);
@@ -113,7 +115,9 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   }, [sensorPointing]);
 
   useEffect(() => {
-    setLiveQuest(quest);
+    setLiveQuest(
+      quest.targetType === "satellite" ? { ...quest, azimuth: null, altitude: null } : quest,
+    );
     setHorizontalCalibration(0);
   }, [quest]);
 
@@ -130,9 +134,12 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         }),
       );
     refreshPosition();
-    const intervalId = window.setInterval(refreshPosition, 30_000);
+    const intervalId = window.setInterval(
+      refreshPosition,
+      quest.targetType === "satellite" ? 1_000 : 30_000,
+    );
     return () => window.clearInterval(intervalId);
-  }, []);
+  }, [quest.targetType]);
 
   function configureCameraControls(stream: MediaStream) {
     const track = stream.getVideoTracks()[0];
@@ -364,11 +371,13 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     liveQuest.azimuth,
     horizontalCalibration,
   );
-  const guidanceReliability = getGuidanceReliability(
+  const sensorReliability = getGuidanceReliability(
     orientationStatus,
     orientationConfidence,
     currentAzimuth,
   );
+  const guidanceReliability =
+    calibratedTargetAzimuth === null ? "text_recommended" : sensorReliability;
   const directionHint =
     calibratedTargetAzimuth !== null && currentAzimuth !== null
       ? getDirectionHint(currentAzimuth, calibratedTargetAzimuth)
@@ -401,11 +410,13 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     altitudeArrow,
     mainHint: isAligned
       ? `${liveQuest.target} est près du centre`
-      : directionHint && directionHint !== "Bonne direction"
-        ? directionHint
-        : altitudeHint && altitudeHint !== "Hauteur proche"
-          ? altitudeHint
-          : `Cherche ${liveQuest.target} dans le ciel`,
+      : liveQuest.targetType === "satellite" && calibratedTargetAzimuth === null
+        ? `Le satellite se déplace vite — suis surtout la direction ${liveQuest.cardinalDirection ?? "indiquée"}`
+        : directionHint && directionHint !== "Bonne direction"
+          ? directionHint
+          : altitudeHint && altitudeHint !== "Hauteur proche"
+            ? altitudeHint
+            : `Cherche ${liveQuest.target} dans le ciel`,
     targetAltitudeLabel,
   };
 
