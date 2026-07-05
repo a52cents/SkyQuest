@@ -32,21 +32,38 @@ import { fetchLightPollutionEstimate } from "@/lib/light-pollution-client";
 import type { LightPollutionEstimate } from "@/lib/light-pollution";
 import { fetchLightingPracticeEstimate } from "@/lib/lighting-practices-client";
 import type { LightingPracticeEstimate } from "@/lib/lighting-practices";
+import { selectEveningQuest } from "@/lib/evening-quest";
+import { getLocalNightKey } from "@/lib/progression";
 import { rankQuestsForRecommendation } from "@/lib/quest-ranking";
 import { calculateBestSkyWindow } from "@/lib/sky-window";
+import { isBestSkyWindowFresh } from "@/lib/sky-window-freshness";
 import { generateQuests } from "@/lib/quest-generator";
 import { isGeneratedAtFresh, isQuestFresh, SKY_DATA_TTL_MS } from "@/lib/quest-freshness";
 import {
+  clearExpiredEveningQuestAssignment,
   getOnboardingCompleted,
   getLastLocation,
   getObservations,
   getProgressProfile,
   saveActiveQuest,
   saveBestSkyWindow,
+  saveEveningQuestAssignment,
   saveLastLocation,
   setOnboardingCompleted,
 } from "@/lib/storage";
-import type { AirQualityNow, BestSkyWindow, Observation, SkyQuest, WeatherNow } from "@/lib/types";
+import type {
+  AirQualityNow,
+  BestSkyWindow,
+  EveningQuestAssignment,
+  Observation,
+  SkyQuest,
+  WeatherNow,
+} from "@/lib/types";
+import {
+  formatVisibilityScore,
+  formatVisibilityScoreForAccessibility,
+  normalizeVisibilityScore,
+} from "@/lib/visibility";
 import {
   fetchWeatherForecast,
   fetchWeatherNow,
@@ -191,6 +208,7 @@ function QuestCard({
   locked,
   stale,
   featured = false,
+  evening = false,
   personalizationBadge = null,
 }: {
   quest: SkyQuest;
@@ -198,6 +216,7 @@ function QuestCard({
   locked: boolean;
   stale: boolean;
   featured?: boolean;
+  evening?: boolean;
   personalizationBadge?: "new_target" | "improved_retry" | null;
 }) {
   const prefersReducedMotion = useReducedMotion() ?? false;
@@ -224,7 +243,9 @@ function QuestCard({
       }}
     >
       <div className="quest-badges">
-        {featured ? <div className="quest-badge recommended">Recommandée</div> : null}
+        {featured ? (
+          <div className="quest-badge recommended">{evening ? "Quête du soir" : "Recommandée"}</div>
+        ) : null}
         {personalizationBadge ? (
           <div className="quest-badge personalized">
             {personalizationBadge === "new_target"
@@ -270,16 +291,25 @@ function QuestCard({
           </svg>
           {quest.cardinalDirection ?? "Horizon dégagé"}
         </div>
-        <div className="quest-meta-item">
+        <div
+          role="group"
+          className="quest-meta-item"
+          aria-label={`${quest.visibilityLabel}. ${formatVisibilityScoreForAccessibility(quest.visibilityScore)}`}
+        >
           <svg viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="4" />
             <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2" />
           </svg>
-          Visibilité {quest.visibilityScore}/100
+          {quest.visibilityLabel} · {formatVisibilityScore(quest.visibilityScore)}
         </div>
       </div>
       <div className="quest-action">
-        <span className="quest-hint">{quest.tip}</span>
+        <span className="quest-hint">
+          {quest.tip}
+          {evening ? (
+            <strong className="mt-2 block text-accent-cyan">Bonus +25 Éclats d’étoile</strong>
+          ) : null}
+        </span>
         <AppButton
           size="sm"
           className="shrink-0 gap-1.5"
@@ -290,7 +320,7 @@ function QuestCard({
             if (!locked) onStart(quest);
           }}
         >
-          {locked ? "Actualise d'abord" : "Guider"}
+          {locked ? "Actualise d'abord" : evening ? "Commencer la quête" : "Guider"}
           <svg
             viewBox="0 0 24 24"
             className="h-3.5 w-3.5 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]"
@@ -331,6 +361,7 @@ export function Dashboard({
   const [discoveredTargets, setDiscoveredTargets] = useState<ReadonlySet<string>>(new Set());
   const [observations, setObservations] = useState<Observation[]>([]);
   const [totalXp, setTotalXp] = useState(0);
+  const [eveningAssignment, setEveningAssignment] = useState<EveningQuestAssignment | null>(null);
   const activeAnalysisRequestRef = useRef(0);
   const notificationAnalysisStartedRef = useRef(false);
 
@@ -498,14 +529,19 @@ export function Dashboard({
     const progressProfile = getProgressProfile();
     setDiscoveredTargets(new Set(progressProfile.discoveredTargets.map((item) => item.target)));
     setTotalXp(progressProfile.totalXp);
+    setEveningAssignment(clearExpiredEveningQuestAssignment(getLocalNightKey(new Date())));
     setIsOnboardingReady(true);
 
     const cachedAnalysis = readCachedAnalysis();
     if (cachedAnalysis) {
       const isFresh = isGeneratedAtFresh(cachedAnalysis.generatedAt);
+      const cachedBestSkyWindow =
+        cachedAnalysis.bestSkyWindow && isBestSkyWindowFresh(cachedAnalysis.bestSkyWindow)
+          ? cachedAnalysis.bestSkyWindow
+          : null;
       setWeather(cachedAnalysis.weather);
       setQuests(cachedAnalysis.quests);
-      setBestSkyWindow(cachedAnalysis.bestSkyWindow ?? null);
+      setBestSkyWindow(cachedBestSkyWindow);
       setLightPollution(cachedAnalysis.lightPollution ?? null);
       setLightingPractice(cachedAnalysis.lightingPractice ?? null);
       setAirQuality(cachedAnalysis.airQuality ?? null);
@@ -647,9 +683,70 @@ export function Dashboard({
       return Number(matches(right.quest)) - Number(matches(left.quest));
     });
   }, [discoveredTargets, observations, preferredTarget, quests, totalXp]);
-  const recommendedQuest = rankedQuests[0] ?? null;
+  const currentNightKey = getLocalNightKey(new Date());
+  const eveningSelection = useMemo(
+    () =>
+      selectEveningQuest({
+        rankedQuests: isGuidanceUnlocked ? rankedQuests : [],
+        existingAssignment: eveningAssignment,
+        nightKey: currentNightKey,
+        totalXp,
+        now: isGuidanceUnlocked && analysisGeneratedAt ? new Date(analysisGeneratedAt) : new Date(),
+      }),
+    [
+      analysisGeneratedAt,
+      currentNightKey,
+      eveningAssignment,
+      isGuidanceUnlocked,
+      rankedQuests,
+      totalXp,
+    ],
+  );
+  const activeEveningQuest =
+    eveningSelection.assignment?.status === "active" ? eveningSelection.quest : null;
+  const eveningRankedQuest = activeEveningQuest
+    ? {
+        quest: activeEveningQuest,
+        personalizationBadge:
+          rankedQuests.find((item) => item.quest.id === activeEveningQuest.id)
+            ?.personalizationBadge ?? null,
+      }
+    : null;
+  const questsWithoutEveningTarget = activeEveningQuest
+    ? rankedQuests.filter(
+        ({ quest }) =>
+          quest.target.toLocaleLowerCase("fr-FR") !==
+          activeEveningQuest.target.toLocaleLowerCase("fr-FR"),
+      )
+    : rankedQuests;
+  const recommendedQuest = eveningRankedQuest ?? rankedQuests[0] ?? null;
   const alternativeQuests = rankedQuests.slice(1, 3);
   const remainingQuests = rankedQuests.slice(3);
+  const displayedAlternativeQuests = activeEveningQuest
+    ? questsWithoutEveningTarget.slice(0, 2)
+    : alternativeQuests;
+  const displayedRemainingQuests = activeEveningQuest
+    ? questsWithoutEveningTarget.slice(2)
+    : remainingQuests;
+
+  useEffect(() => {
+    const next = eveningSelection.assignment;
+    if (!next) return;
+    const unchanged =
+      eveningAssignment?.nightKey === next.nightKey &&
+      eveningAssignment.target === next.target &&
+      eveningAssignment.lastMatchedAt === next.lastMatchedAt &&
+      eveningAssignment.status === next.status &&
+      eveningAssignment.completedAt === next.completedAt;
+    if (unchanged) return;
+
+    saveEveningQuestAssignment(next);
+    setEveningAssignment(next);
+    if (eveningSelection.wasReassigned) {
+      setNotice("Les conditions ont changé : SkyQuest a ajusté ta quête du soir.");
+    }
+  }, [eveningAssignment, eveningSelection]);
+
   const airTransparency = airQuality ? getAirTransparencyEstimate(airQuality) : null;
   const conditionsLabel =
     analysisSavedAt && !isGuidanceUnlocked
@@ -695,15 +792,29 @@ export function Dashboard({
             <AnimatedValue value={weather ? `${Math.round(weather.cloudCover)}%` : "—"} />
             <div className="condition-label">Nuages</div>
           </AppCard>
-          <AppCard variant="solid" padding="none" className="condition-item">
+          <AppCard
+            role="group"
+            variant="solid"
+            padding="none"
+            className="condition-item"
+            aria-label={
+              averageVisibility === null
+                ? "Indice moyen des quêtes disponibles : indisponible"
+                : `Indice moyen des quêtes disponibles : ${normalizeVisibilityScore(averageVisibility)} sur 100`
+            }
+          >
             <svg className="condition-icon" viewBox="0 0 24 24">
               <path d="M12 2L2 7l10 5 10-5-10-5z" />
               <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
             </svg>
             <AnimatedValue
-              value={averageVisibility === null ? "—" : `${Math.round(averageVisibility / 10)}/10`}
+              value={
+                averageVisibility === null
+                  ? "—"
+                  : formatVisibilityScore(averageVisibility, "compact")
+              }
             />
-            <div className="condition-label">Visibilité</div>
+            <div className="condition-label">Indice ciel</div>
           </AppCard>
           <AppCard variant="solid" padding="none" className="condition-item">
             <svg className="condition-icon" viewBox="0 0 24 24">
@@ -900,10 +1011,31 @@ export function Dashboard({
           </div>
         </MotionBlock>
 
+        {eveningSelection.assignment?.status === "completed" ? (
+          <MotionBlock>
+            <AppCard variant="subtle" padding="sm" className="border-success/20">
+              <p className="text-sm font-semibold text-success">Quête du soir accomplie</p>
+              <p className="mt-1 text-xs text-muted">
+                Ton bonus est enregistré. Tu peux continuer à explorer librement.
+              </p>
+            </AppCard>
+          </MotionBlock>
+        ) : loadState === "ready" && isGuidanceUnlocked && !activeEveningQuest ? (
+          <MotionBlock>
+            <AppCard variant="subtle" padding="sm">
+              <p className="text-sm text-muted">
+                Ta quête du soir apparaîtra quand une cible fiable sera disponible.
+              </p>
+            </AppCard>
+          </MotionBlock>
+        ) : null}
+
         {recommendedQuest ? (
           <MotionBlock className="quest-priority">
             <div className="section-header">
-              <h2 className="section-title">Ta quête recommandée</h2>
+              <h2 className="section-title">
+                {activeEveningQuest ? "Ta quête du soir" : "Ta quête recommandée"}
+              </h2>
               <span
                 className={`status-pill ${loadState === "loading" || isRefining ? "loading" : ""}`}
               >
@@ -921,22 +1053,25 @@ export function Dashboard({
                   locked={!isQuestGuidanceAvailable(recommendedQuest.quest, isGuidanceUnlocked)}
                   stale={analysisSavedAt !== null}
                   featured
+                  evening={Boolean(activeEveningQuest)}
                   personalizationBadge={recommendedQuest.personalizationBadge}
                 />
               </AnimatePresence>
             </motion.div>
 
-            {alternativeQuests.length > 0 ? (
+            {displayedAlternativeQuests.length > 0 ? (
               <>
                 <div className="alternatives-header">
                   <h3>
-                    {alternativeQuests.length === 1 ? "Une alternative" : "Deux alternatives"}
+                    {displayedAlternativeQuests.length === 1
+                      ? "Une alternative"
+                      : "Deux alternatives"}
                   </h3>
                   <span>Si tu préfères une autre cible</span>
                 </div>
                 <motion.div className="quest-list quest-alternatives" variants={rootVariants}>
                   <AnimatePresence mode="popLayout">
-                    {alternativeQuests.map(({ quest, personalizationBadge }) => (
+                    {displayedAlternativeQuests.map(({ quest, personalizationBadge }) => (
                       <QuestCard
                         key={quest.id}
                         quest={quest}
@@ -951,7 +1086,7 @@ export function Dashboard({
               </>
             ) : null}
 
-            {remainingQuests.length > 0 ? (
+            {displayedRemainingQuests.length > 0 ? (
               <details
                 className={getAppCardClassName({
                   variant: "subtle",
@@ -962,11 +1097,12 @@ export function Dashboard({
                 <summary>
                   <span>Voir toutes les quêtes</span>
                   <small>
-                    {remainingQuests.length} autre{remainingQuests.length > 1 ? "s" : ""}
+                    {displayedRemainingQuests.length} autre
+                    {displayedRemainingQuests.length > 1 ? "s" : ""}
                   </small>
                 </summary>
                 <motion.div className="quest-list all-quests-list" variants={rootVariants}>
-                  {remainingQuests.map(({ quest, personalizationBadge }) => (
+                  {displayedRemainingQuests.map(({ quest, personalizationBadge }) => (
                     <QuestCard
                       key={quest.id}
                       quest={quest}

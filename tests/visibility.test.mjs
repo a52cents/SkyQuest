@@ -1,6 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateVisibilityScore, getVisibilityLabel } from "../lib/visibility.ts";
+import {
+  calculateVisibilityScore,
+  formatVisibilityScore,
+  formatVisibilityScoreForAccessibility,
+  getVisibilityLabel,
+  normalizeVisibilityScore,
+} from "../lib/visibility.ts";
+
+test("visibility score formatting uses a bounded editorial index", () => {
+  assert.equal(formatVisibilityScore(72), "Indice 72/100");
+  assert.equal(formatVisibilityScore(72, "compact"), "72/100");
+  assert.equal(formatVisibilityScore(72.6), "Indice 73/100");
+  assert.equal(normalizeVisibilityScore(-12), 0);
+  assert.equal(normalizeVisibilityScore(140), 100);
+  assert.equal(normalizeVisibilityScore(Number.NaN), 0);
+  assert.equal(normalizeVisibilityScore(Number.POSITIVE_INFINITY), 0);
+  assert.equal(formatVisibilityScoreForAccessibility(72.4), "Indice de visibilité : 72 sur 100");
+});
 
 test("visibility labels keep their editorial thresholds", () => {
   assert.equal(getVisibilityLabel(80), "Excellente chance");

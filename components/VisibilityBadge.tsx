@@ -1,3 +1,5 @@
+import { formatVisibilityScore, formatVisibilityScoreForAccessibility } from "@/lib/visibility";
+
 type VisibilityBadgeProps = {
   label: string;
   score: number;
@@ -20,13 +22,15 @@ export function VisibilityBadge({ label, score, className }: VisibilityBadgeProp
 
   return (
     <span
+      role="group"
       className={joinClasses(
         "inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-bold",
         tone,
         className,
       )}
+      aria-label={`${label}. ${formatVisibilityScoreForAccessibility(score)}`}
     >
-      {label} {"\u00b7"} Conditions {score}/100
+      {label} {"\u00b7"} {formatVisibilityScore(score)}
     </span>
   );
 }

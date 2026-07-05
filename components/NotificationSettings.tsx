@@ -49,6 +49,10 @@ export function NotificationSettings({
         <p className="mt-1 mb-0 text-xs leading-5 text-muted">
           De 19 h à 3 h · 12 h minimum entre deux alertes
         </p>
+        <p className="mt-1 mb-0 text-xs leading-5 text-faint">
+          Les rappels « Me prévenir » demandés volontairement peuvent arriver indépendamment de
+          cette limite.
+        </p>
       </div>
 
       <div className="mt-4">

@@ -47,6 +47,9 @@ export const RANKS: readonly Rank[] = [
   { name: "Guide du ciel", minimumXp: 1500 },
 ];
 
+export const EVENING_QUEST_BONUS_XP = 25;
+const EVENING_QUEST_COMPLETION_HISTORY_LIMIT = 180;
+
 export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   {
     id: "first-look",
@@ -119,10 +122,13 @@ export function createEmptyProgressProfile(now = new Date(0).toISOString()): Pro
     discoveredTargets: [],
     unlockedAchievements: [],
     rewardHistory: [],
+    eveningQuestCompletions: [],
+    eveningQuestCompletionCount: 0,
     currentStreak: 0,
     longestStreak: 0,
     lastObservationNightKey: null,
     streakFreezeCount: 1,
+    lastStreakFreezeUsedNightKey: null,
     lastFreezeRegenerationKey: null,
     updatedAt: now,
   };
@@ -187,6 +193,57 @@ function getNightDifference(currentNightKey: string, previousNightKey: string): 
   return getNightDayNumber(currentNightKey) - getNightDayNumber(previousNightKey);
 }
 
+export type StreakDisplayStatus = "active" | "at_risk" | "protected" | "expired";
+
+export type StreakDisplayState = {
+  displayStreak: number;
+  status: StreakDisplayStatus;
+  message: string | null;
+};
+
+export function getStreakDisplayState(profile: ProgressProfile, now: Date): StreakDisplayState {
+  if (profile.currentStreak <= 0 || !profile.lastObservationNightKey) {
+    return {
+      displayStreak: 0,
+      status: "expired",
+      message: "Observe cette nuit pour commencer une nouvelle série.",
+    };
+  }
+
+  const currentNightKey = getLocalNightKey(now);
+  const nightDifference = getNightDifference(currentNightKey, profile.lastObservationNightKey);
+
+  if (nightDifference <= 0) {
+    return {
+      displayStreak: profile.currentStreak,
+      status: "active",
+      message: `Série de ${profile.currentStreak} nuit${profile.currentStreak > 1 ? "s" : ""} !`,
+    };
+  }
+
+  if (nightDifference === 1) {
+    return {
+      displayStreak: profile.currentStreak,
+      status: "at_risk",
+      message: "Observe cette nuit pour continuer ta série.",
+    };
+  }
+
+  if (nightDifference === 2 && profile.streakFreezeCount > 0) {
+    return {
+      displayStreak: profile.currentStreak,
+      status: "protected",
+      message: "Ton freeze protège cette série.",
+    };
+  }
+
+  return {
+    displayStreak: 0,
+    status: "expired",
+    message: "Observe cette nuit pour commencer une nouvelle série.",
+  };
+}
+
 type StreakUpdateResult = {
   profile: ProgressProfile;
   previousStreak: number;
@@ -197,43 +254,50 @@ function computeStreakOnSuccess(profile: ProgressProfile, now: Date): StreakUpda
   const currentNightKey = getLocalNightKey(now);
   const previousNightKey = profile.lastObservationNightKey;
   const previousStreak = profile.currentStreak;
+  const nightDifference = previousNightKey
+    ? getNightDifference(currentNightKey, previousNightKey)
+    : null;
 
-  if (previousNightKey === currentNightKey) {
+  if (nightDifference !== null && nightDifference <= 0) {
     return { profile, previousStreak, streakMessage: null };
   }
 
   const timestamp = now.toISOString();
-  const nightDifference = previousNightKey
-    ? getNightDifference(currentNightKey, previousNightKey)
-    : null;
   let currentStreak = 1;
   let streakFreezeCount = Math.min(1, Math.max(0, profile.streakFreezeCount));
+  let lastStreakFreezeUsedNightKey = profile.lastStreakFreezeUsedNightKey;
   let lastFreezeRegenerationKey = profile.lastFreezeRegenerationKey;
   let streakMessage: string | null = null;
 
-  if (nightDifference === null || nightDifference <= 1) {
-    currentStreak = previousStreak > 0 ? previousStreak + 1 : 1;
+  if (nightDifference === null || previousStreak <= 0) {
+    currentStreak = 1;
+    streakMessage = "Série de 1 nuit !";
+  } else if (nightDifference === 1) {
+    currentStreak = previousStreak + 1;
     streakMessage = `Série de ${currentStreak} nuit${currentStreak > 1 ? "s" : ""} !`;
-  } else if (previousStreak > 0) {
-    const freezeDifference = lastFreezeRegenerationKey
-      ? getNightDifference(currentNightKey, lastFreezeRegenerationKey)
-      : Number.POSITIVE_INFINITY;
-    if (streakFreezeCount < 1 && freezeDifference >= 7) {
-      streakFreezeCount = 1;
-      lastFreezeRegenerationKey = currentNightKey;
-    }
-
+  } else if (nightDifference === 2) {
     if (streakFreezeCount > 0) {
       streakFreezeCount = 0;
       currentStreak = previousStreak + 1;
-      streakMessage = `Série de ${currentStreak} nuit${currentStreak > 1 ? "s" : ""} !`;
+      lastStreakFreezeUsedNightKey = currentNightKey;
+      streakMessage = "Ton freeze protège cette série.";
     } else {
       currentStreak = 1;
-      streakMessage = "Ouch, série perdue";
+      streakMessage = "Nouvelle série commencée.";
     }
   } else {
     currentStreak = 1;
-    streakMessage = "Série de 1 nuit !";
+    streakMessage = "Nouvelle série commencée.";
+  }
+
+  // Regeneration happens only after the current streak outcome is settled. A newly
+  // available freeze can protect a future gap, never the one handled above.
+  if (streakFreezeCount === 0 && lastStreakFreezeUsedNightKey) {
+    const nightsSinceFreezeUse = getNightDifference(currentNightKey, lastStreakFreezeUsedNightKey);
+    if (nightsSinceFreezeUse >= 7) {
+      streakFreezeCount = 1;
+      lastFreezeRegenerationKey = currentNightKey;
+    }
   }
 
   const nextProfile: ProgressProfile = {
@@ -242,6 +306,7 @@ function computeStreakOnSuccess(profile: ProgressProfile, now: Date): StreakUpda
     longestStreak: Math.max(profile.longestStreak, currentStreak),
     lastObservationNightKey: currentNightKey,
     streakFreezeCount,
+    lastStreakFreezeUsedNightKey,
     lastFreezeRegenerationKey,
     updatedAt: timestamp,
   };
@@ -324,11 +389,25 @@ export function applyQuestReward(
     !isFreeObservation &&
     !profile.discoveredTargets.some((item) => item.target.toLowerCase() === target);
   const desiredXp = isFreeObservation
-    ? 15
+    ? status === "seen"
+      ? 15
+      : 5
     : status === "missed"
       ? 10
       : getSuccessXp(quest.difficulty, quest.visibilityScore, isFirstDiscovery);
-  const xpEarned = Math.max(0, desiredXp - (existingReward?.awardedXp ?? 0));
+  const standardXpEarned = Math.max(0, desiredXp - (existingReward?.awardedXp ?? 0));
+  const isEligibleEveningQuest =
+    quest.questKind === "evening" && quest.eveningQuestNightKey === localNight && status === "seen";
+  const hasEveningQuestCompletion = profile.eveningQuestCompletions.some(
+    (completion) => completion.nightKey === localNight,
+  );
+  const eveningQuestBonusXp =
+    isEligibleEveningQuest && !hasEveningQuestCompletion ? EVENING_QUEST_BONUS_XP : 0;
+  const isEveningQuestCompleted = eveningQuestBonusXp > 0;
+  const xpEarned = standardXpEarned + eveningQuestBonusXp;
+  const eveningQuestCompletionCount = Number.isFinite(profile.eveningQuestCompletionCount)
+    ? profile.eveningQuestCompletionCount
+    : profile.eveningQuestCompletions.length;
   const hadMissed =
     existingReward?.hadMissed === true ||
     existingReward?.status === "missed" ||
@@ -358,6 +437,18 @@ export function applyQuestReward(
     totalXp: profile.totalXp + xpEarned,
     discoveredTargets,
     rewardHistory,
+    eveningQuestCompletions: isEveningQuestCompleted
+      ? [
+          ...profile.eveningQuestCompletions,
+          {
+            nightKey: localNight,
+            target: quest.target,
+            completedAt: timestamp,
+            bonusXp: eveningQuestBonusXp,
+          },
+        ].slice(-EVENING_QUEST_COMPLETION_HISTORY_LIMIT)
+      : profile.eveningQuestCompletions,
+    eveningQuestCompletionCount: eveningQuestCompletionCount + (isEveningQuestCompleted ? 1 : 0),
     updatedAt: timestamp,
   };
   const streakResult =
@@ -382,6 +473,8 @@ export function applyQuestReward(
     profile: nextProfile,
     reward: {
       xpEarned,
+      eveningQuestBonusXp,
+      isEveningQuestCompleted,
       totalXp: nextProfile.totalXp,
       isFirstDiscovery,
       unlockedAchievements: newlyUnlocked,

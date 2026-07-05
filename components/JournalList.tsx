@@ -4,6 +4,7 @@ import { ObservationMemoryCard } from "@/components/ObservationMemoryCard";
 import { getObservationTargetLabel, getSeasonLabel, getWeatherLabel } from "@/lib/observation-card";
 import { getPhotoObjectUrl, revokePhotoObjectUrl } from "@/lib/photo-db";
 import type { Observation } from "@/lib/types";
+import { formatVisibilityScore, formatVisibilityScoreForAccessibility } from "@/lib/visibility";
 import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 
@@ -18,6 +19,13 @@ type AlbumGroup = {
   season: string;
   observations: Observation[];
 };
+
+function isFreeObservation(observation: Observation): boolean {
+  return (
+    observation.targetType === "free_observation" ||
+    observation.target.toLowerCase() === "freeobservation"
+  );
+}
 
 function groupAlbum(observations: Observation[]): AlbumGroup[] {
   const groups = new Map<string, AlbumGroup>();
@@ -45,7 +53,12 @@ export function JournalList({ observations, onClear }: JournalListProps) {
   const [view, setView] = useState<"album" | "history">("album");
   const prefersReducedMotion = useReducedMotion() ?? false;
   const albumGroups = useMemo(
-    () => groupAlbum(observations.filter((observation) => observation.status === "seen")),
+    () =>
+      groupAlbum(
+        observations.filter(
+          (observation) => observation.status === "seen" && !isFreeObservation(observation),
+        ),
+      ),
     [observations],
   );
   const listVariants: Variants = prefersReducedMotion
@@ -155,7 +168,7 @@ export function JournalList({ observations, onClear }: JournalListProps) {
                       variants={itemVariants}
                       onClick={() => setMemoryObservation(observation)}
                       className="group relative aspect-[4/5] overflow-hidden rounded-[18px] border border-white/[0.1] bg-surface-strong bg-[radial-gradient(circle_at_70%_15%,color-mix(in_srgb,var(--accent)_36%,transparent),transparent_35%)] text-left shadow-[0_12px_32px_rgba(0,0,0,0.25)]"
-                      aria-label={`Ouvrir la carte de ${getObservationTargetLabel(observation)}`}
+                      aria-label={`Ouvrir la carte de ${getObservationTargetLabel(observation)}. ${formatVisibilityScoreForAccessibility(observation.visibilityScore)}`}
                     >
                       {thumbnailUrls[observation.id] ? (
                         <span
@@ -165,7 +178,7 @@ export function JournalList({ observations, onClear }: JournalListProps) {
                       ) : null}
                       <span className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,14,0.1),rgba(5,6,14,0.25)_38%,rgba(5,6,14,0.96))]" />
                       <span className="absolute left-3 top-3 rounded-full border border-white/15 bg-black/45 px-2.5 py-1 text-[10px] font-bold tracking-[0.08em] text-white backdrop-blur-md">
-                        ✦ SKYQUEST
+                        {observation.questKind === "evening" ? "Quête du soir" : "✦ SKYQUEST"}
                       </span>
                       <span className="absolute inset-x-0 bottom-0 p-3">
                         <span className="block font-[Georgia,'Times_New_Roman',serif] text-lg leading-tight text-white">
@@ -179,9 +192,9 @@ export function JournalList({ observations, onClear }: JournalListProps) {
                             minute: "2-digit",
                           }).format(new Date(observation.createdAt))}
                         </span>
-                        <span className="mt-2 flex items-center justify-between text-[10px] font-semibold text-white/80">
+                        <span className="mt-2 flex flex-wrap items-center justify-between gap-1 text-[10px] font-semibold text-white/80">
                           <span>{getWeatherLabel(observation)}</span>
-                          <span>{observation.visibilityScore}%</span>
+                          <span>{formatVisibilityScore(observation.visibilityScore)}</span>
                         </span>
                       </span>
                     </motion.button>
@@ -225,11 +238,22 @@ export function JournalList({ observations, onClear }: JournalListProps) {
                       {getObservationTargetLabel(observation)}
                     </h3>
                     <div className="mt-2 flex flex-wrap gap-1.5 text-xs text-muted">
+                      {observation.questKind === "evening" ? (
+                        <span className="rounded-md bg-accent/[0.09] px-2 py-1 text-accent-cyan">
+                          Quête du soir
+                        </span>
+                      ) : null}
                       <span className="rounded-md bg-white/[0.04] px-2 py-1">
-                        {observation.status === "seen" ? "Vu" : "Pas trouvé"}
+                        {isFreeObservation(observation)
+                          ? observation.status === "seen"
+                            ? "Quelque chose remarqué"
+                            : "Rien de particulier"
+                          : observation.status === "seen"
+                            ? "Vu"
+                            : "Pas trouvé"}
                       </span>
                       <span className="rounded-md bg-white/[0.04] px-2 py-1">
-                        {observation.visibilityScore}/100
+                        {formatVisibilityScore(observation.visibilityScore)}
                       </span>
                       {typeof observation.xpEarned === "number" ? (
                         <span className="rounded-md bg-accent/[0.09] px-2 py-1 text-accent-cyan">
@@ -238,7 +262,7 @@ export function JournalList({ observations, onClear }: JournalListProps) {
                       ) : null}
                     </div>
                   </div>
-                  {observation.status === "seen" ? (
+                  {observation.status === "seen" && !isFreeObservation(observation) ? (
                     <AppButton
                       variant="secondary"
                       size="sm"

@@ -12,16 +12,21 @@
  * - tolérer les données corrompues ou issues d'une ancienne version sans faire planter l'UI ;
  * - les photos restent locales dans IndexedDB ; localStorage ne garde que leurs identifiants.
  */
-import { deletePhoto, savePhotoFromDataUrl } from "@/lib/photo-db";
-import { applyQuestReward, createEmptyProgressProfile } from "@/lib/progression";
+import { deletePhoto, savePhotoFromDataUrl } from "./photo-db.ts";
+import { applyQuestReward, createEmptyProgressProfile, getLocalNightKey } from "./progression.ts";
+import {
+  getBestSkyWindowValidity,
+  type BestSkyWindowValidityReason,
+} from "./sky-window-freshness.ts";
 export {
   getOnboardingCompleted,
   resetOnboardingCompleted,
   setOnboardingCompleted,
-} from "@/lib/onboarding";
+} from "./onboarding.ts";
 import type {
   AchievementId,
   BestSkyWindow,
+  EveningQuestAssignment,
   Observation,
   ObservationPhotoDraft,
   ProgressProfile,
@@ -35,6 +40,7 @@ const ACTIVE_QUEST_KEY = "skyquest.activeQuest.v0";
 const LAST_LOCATION_KEY = "skyquest.lastLocation.v0";
 const PROGRESS_PROFILE_KEY = "skyquest.progression.v1";
 const BEST_SKY_WINDOW_KEY = "skyquest.bestSkyWindow.v1";
+const EVENING_QUEST_ASSIGNMENT_KEY = "skyquest.eveningQuestAssignment.v1";
 
 type StoredLocation = {
   latitude: number;
@@ -46,6 +52,7 @@ let memoryProfile = createEmptyProgressProfile();
 let memoryActiveQuest: SkyQuest | null = null;
 let memoryLastLocation: StoredLocation | null = null;
 let memoryBestSkyWindow: BestSkyWindow | null = null;
+let memoryEveningQuestAssignment: EveningQuestAssignment | null = null;
 let legacyMigrationPromise: Promise<Observation[]> | null = null;
 const failedStorageKeys = new Set<string>();
 
@@ -82,6 +89,17 @@ function writeJson<T>(key: string, value: T): boolean {
   }
 }
 
+function removeStoredValue(key: string): void {
+  if (!canUseStorage()) return;
+
+  try {
+    window.localStorage.removeItem(key);
+    failedStorageKeys.delete(key);
+  } catch {
+    failedStorageKeys.add(key);
+  }
+}
+
 function roundCoordinate(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -98,6 +116,41 @@ function normalizeProgressProfile(
     typeof value.longestStreak === "number" && Number.isFinite(value.longestStreak)
       ? Math.max(0, Math.trunc(value.longestStreak))
       : currentStreak;
+  const lastObservationNightKey =
+    typeof value.lastObservationNightKey === "string" ? value.lastObservationNightKey : null;
+  const streakFreezeCount =
+    typeof value.streakFreezeCount === "number" && Number.isFinite(value.streakFreezeCount)
+      ? Math.min(1, Math.max(0, Math.trunc(value.streakFreezeCount)))
+      : 1;
+  const lastFreezeRegenerationKey =
+    typeof value.lastFreezeRegenerationKey === "string" ? value.lastFreezeRegenerationKey : null;
+  const lastStreakFreezeUsedNightKey =
+    typeof value.lastStreakFreezeUsedNightKey === "string"
+      ? value.lastStreakFreezeUsedNightKey
+      : streakFreezeCount === 0
+        ? (lastFreezeRegenerationKey ?? lastObservationNightKey)
+        : null;
+  const eveningQuestCompletions = Array.isArray(value.eveningQuestCompletions)
+    ? value.eveningQuestCompletions
+        .filter(
+          (item) =>
+            item &&
+            typeof item.nightKey === "string" &&
+            /^\d{4}-\d{2}-\d{2}$/.test(item.nightKey) &&
+            typeof item.target === "string" &&
+            item.target.trim().length > 0 &&
+            typeof item.completedAt === "string" &&
+            Number.isFinite(new Date(item.completedAt).getTime()) &&
+            typeof item.bonusXp === "number" &&
+            Number.isFinite(item.bonusXp) &&
+            item.bonusXp >= 0,
+        )
+        .sort(
+          (left, right) =>
+            new Date(left.completedAt).getTime() - new Date(right.completedAt).getTime(),
+        )
+        .slice(-180)
+    : [];
 
   return {
     version: 1,
@@ -133,16 +186,18 @@ function normalizeProgressProfile(
           )
           .map((item) => ({ ...item, hadMissed: item.hadMissed === true }))
       : [],
+    eveningQuestCompletions,
+    eveningQuestCompletionCount:
+      typeof value.eveningQuestCompletionCount === "number" &&
+      Number.isFinite(value.eveningQuestCompletionCount)
+        ? Math.max(eveningQuestCompletions.length, Math.trunc(value.eveningQuestCompletionCount))
+        : eveningQuestCompletions.length,
     currentStreak,
     longestStreak,
-    lastObservationNightKey:
-      typeof value.lastObservationNightKey === "string" ? value.lastObservationNightKey : null,
-    streakFreezeCount:
-      typeof value.streakFreezeCount === "number" && Number.isFinite(value.streakFreezeCount)
-        ? Math.min(1, Math.max(0, Math.trunc(value.streakFreezeCount)))
-        : 1,
-    lastFreezeRegenerationKey:
-      typeof value.lastFreezeRegenerationKey === "string" ? value.lastFreezeRegenerationKey : null,
+    lastObservationNightKey,
+    streakFreezeCount,
+    lastStreakFreezeUsedNightKey,
+    lastFreezeRegenerationKey,
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : fallbackUpdatedAt,
   };
 }
@@ -274,6 +329,12 @@ export function getProgressProfile(): ProgressProfile {
       value.lastObservationNightKey === null || typeof value.lastObservationNightKey === "string"
     ) ||
     typeof value.streakFreezeCount !== "number" ||
+    !Array.isArray(value.eveningQuestCompletions) ||
+    typeof value.eveningQuestCompletionCount !== "number" ||
+    !(
+      value.lastStreakFreezeUsedNightKey === null ||
+      typeof value.lastStreakFreezeUsedNightKey === "string"
+    ) ||
     !(
       value.lastFreezeRegenerationKey === null ||
       typeof value.lastFreezeRegenerationKey === "string"
@@ -303,7 +364,19 @@ export async function addObservation(
   reward: ProgressReward;
   persisted: boolean;
 }> {
-  const { profile, reward } = applyQuestReward(getProgressProfile(), quest, status, now);
+  const nightKey = getLocalNightKey(now);
+  const eveningAssignment = getEveningQuestAssignment();
+  const hasValidEveningAssignment =
+    quest.questKind === "evening" &&
+    quest.eveningQuestNightKey === nightKey &&
+    eveningAssignment?.nightKey === nightKey &&
+    eveningAssignment.status === "active" &&
+    eveningAssignment.target.trim().toLocaleLowerCase("fr-FR") ===
+      quest.target.trim().toLocaleLowerCase("fr-FR");
+  const rewardQuest: SkyQuest = hasValidEveningAssignment
+    ? quest
+    : { ...quest, questKind: "standard", eveningQuestNightKey: undefined };
+  const { profile, reward } = applyQuestReward(getProgressProfile(), rewardQuest, status, now);
   const [photoId, photoThumbnailId] = await Promise.all([
     photo?.photoDataUrl
       ? savePhotoFromDataUrl(photo.photoDataUrl).catch(() => undefined)
@@ -315,29 +388,34 @@ export async function addObservation(
   const observation: Observation = {
     id: `${quest.id}-${status}-${Date.now()}`,
     createdAt: now.toISOString(),
-    questTitle: quest.title,
-    target: quest.target,
+    questTitle: rewardQuest.title,
+    target: rewardQuest.target,
     status,
-    visibilityScore: quest.visibilityScore,
-    targetType: quest.targetType,
-    difficulty: quest.difficulty,
+    visibilityScore: rewardQuest.visibilityScore,
+    targetType: rewardQuest.targetType,
+    difficulty: rewardQuest.difficulty,
     xpEarned: reward.xpEarned,
     isFirstDiscovery: reward.isFirstDiscovery,
     unlockedAchievements: reward.unlockedAchievements,
     totalXp: reward.totalXp,
     rankName: reward.rankName,
     streak: reward.currentStreak,
-    weather: quest.weather,
+    weather: rewardQuest.weather,
     latitude: location ? roundCoordinate(location.latitude) : undefined,
     longitude: location ? roundCoordinate(location.longitude) : undefined,
     photoId,
     photoThumbnailId,
+    questKind: rewardQuest.questKind,
+    eveningQuestBonusXp: reward.eveningQuestBonusXp,
   };
 
   const previous = await getObservations();
   const next = [observation, ...previous].slice(0, 50);
   const discarded = previous.slice(49);
   saveProgressProfile(profile);
+  if (reward.isEveningQuestCompleted) {
+    completeEveningQuestAssignment(nightKey, rewardQuest.target, now);
+  }
   memoryObservations = next;
   const observationPersisted = writeJson(OBSERVATIONS_KEY, next);
   await Promise.allSettled(
@@ -374,6 +452,78 @@ export function getActiveQuest(): SkyQuest | null {
   return quest;
 }
 
+function isValidEveningQuestAssignment(value: unknown): value is EveningQuestAssignment {
+  if (!value || typeof value !== "object") return false;
+  const assignment = value as Partial<EveningQuestAssignment>;
+  return (
+    assignment.version === 1 &&
+    typeof assignment.nightKey === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(assignment.nightKey) &&
+    typeof assignment.target === "string" &&
+    assignment.target.trim().length > 0 &&
+    isTargetType(assignment.targetType) &&
+    typeof assignment.assignedAt === "string" &&
+    Number.isFinite(new Date(assignment.assignedAt).getTime()) &&
+    typeof assignment.lastMatchedAt === "string" &&
+    Number.isFinite(new Date(assignment.lastMatchedAt).getTime()) &&
+    (assignment.status === "active" || assignment.status === "completed") &&
+    (assignment.completedAt === undefined ||
+      (typeof assignment.completedAt === "string" &&
+        Number.isFinite(new Date(assignment.completedAt).getTime())))
+  );
+}
+
+export function getEveningQuestAssignment(): EveningQuestAssignment | null {
+  const value = readJson<unknown>(EVENING_QUEST_ASSIGNMENT_KEY, memoryEveningQuestAssignment);
+  if (!isValidEveningQuestAssignment(value)) {
+    memoryEveningQuestAssignment = null;
+    if (value !== null) removeStoredValue(EVENING_QUEST_ASSIGNMENT_KEY);
+    return null;
+  }
+  memoryEveningQuestAssignment = value;
+  return value;
+}
+
+export function saveEveningQuestAssignment(
+  assignment: EveningQuestAssignment,
+): EveningQuestAssignment | null {
+  if (!isValidEveningQuestAssignment(assignment)) return null;
+  memoryEveningQuestAssignment = assignment;
+  writeJson(EVENING_QUEST_ASSIGNMENT_KEY, assignment);
+  return assignment;
+}
+
+export function clearExpiredEveningQuestAssignment(
+  nightKey = getLocalNightKey(new Date()),
+): EveningQuestAssignment | null {
+  const assignment = getEveningQuestAssignment();
+  if (!assignment || assignment.nightKey === nightKey) return assignment;
+  memoryEveningQuestAssignment = null;
+  removeStoredValue(EVENING_QUEST_ASSIGNMENT_KEY);
+  return null;
+}
+
+export function completeEveningQuestAssignment(
+  nightKey: string,
+  target: string,
+  now = new Date(),
+): EveningQuestAssignment | null {
+  const assignment = getEveningQuestAssignment();
+  if (
+    !assignment ||
+    assignment.nightKey !== nightKey ||
+    assignment.status !== "active" ||
+    assignment.target.trim().toLocaleLowerCase("fr-FR") !== target.trim().toLocaleLowerCase("fr-FR")
+  ) {
+    return assignment;
+  }
+  return saveEveningQuestAssignment({
+    ...assignment,
+    status: "completed",
+    completedAt: now.toISOString(),
+  });
+}
+
 export function saveLastLocation(location: StoredLocation): void {
   const roundedLocation = {
     latitude: roundCoordinate(location.latitude),
@@ -394,19 +544,43 @@ export function saveBestSkyWindow(window: BestSkyWindow): void {
   writeJson(BEST_SKY_WINDOW_KEY, window);
 }
 
-export function getBestSkyWindow(): BestSkyWindow | null {
+export type BestSkyWindowReadResult = {
+  window: BestSkyWindow | null;
+  reason: BestSkyWindowValidityReason | "missing" | "invalid_structure";
+};
+
+export function getBestSkyWindowStatus(now = new Date()): BestSkyWindowReadResult {
   const value = readJson<BestSkyWindow | null>(BEST_SKY_WINDOW_KEY, memoryBestSkyWindow);
+  if (!value) {
+    memoryBestSkyWindow = null;
+    return { window: null, reason: "missing" };
+  }
+
   if (
-    !value ||
     typeof value.generatedAt !== "string" ||
     typeof value.startsAt !== "string" ||
     typeof value.endsAt !== "string" ||
     typeof value.score !== "number" ||
     !Array.isArray(value.hours) ||
-    !Array.isArray(value.bestTargets)
+    !Array.isArray(value.bestTargets) ||
+    typeof value.isEstimated !== "boolean"
   ) {
-    return null;
+    memoryBestSkyWindow = null;
+    removeStoredValue(BEST_SKY_WINDOW_KEY);
+    return { window: null, reason: "invalid_structure" };
   }
+
+  const validity = getBestSkyWindowValidity(value, now);
+  if (!validity.valid) {
+    memoryBestSkyWindow = null;
+    removeStoredValue(BEST_SKY_WINDOW_KEY);
+    return { window: null, reason: validity.reason };
+  }
+
   memoryBestSkyWindow = value;
-  return value;
+  return { window: value, reason: "valid" };
+}
+
+export function getBestSkyWindow(now = new Date()): BestSkyWindow | null {
+  return getBestSkyWindowStatus(now).window;
 }

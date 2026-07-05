@@ -16,11 +16,12 @@ persistantes et dédupliquées par leur `endpoint` unique.
 3. Dans **Project Settings → API Keys**, récupérer l’URL du projet, la clé publique/anon et la clé
    `service_role`.
 
-La table a la RLS activée et aucune policy `anon` ou `authenticated`. C’est volontaire : le client
-web ne lit et n’écrit jamais `push_subscriptions`. Toutes les opérations passent par les routes
-Next.js avec la clé `service_role`, strictement serveur. La fonction SQL
-`claim_push_notification_slot` réserve atomiquement l’heure UTC courante afin que deux crons
-concurrents ne puissent pas envoyer deux alertes pendant la même heure. Il ne retient un créneau futur que si son indice
+Les tables ont la RLS activée et aucune policy `anon` ou `authenticated`. C’est volontaire : le
+client web ne lit et n’écrit jamais `push_subscriptions` ni `push_notification_claims`. Toutes les
+opérations passent par les routes Next.js avec la clé `service_role`, strictement serveur. La
+fonction SQL `claim_push_notification_slot` verrouille atomiquement l’abonnement, applique le
+cooldown éditorial de 12 heures et enregistre une clé stable dans `push_notification_claims`. Deux
+crons concurrents ne peuvent donc réclamer la même occasion. Le serveur ne retient un créneau futur que si son indice
 atteint 75/100 et qu’il commence dans 10 minutes au maximum ; un ciel générique doit avoir au plus
 15 % de nuages.
 
@@ -108,8 +109,8 @@ Parcours local :
 7. Désactiver les alertes et vérifier que `enabled` passe à `false`.
 
 La route test est libre uniquement en développement. En production, elle exige toujours
-`Authorization: Bearer <PUSH_TEST_SECRET>`. Elle utilise le même verrou horaire et répond `429` si
-une notification a déjà été réservée pour cet abonnement pendant l’heure UTC courante.
+`Authorization: Bearer <PUSH_TEST_SECRET>`. Elle utilise un limiteur séparé d’une heure et ne
+consomme jamais le cooldown éditorial de 12 heures.
 
 ## 5. Déployer sur Vercel
 
@@ -118,8 +119,8 @@ environnements concernés, puis redéployer. Les secrets ne doivent pas être co
 navigateur.
 
 `vercel.json` conserve un appel de secours une fois par jour à `18:00 UTC`, compatible avec Vercel
-Hobby. Pour obtenir le contrôle horaire demandé, utiliser un Cloudflare Worker avec le Cron Trigger
-suivant :
+Hobby. Il ne suffit pas pour les rappels précis. Le Worker reproductible se trouve dans
+[`workers/sky-alerts-cron`](../workers/sky-alerts-cron/) et utilise le Cron Trigger suivant :
 
 ```text
 */5 * * * *
@@ -129,25 +130,10 @@ Le passage toutes les cinq minutes permet d’envoyer les rappels intentionnels 
 créneau. Le code serveur vérifie lui-même l’heure locale de chaque subscription pour les alertes
 éditoriales et ne les traite pas hors de la plage 19 h–3 h 59.
 
-Le Worker Cloudflare peut appeler la route avec :
-
-```js
-export default {
-  async scheduled(_controller, env) {
-    const response = await fetch("https://sky-quest-psi.vercel.app/api/cron/sky-alerts", {
-      headers: { Authorization: `Bearer ${env.CRON_SECRET}` },
-    });
-
-    if (!response.ok) {
-      throw new Error(`SkyQuest cron failed: ${response.status}`);
-    }
-  },
-};
-```
-
-Ajouter `CRON_SECRET` comme secret chiffré Cloudflare avec exactement la même valeur que dans
-Vercel. Le déclencheur Vercel quotidien peut rester comme secours : le verrou SQL horaire empêche un
-double envoi s’il chevauche Cloudflare.
+Configurer `SKYQUEST_URL`, puis ajouter `CRON_SECRET` comme secret chiffré Cloudflare avec exactement
+la même valeur que dans Vercel. Les commandes vérifiables figurent dans le README du Worker. Le
+déclencheur Vercel quotidien peut rester comme secours : les claims SQL et le cooldown de 12 heures
+empêchent un double envoi s’il chevauche Cloudflare.
 
 Vercel envoie automatiquement `Authorization: Bearer <CRON_SECRET>` lorsque la variable
 `CRON_SECRET` existe dans le projet ; l’endpoint reste donc privé.
@@ -190,7 +176,9 @@ le réglage, sans redemander automatiquement la permission.
 - `GET /api/cron/sky-alerts` lit seulement les rows actives et exige `CRON_SECRET` ;
 - une réponse Web Push 404/410 désactive la subscription expirée ;
 - les coordonnées sont réarrondies à `0.1°` côté route et côté store ;
-- la fonction SQL atomique empêche les doublons horaires ;
+- la fonction SQL atomique impose 12 heures entre alertes éditoriales et déduplique chaque occasion ;
+- les rappels volontaires restent one-shot, prioritaires et repoussent ensuite les alertes éditoriales ;
+- les notifications de test ont leur propre limite d’une heure ;
 - aucune opportunité n’est envoyée hors de la plage locale 19 h–3 h 59.
 
 ## Checklist complète

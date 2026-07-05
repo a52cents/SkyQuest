@@ -40,8 +40,6 @@ export async function POST(request: Request) {
     !windowEndsAt ||
     reminderAt.getTime() < now - 5 * 60 * 1_000 ||
     reminderAt.getTime() > latestAllowed ||
-    windowStartsAt.getTime() > windowEndsAt.getTime() ||
-    windowEndsAt.getTime() < now ||
     windowEndsAt.getTime() > latestAllowed ||
     typeof body.score !== "number" ||
     !Number.isFinite(body.score) ||
@@ -50,6 +48,24 @@ export async function POST(request: Request) {
     (body.target !== undefined && (typeof body.target !== "string" || body.target.length > 100))
   ) {
     return NextResponse.json({ error: "Rappel invalide." }, { status: 400 });
+  }
+
+  if (windowStartsAt.getTime() >= windowEndsAt.getTime()) {
+    return NextResponse.json({ error: "Fenêtre d’observation incohérente." }, { status: 400 });
+  }
+
+  if (windowEndsAt.getTime() <= now) {
+    return NextResponse.json(
+      { error: "Cette fenêtre d’observation est terminée." },
+      { status: 400 },
+    );
+  }
+
+  if (reminderAt.getTime() > windowEndsAt.getTime()) {
+    return NextResponse.json(
+      { error: "Le rappel doit précéder la fin de la fenêtre d’observation." },
+      { status: 400 },
+    );
   }
 
   try {

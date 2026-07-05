@@ -9,8 +9,8 @@ export function VisibilityExplanationContent() {
         et galaxies demandent un ciel plus sombre.
       </p>
       <p className="mt-2">
-        Si la météo manque, une estimation prudente prend le relais. Le score aide à choisir : ce
-        n’est jamais une garantie d’observation.
+        Si la météo manque, une estimation prudente prend le relais. L’indice aide à choisir : ce
+        n’est jamais une garantie d’observation ni une probabilité scientifique.
       </p>
     </div>
   );

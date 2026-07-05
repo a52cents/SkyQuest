@@ -32,7 +32,7 @@ import {
   readCameraCapabilities,
   readCameraZoomRange,
 } from "./camera-utils";
-import { createPhotoDraftFromFile, createPhotoDraftFromImage } from "./photo-utils";
+import { createPhotoDraftFromFile } from "./photo-utils";
 import type {
   CameraConstraintSet,
   CameraGuideProps,
@@ -83,6 +83,8 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
   const [photoDraft, setPhotoDraft] = useState<PhotoDraft | null>(null);
   const [photoCaptureStatus, setPhotoCaptureStatus] = useState<PhotoCaptureStatus>("idle");
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const sensorPointing = useDeviceOrientation(orientationEnabled);
 
   useEffect(() => () => streamRef.current?.getTracks().forEach((track) => track.stop()), []);
@@ -255,25 +257,6 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     if (orientationReady || cameraReady) setSetupModalOpen(false);
   }
 
-  async function capturePhotoFromVideo(): Promise<PhotoDraft | null> {
-    setPhotoError(null);
-    const video = videoRef.current;
-    if (!video || cameraStatus !== "active" || video.videoWidth <= 0 || video.videoHeight <= 0) {
-      setPhotoError(
-        "La caméra n'est pas prête. Tu peux choisir une photo ou continuer sans photo.",
-      );
-      return null;
-    }
-    try {
-      return await createPhotoDraftFromImage(video, video.videoWidth, video.videoHeight);
-    } catch {
-      setPhotoError(
-        "Photo impossible depuis la caméra. Tu peux choisir une image ou continuer sans photo.",
-      );
-      return null;
-    }
-  }
-
   async function handleFilePhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -310,6 +293,13 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     }
   }
 
+  function openOptionalPhotoPanel() {
+    setPhotoDraft(null);
+    setPhotoError(null);
+    setPhotoCaptureStatus("idle");
+    setPhotoSheetOpen(true);
+  }
+
   function handleScenePointerDown(event: PointerEvent<HTMLElement>) {
     if (event.button !== 0 || (event.target as HTMLElement).closest("[data-camera-control]")) {
       scenePointerRef.current = null;
@@ -340,27 +330,29 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     setIsHudVisible((visible) => !visible);
   }
 
-  async function handleTargetFound() {
-    setPhotoDraft(null);
-    setPhotoError(null);
-    setPhotoSheetOpen(true);
-    setPhotoCaptureStatus("capturing");
-    const draft = await capturePhotoFromVideo();
-    setPhotoDraft(draft);
-    setPhotoCaptureStatus(draft ? "ready" : "error");
+  function beginSubmission(): boolean {
+    if (isSubmittingRef.current) return false;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    return true;
   }
 
-  function saveSeenWithPhoto() {
-    haptic("success");
-    onSeen(photoDraft ?? undefined);
+  function handleSeenWithoutPhoto() {
+    if (!beginSubmission()) return;
+    onSeen();
+  }
+
+  function handleSeenWithPhoto() {
+    if (!photoDraft || !beginSubmission()) return;
+    onSeen(photoDraft);
   }
 
   function handleMissed() {
-    haptic("missed");
+    if (!beginSubmission()) return;
     onMissed();
   }
 
-  function retakeTargetPhoto() {
+  function closePhotoPanel() {
     setPhotoSheetOpen(false);
     setPhotoDraft(null);
     setPhotoError(null);
@@ -460,7 +452,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
           <CameraControls
             camera={{ status: cameraStatus, error: cameraError }}
             zoom={{ range: zoomRange, value: currentZoom, error: zoomError }}
-            photoStatus={photoCaptureStatus}
+            submitting={isSubmitting}
             nativePhotoError={!photoSheetOpen ? photoError : null}
             guidanceReliability={guidanceReliability}
             isCalibrated={horizontalCalibration !== 0}
@@ -468,9 +460,9 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
               setCurrentZoom(value);
               void applyCameraSetting({ zoom: value });
             }}
-            onFound={() => void handleTargetFound()}
+            onFound={handleSeenWithoutPhoto}
             onMissed={handleMissed}
-            onNativePhoto={openNativePhotoCapture}
+            onPhoto={openOptionalPhotoPanel}
             onStartCamera={() => void startCamera()}
             onRecalibrate={() => setCalibrationOpen(true)}
           />
@@ -509,12 +501,13 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
       />
       <CameraPhotoPanel
         open={photoSheetOpen}
-        target={liveQuest.target}
         draft={photoDraft}
         status={photoCaptureStatus}
         error={photoError}
-        onSave={saveSeenWithPhoto}
-        onRetake={retakeTargetPhoto}
+        submitting={isSubmitting}
+        onSaveWithPhoto={handleSeenWithPhoto}
+        onContinueWithoutPhoto={handleSeenWithoutPhoto}
+        onClose={closePhotoPanel}
         onChoosePhoto={openNativePhotoCapture}
       />
     </CameraVideoScene>

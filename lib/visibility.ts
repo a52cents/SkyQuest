@@ -33,6 +33,25 @@ type VisibilityInput = {
   airQuality?: AirQualityNow | null;
 };
 
+export type VisibilityScoreFormat = "full" | "compact";
+
+export function normalizeVisibilityScore(score: number): number {
+  if (!Number.isFinite(score)) return 0;
+  return Math.min(100, Math.max(0, Math.round(score)));
+}
+
+export function formatVisibilityScore(
+  score: number,
+  format: VisibilityScoreFormat = "full",
+): string {
+  const normalizedScore = normalizeVisibilityScore(score);
+  return format === "compact" ? `${normalizedScore}/100` : `Indice ${normalizedScore}/100`;
+}
+
+export function formatVisibilityScoreForAccessibility(score: number): string {
+  return `Indice de visibilité : ${normalizeVisibilityScore(score)} sur 100`;
+}
+
 export function calculateVisibilityScore({
   object,
   weather,

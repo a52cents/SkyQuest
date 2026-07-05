@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { sendPushToMany } from "@/lib/push-server";
-import { claimHourlyPushSlot, getPushSubscription } from "@/lib/push-store";
+import { claimTestPushSlot, getPushSubscription } from "@/lib/push-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    if (!(await claimHourlyPushSlot(subscription.endpoint))) {
+    if (!(await claimTestPushSlot(subscription.endpoint))) {
       return NextResponse.json(
         { error: "Une notification a déjà été envoyée à cet abonnement pendant cette heure." },
         { status: 429, headers: { "Retry-After": "3600" } },
@@ -47,13 +47,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Stockage push indisponible." }, { status: 503 });
   }
 
-  const result = await sendPushToMany([subscription], {
-    title: "SkyQuest est prêt ✨",
-    body: "Les alertes du ciel sont bien activées sur cet appareil.",
-    url: "/",
-    tag: "skyquest-test",
-    data: { type: "test" },
-  });
+  const result = await sendPushToMany(
+    [subscription],
+    {
+      title: "SkyQuest est prêt ✨",
+      body: "Les alertes du ciel sont bien activées sur cet appareil.",
+      url: "/",
+      tag: "skyquest-test",
+      data: { type: "test" },
+    },
+    { markEditorialSent: false },
+  );
 
   if (result.sent !== 1) {
     return NextResponse.json(

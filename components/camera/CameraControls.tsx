@@ -2,24 +2,19 @@ import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer
 import { AppButton } from "@/components/AppButton";
 import { CameraFallback } from "./CameraFallback";
 import { CameraZoomControl } from "./CameraZoomControl";
-import type {
-  CameraStatus,
-  CameraZoomRange,
-  GuidanceReliability,
-  PhotoCaptureStatus,
-} from "./types";
+import type { CameraStatus, CameraZoomRange, GuidanceReliability } from "./types";
 
 type CameraControlsProps = {
   camera: { status: CameraStatus; error: string | null };
   zoom: { range: CameraZoomRange | null; value: number | null; error: string | null };
-  photoStatus: PhotoCaptureStatus;
+  submitting: boolean;
   nativePhotoError: string | null;
   guidanceReliability: GuidanceReliability;
   isCalibrated: boolean;
   onZoomChange: (value: number) => void;
   onFound: () => void;
   onMissed: () => void;
-  onNativePhoto: () => void;
+  onPhoto: () => void;
   onStartCamera: () => void;
   onRecalibrate: () => void;
 };
@@ -33,14 +28,14 @@ const RELIABILITY_LABELS: Record<GuidanceReliability, string> = {
 export function CameraControls({
   camera,
   zoom,
-  photoStatus,
+  submitting,
   nativePhotoError,
   guidanceReliability,
   isCalibrated,
   onZoomChange,
   onFound,
   onMissed,
-  onNativePhoto,
+  onPhoto,
   onStartCamera,
   onRecalibrate,
 }: CameraControlsProps) {
@@ -96,22 +91,36 @@ export function CameraControls({
           size="sm"
           onClick={onFound}
           className="min-h-12"
-          disabled={photoStatus === "capturing"}
+          disabled={submitting}
+          hapticFeedback={false}
         >
-          {photoStatus === "capturing" ? "Photo..." : "Je l'ai trouvée"}
+          Je l&apos;ai trouvée
         </AppButton>
-        <AppButton variant="ghost" size="sm" onClick={onMissed} className="min-h-12">
-          Pas trouve
+        <AppButton
+          variant="ghost"
+          size="sm"
+          onClick={onMissed}
+          className="min-h-12"
+          disabled={submitting}
+          hapticFeedback={false}
+        >
+          Pas trouvé
         </AppButton>
       </div>
       <AppButton
         variant="secondary"
         size="sm"
-        onClick={onNativePhoto}
+        onClick={onPhoto}
         fullWidth
         className="mt-2 min-h-12"
+        disabled={submitting}
       >
-        📷 Photo
+        <span className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+          <span>📷 Ajouter une photo souvenir</span>
+          <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] text-muted">
+            Optionnel
+          </span>
+        </span>
       </AppButton>
       {camera.status !== "active" ? (
         <AppButton

@@ -68,6 +68,7 @@ export async function sendPushNotification(
 export async function sendPushToMany(
   subscriptions: StoredPushSubscription[],
   payload: SkyQuestPushPayload,
+  { markEditorialSent = true }: { markEditorialSent?: boolean } = {},
 ): Promise<{ sent: number; failed: number; expired: number }> {
   const result = { sent: 0, failed: 0, expired: 0 };
   await Promise.all(
@@ -88,12 +89,16 @@ export async function sendPushToMany(
         return;
       }
 
-      try {
-        await markPushNotificationSent(subscription.endpoint);
+      if (markEditorialSent) {
+        try {
+          await markPushNotificationSent(subscription.endpoint);
+          result.sent += 1;
+        } catch {
+          // The push was delivered, but without persistence we cannot safely count it as successful.
+          result.failed += 1;
+        }
+      } else {
         result.sent += 1;
-      } catch {
-        // The push was delivered, but without persistence we cannot safely count it as successful.
-        result.failed += 1;
       }
     }),
   );

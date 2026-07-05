@@ -22,6 +22,14 @@ const cameraControlsSource = readFileSync(
   new URL("../components/camera/CameraControls.tsx", import.meta.url),
   "utf8",
 );
+const cameraPhotoPanelSource = readFileSync(
+  new URL("../components/camera/CameraPhotoPanel.tsx", import.meta.url),
+  "utf8",
+);
+const questPageSource = readFileSync(
+  new URL("../app/quest/[id]/page.tsx", import.meta.url),
+  "utf8",
+);
 
 test("camera guide arrows cover aligned and non-aligned states", () => {
   assert.equal(getDirectionArrow(0), "◎");
@@ -70,4 +78,38 @@ test("camera guidance exposes a temporary manual recalibration flow", () => {
   assert.match(cameraControlsSource, /Guidage texte conseillé/);
   assert.match(calibrationPanelSource, /type="range"/);
   assert.match(calibrationPanelSource, /Cette correction reste sur cet écran/);
+});
+
+test("found target submits immediately without a photo or opening the photo panel", () => {
+  assert.match(
+    cameraGuideSource,
+    /function handleSeenWithoutPhoto\(\) \{[\s\S]*?if \(!beginSubmission\(\)\) return;[\s\S]*?onSeen\(\);[\s\S]*?\}/,
+  );
+  assert.match(cameraGuideSource, /onFound=\{handleSeenWithoutPhoto\}/);
+  assert.doesNotMatch(cameraGuideSource, /handleTargetFound|capturePhotoFromVideo/);
+  assert.doesNotMatch(cameraGuideSource, /videoWidth|videoHeight|createPhotoDraftFromImage/);
+});
+
+test("optional photo flow can save a chosen image or continue without one", () => {
+  assert.match(cameraControlsSource, /Ajouter une photo souvenir/);
+  assert.match(cameraControlsSource, /Optionnel/);
+  assert.match(cameraGuideSource, /onPhoto=\{openOptionalPhotoPanel\}/);
+  assert.match(cameraGuideSource, /setPhotoDraft\(await createPhotoDraftFromFile\(file\)\)/);
+  assert.match(cameraGuideSource, /onSeen\(photoDraft\)/);
+  assert.match(cameraPhotoPanelSource, /Enregistrer avec cette photo/);
+  assert.match(cameraPhotoPanelSource, /Continuer sans photo/);
+  assert.match(cameraPhotoPanelSource, /Retour au guidage/);
+  assert.match(cameraPhotoPanelSource, /Une étoile ou une planète peut ne pas apparaître/);
+  assert.doesNotMatch(cameraPhotoPanelSource, /Vérification|est-elle au centre|Pas centrée/);
+});
+
+test("camera result submission stays single and preserves missed and stream cleanup", () => {
+  assert.match(cameraGuideSource, /isSubmittingRef\.current/);
+  assert.match(questPageSource, /isLoggingRef\.current/);
+  assert.match(cameraGuideSource, /function handleMissed\(\)[\s\S]*?onMissed\(\)/);
+  assert.match(cameraGuideSource, /getTracks\(\)\.forEach\(\(track\) => track\.stop\(\)\)/);
+  assert.doesNotMatch(cameraGuideSource, /haptic\("success"\)|haptic\("missed"\)/);
+  assert.match(questPageSource, /haptic\(status === "seen" \? "success" : "missed"\)/);
+  assert.match(cameraControlsSource, /hapticFeedback=\{false\}/);
+  assert.match(cameraPhotoPanelSource, /hapticFeedback=\{false\}/);
 });

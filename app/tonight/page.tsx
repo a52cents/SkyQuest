@@ -8,7 +8,12 @@ import { UpcomingSkyEvents } from "@/components/UpcomingSkyEvents";
 import { getCurrentPosition } from "@/lib/browser-support";
 import { calculateBestSkyWindow } from "@/lib/sky-window";
 import {
-  getBestSkyWindow,
+  BEST_SKY_WINDOW_TTL_MS,
+  ESTIMATED_BEST_SKY_WINDOW_TTL_MS,
+  isBestSkyWindowFresh,
+} from "@/lib/sky-window-freshness";
+import {
+  getBestSkyWindowStatus,
   getLastLocation,
   saveBestSkyWindow,
   saveLastLocation,
@@ -16,6 +21,7 @@ import {
 import type { BestSkyWindow, FogRisk } from "@/lib/types";
 import { fetchWeatherForecast, getFallbackWeatherForecast } from "@/lib/weather";
 import { scheduleSkyWindowReminder } from "@/lib/push-client";
+import { formatVisibilityScore, formatVisibilityScoreForAccessibility } from "@/lib/visibility";
 
 const FOG_LABELS: Record<FogRisk, string> = {
   low: "faible",
@@ -50,7 +56,45 @@ export default function TonightPage() {
   const [isSchedulingReminder, setIsSchedulingReminder] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => setSkyWindow(getBestSkyWindow()), []);
+  useEffect(() => {
+    const stored = getBestSkyWindowStatus();
+    setSkyWindow(stored.window);
+    if (!stored.window && stored.reason !== "missing") {
+      setNotice("Ton précédent créneau a expiré. Recalcule les conditions avant de sortir.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!skyWindow) return;
+
+    const revalidateSkyWindow = () => {
+      const stored = getBestSkyWindowStatus(new Date());
+      setSkyWindow(stored.window);
+      if (!stored.window) {
+        setIsSchedulingReminder(false);
+        setNotice("Ton précédent créneau a expiré. Recalcule les conditions avant de sortir.");
+      }
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") revalidateSkyWindow();
+    };
+    const endsAtMs = new Date(skyWindow.endsAt).getTime();
+    const generatedAtMs = new Date(skyWindow.generatedAt).getTime();
+    const ttlMs = skyWindow.isEstimated ? ESTIMATED_BEST_SKY_WINDOW_TTL_MS : BEST_SKY_WINDOW_TTL_MS;
+    const invalidAtMs = Math.min(endsAtMs, generatedAtMs + ttlMs);
+    const timeoutId = window.setTimeout(
+      revalidateSkyWindow,
+      Math.max(0, invalidAtMs - Date.now() + 25),
+    );
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", revalidateSkyWindow);
+    return () => {
+      window.clearTimeout(timeoutId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", revalidateSkyWindow);
+    };
+  }, [skyWindow]);
 
   const bestHour = useMemo(() => {
     if (!skyWindow) return null;
@@ -110,8 +154,15 @@ export default function TonightPage() {
 
   async function handleReminder() {
     if (!skyWindow || isSchedulingReminder) return;
+    const now = new Date();
+    if (!isBestSkyWindowFresh(skyWindow, now)) {
+      getBestSkyWindowStatus(now);
+      setSkyWindow(null);
+      setNotice("Ton précédent créneau a expiré. Recalcule les conditions avant de sortir.");
+      return;
+    }
     const startsAt = new Date(skyWindow.startsAt);
-    const reminderAt = new Date(Math.max(Date.now(), startsAt.getTime() - 15 * 60 * 1_000));
+    const reminderAt = new Date(Math.max(now.getTime(), startsAt.getTime() - 15 * 60 * 1_000));
     setIsSchedulingReminder(true);
     setNotice(null);
     const scheduled = await scheduleSkyWindowReminder({
@@ -145,8 +196,8 @@ export default function TonightPage() {
               </span>
             </h2>
             <p className="relative mt-3 text-sm leading-6 text-muted">
-              {scoreLabel(skyWindow.score)} · indice {skyWindow.score}/100. Ce score guide ton
-              choix, il ne garantit jamais une observation.
+              {scoreLabel(skyWindow.score)} · {formatVisibilityScore(skyWindow.score)}. Cet indice
+              guide ton choix, il ne garantit jamais une observation.
             </p>
             <div className="relative mt-5 border-t border-white/[0.07] pt-4">
               <p className="text-xs font-semibold tracking-[0.08em] text-faint uppercase">
@@ -204,6 +255,7 @@ export default function TonightPage() {
                     padding="sm"
                     key={hour.date}
                     className={`min-w-[86px] snap-start text-center ${active ? "border-accent/60 bg-accent/[0.12]" : ""}`}
+                    aria-label={`${formatTime(hour.date, skyWindow.timezone)}. ${formatVisibilityScoreForAccessibility(hour.score)}`}
                   >
                     <p className="text-xs font-semibold text-muted">
                       {formatTime(hour.date, skyWindow.timezone)}
@@ -211,7 +263,7 @@ export default function TonightPage() {
                     <p
                       className={`mt-3 text-2xl font-semibold ${active ? "text-accent-cyan" : "text-text"}`}
                     >
-                      {hour.score}
+                      {formatVisibilityScore(hour.score, "compact")}
                     </p>
                     <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
                       <div
@@ -245,7 +297,7 @@ export default function TonightPage() {
             </div>
           </AppCard>
 
-          {new Date(skyWindow.endsAt).getTime() > Date.now() ? (
+          {isBestSkyWindowFresh(skyWindow) ? (
             <AppCard as="section" variant="glass" padding="md" className="mt-4">
               <p className="premium-kicker">Au bon moment</p>
               <h2 className="mt-1 text-base font-semibold text-text">

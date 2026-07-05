@@ -47,6 +47,7 @@ export function ProgressFeedback({
   previousRankName?: string | null;
 }) {
   const rank = getRankProgress(reward.totalXp);
+  const standardXpEarned = Math.max(0, reward.xpEarned - reward.eveningQuestBonusXp);
   const currentRankName = rank.current.name;
   const didAnnounceRef = useRef(false);
   const prefersReducedMotion = useReducedMotion() ?? false;
@@ -92,14 +93,21 @@ export function ProgressFeedback({
           className="border-accent/25 bg-surface-strong bg-[radial-gradient(circle_at_100%_0%,color-mix(in_srgb,var(--accent)_14%,transparent),transparent_48%)]"
           aria-live="polite"
         >
-          <p className="premium-kicker">Progression enregistrée</p>
+          <p className="premium-kicker">
+            {reward.isEveningQuestCompleted ? "Quête du soir accomplie" : "Progression enregistrée"}
+          </p>
           <h2 className="mt-2 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal tracking-[-0.03em] text-white">
-            {reward.xpEarned > 0 ? (
-              <AnimatedXp value={reward.xpEarned} />
+            {standardXpEarned > 0 ? (
+              <AnimatedXp value={standardXpEarned} />
             ) : (
               "Déjà compté cette nuit"
             )}
           </h2>
+          {reward.isEveningQuestCompleted ? (
+            <p className="mt-2 text-sm font-semibold text-accent-cyan">
+              +{reward.eveningQuestBonusXp} bonus du soir
+            </p>
+          ) : null}
           {reward.streakMessage ? (
             <p className="mt-2 text-sm font-semibold text-accent">{reward.streakMessage}</p>
           ) : null}

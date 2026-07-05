@@ -5,12 +5,14 @@ import {
   COLLECTION_CATEGORIES,
   getAchievementProgress,
   getRankProgress,
+  getStreakDisplayState,
 } from "@/lib/progression";
 import type { ProgressProfile } from "@/lib/types";
 
 export function ProgressDashboard({ profile }: { profile: ProgressProfile }) {
   const rank = getRankProgress(profile.totalXp);
   const achievements = getAchievementProgress(profile);
+  const streakDisplay = getStreakDisplayState(profile, new Date());
   const prefersReducedMotion = useReducedMotion() ?? false;
 
   const containerVariants: Variants = prefersReducedMotion
@@ -61,6 +63,11 @@ export function ProgressDashboard({ profile }: { profile: ProgressProfile }) {
             ? `${rank.xpToNext} Éclats d’étoile avant ${rank.next.name}`
             : "Tous les rangs symboliques sont atteints."}
         </p>
+        <p className="mt-3 text-sm font-semibold text-accent-cyan">
+          {profile.eveningQuestCompletionCount} quête
+          {profile.eveningQuestCompletionCount !== 1 ? "s" : ""} du soir accomplie
+          {profile.eveningQuestCompletionCount !== 1 ? "s" : ""}
+        </p>
       </AppCard>
 
       <AppCard as="section">
@@ -99,11 +106,11 @@ export function ProgressDashboard({ profile }: { profile: ProgressProfile }) {
       </AppCard>
 
       <AppCard as="section" variant="solid">
-        <p className="premium-kicker">Série en cours</p>
+        <p className="premium-kicker">Rythme d’observation</p>
         <div className="mt-3 flex items-start justify-between gap-4">
           <div>
             <h2 className="font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal tracking-[-0.03em] text-white">
-              {profile.currentStreak} nuit{profile.currentStreak > 1 ? "s" : ""}
+              {streakDisplay.displayStreak} nuit{streakDisplay.displayStreak > 1 ? "s" : ""}
             </h2>
             <p className="mt-1 text-sm text-muted">
               Record · {profile.longestStreak} nuit{profile.longestStreak > 1 ? "s" : ""}
@@ -113,6 +120,9 @@ export function ProgressDashboard({ profile }: { profile: ProgressProfile }) {
             ✦
           </span>
         </div>
+        {streakDisplay.message ? (
+          <p className="mt-3 text-sm font-medium text-accent">{streakDisplay.message}</p>
+        ) : null}
         <div className="mt-4 flex items-center justify-between rounded-[12px] border border-white/[0.06] bg-white/[0.025] px-3 py-2">
           <div>
             <p className="text-sm font-semibold text-white">Streak Freeze</p>

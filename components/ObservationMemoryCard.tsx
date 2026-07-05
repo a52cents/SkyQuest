@@ -11,6 +11,7 @@ import {
 import type { Observation } from "@/lib/types";
 import { getRankProgress } from "@/lib/progression";
 import { getProgressProfile } from "@/lib/storage";
+import { formatVisibilityScoreForAccessibility } from "@/lib/visibility";
 
 type ObservationMemoryCardProps = {
   observation: Observation;
@@ -109,7 +110,7 @@ export function ObservationMemoryCard({ observation, onClose }: ObservationMemor
       as="section"
       className="overflow-hidden border-accent/25 bg-surface bg-[radial-gradient(circle_at_100%_0%,color-mix(in_srgb,var(--accent)_16%,transparent),transparent_42%)]"
       padding="sm"
-      aria-label="Carte souvenir de l’observation"
+      aria-label={`Carte souvenir de l’observation. ${formatVisibilityScoreForAccessibility(observation.visibilityScore)}`}
     >
       <div className="flex items-start justify-between gap-3 px-1 pb-3">
         <div>
@@ -135,7 +136,11 @@ export function ObservationMemoryCard({ observation, onClose }: ObservationMemor
         {cardUrl ? (
           // The canvas export is the source of truth, so the preview exactly matches the shared file.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={cardUrl} alt="Carte souvenir SkyQuest" className="h-full w-full object-cover" />
+          <img
+            src={cardUrl}
+            alt={`Carte souvenir SkyQuest. ${formatVisibilityScoreForAccessibility(observation.visibilityScore)}`}
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted">
             {error ?? "Création de la carte…"}

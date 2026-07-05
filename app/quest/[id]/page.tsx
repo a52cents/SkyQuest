@@ -7,6 +7,7 @@ import { getAppButtonClassName } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
 import { CameraGuide } from "@/components/CameraGuide";
 import { ErrorState } from "@/components/ErrorState";
+import { FreeObservationGuide } from "@/components/FreeObservationGuide";
 import { PageShell } from "@/components/PageShell";
 import { ObservationMemoryCard } from "@/components/ObservationMemoryCard";
 import { ProgressFeedback } from "@/components/ProgressFeedback";
@@ -63,7 +64,10 @@ export default function QuestGuidePage() {
       reward: result.reward,
       previousRankName,
       observation: result.observation,
-      showNotificationInvite: status === "seen" && previousProfile.discoveredTargets.length === 0,
+      showNotificationInvite:
+        status === "seen" &&
+        quest.targetType !== "free_observation" &&
+        previousProfile.discoveredTargets.length === 0,
     });
   }
 
@@ -75,7 +79,8 @@ export default function QuestGuidePage() {
         className="max-w-2xl justify-center"
         contentClassName="flex flex-col justify-center gap-3"
       >
-        {reward.observation.status === "seen" ? (
+        {reward.observation.status === "seen" &&
+        reward.observation.targetType !== "free_observation" ? (
           <ObservationMemoryCard observation={reward.observation} />
         ) : null}
         <ProgressFeedback
@@ -141,6 +146,15 @@ export default function QuestGuidePage() {
           Retour à {"l'accueil"}
         </Link>
       </PageShell>
+    );
+  }
+
+  if (quest.targetType === "free_observation") {
+    return (
+      <FreeObservationGuide
+        onSeen={() => void logAndReturn("seen")}
+        onMissed={() => void logAndReturn("missed")}
+      />
     );
   }
 

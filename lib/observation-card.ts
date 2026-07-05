@@ -1,5 +1,6 @@
 import { getPhoto } from "@/lib/photo-db";
 import type { Observation } from "@/lib/types";
+import { formatVisibilityScore } from "@/lib/visibility";
 
 const CARD_WIDTH = 1080;
 const CARD_HEIGHT = 1350;
@@ -19,6 +20,13 @@ export function getObservationBadgeLabels(observation: Observation): string[] {
 }
 
 export function getObservationTargetLabel(observation: Observation): string {
+  if (
+    observation.targetType === "free_observation" ||
+    observation.target.toLowerCase() === "freeobservation"
+  ) {
+    return "Observation libre";
+  }
+
   if (/^[A-ZÀ-ÖØ-Þ]/.test(observation.target) || observation.target.toLowerCase() === "iss") {
     return observation.target.toLowerCase() === "iss" ? "ISS" : observation.target;
   }
@@ -183,7 +191,7 @@ export async function createObservationCardBlob(observation: Observation): Promi
   let pillX = 72;
   const weatherWidth = drawPill(context, getWeatherLabel(observation), pillX, 1050);
   pillX += weatherWidth + 16;
-  drawPill(context, `${Math.round(observation.visibilityScore)}% visibilité`, pillX, 1050, {
+  drawPill(context, formatVisibilityScore(observation.visibilityScore), pillX, 1050, {
     accent: true,
   });
 

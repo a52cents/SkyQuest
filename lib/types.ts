@@ -16,6 +16,8 @@ export type RequiredGear = "naked_eye" | "binoculars_recommended";
 
 export type QuestDifficulty = "easy" | "medium";
 
+export type QuestKind = "standard" | "evening";
+
 export type AchievementId =
   | "first-look"
   | "first-planet"
@@ -119,6 +121,19 @@ export type SkyQuest = {
   endsAt?: string;
   satelliteTrajectory?: SatelliteTrajectoryPoint[];
   weather?: WeatherNow;
+  questKind?: QuestKind;
+  eveningQuestNightKey?: string;
+};
+
+export type EveningQuestAssignment = {
+  version: 1;
+  nightKey: string;
+  target: string;
+  targetType: QuestTargetType;
+  assignedAt: string;
+  lastMatchedAt: string;
+  status: "active" | "completed";
+  completedAt?: string;
 };
 
 export type Observation = {
@@ -141,6 +156,8 @@ export type Observation = {
   longitude?: number;
   photoId?: string;
   photoThumbnailId?: string;
+  questKind?: QuestKind;
+  eveningQuestBonusXp?: number;
 };
 
 export type ObservationPhotoDraft = {
@@ -169,22 +186,34 @@ export type RewardHistoryEntry = {
   updatedAt: string;
 };
 
+export type EveningQuestCompletion = {
+  nightKey: string;
+  target: string;
+  completedAt: string;
+  bonusXp: number;
+};
+
 export type ProgressProfile = {
   version: 1;
   totalXp: number;
   discoveredTargets: DiscoveredTarget[];
   unlockedAchievements: UnlockedAchievement[];
   rewardHistory: RewardHistoryEntry[];
+  eveningQuestCompletions: EveningQuestCompletion[];
+  eveningQuestCompletionCount: number;
   currentStreak: number;
   longestStreak: number;
   lastObservationNightKey: string | null;
   streakFreezeCount: number;
+  lastStreakFreezeUsedNightKey: string | null;
   lastFreezeRegenerationKey: string | null;
   updatedAt: string;
 };
 
 export type ProgressReward = {
   xpEarned: number;
+  eveningQuestBonusXp: number;
+  isEveningQuestCompleted: boolean;
   totalXp: number;
   isFirstDiscovery: boolean;
   unlockedAchievements: AchievementId[];

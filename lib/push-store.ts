@@ -23,6 +23,8 @@ export type StoredPushSubscription = {
   reminderScore?: number;
 };
 
+export type PushOpportunityClaimResult = "claimed" | "cooldown" | "duplicate" | "disabled";
+
 type PushSubscriptionRow = {
   endpoint: string;
   p256dh: string;
@@ -238,14 +240,40 @@ export async function markPushNotificationSent(
   if (error) throwStoreError("mark sent", error);
 }
 
-export async function claimHourlyPushSlot(endpoint: string, now = new Date()): Promise<boolean> {
+export async function claimPushOpportunity({
+  endpoint,
+  dedupeKey,
+  now = new Date(),
+}: {
+  endpoint: string;
+  dedupeKey: string;
+  now?: Date;
+}): Promise<PushOpportunityClaimResult> {
+  if (!dedupeKey || dedupeKey.length > 200) {
+    throw new Error("Invalid push opportunity dedupe key");
+  }
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase.rpc("claim_push_notification_slot", {
+    p_endpoint: endpoint,
+    p_dedupe_key: dedupeKey,
+    p_now: now.toISOString(),
+  });
+
+  if (error) throwStoreError("claim push opportunity", error);
+  if (data === "claimed" || data === "cooldown" || data === "duplicate" || data === "disabled") {
+    return data;
+  }
+  throwStoreError("claim push opportunity result", data);
+}
+
+export async function claimTestPushSlot(endpoint: string, now = new Date()): Promise<boolean> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc("claim_push_test_slot", {
     p_endpoint: endpoint,
     p_now: now.toISOString(),
   });
 
-  if (error) throwStoreError("claim hourly slot", error);
+  if (error) throwStoreError("claim test push slot", error);
   return data === true;
 }
 
@@ -261,4 +289,15 @@ export async function claimDueSkyWindowReminder(
 
   if (error) throwStoreError("claim reminder", error);
   return data === true;
+}
+
+export async function cleanupExpiredSkyWindowReminders(now = new Date()): Promise<number> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc("cleanup_expired_sky_window_reminders", {
+    p_now: now.toISOString(),
+  });
+
+  if (error) throwStoreError("cleanup expired reminders", error);
+  const cleaned = typeof data === "number" ? data : Number(data);
+  return Number.isFinite(cleaned) ? cleaned : 0;
 }

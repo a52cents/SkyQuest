@@ -5,12 +5,14 @@ import { calculateBestSkyWindow } from "@/lib/sky-window";
 import { sendPushToMany, type SkyQuestPushPayload } from "@/lib/push-server";
 import {
   claimDueSkyWindowReminder,
-  claimHourlyPushSlot,
+  claimPushOpportunity,
+  cleanupExpiredSkyWindowReminders,
   listPushSubscriptions,
   type StoredPushSubscription,
 } from "@/lib/push-store";
 import {
   isExceptionalClearSky,
+  getPushLocalNightKey,
   isInterestingApproachingSkyWindow,
   isInterestingBrightTarget,
 } from "@/lib/push-opportunity";
@@ -44,6 +46,12 @@ type OpportunityDiagnostics = {
   reason?: NoOpportunityReason;
 };
 
+type PushOpportunity = {
+  payload: SkyQuestPushPayload;
+  dedupeKey: string;
+  intentionalReminder: boolean;
+};
+
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
   return Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`);
@@ -72,14 +80,7 @@ async function createOpportunity(
   subscription: StoredPushSubscription,
   now: Date,
   diagnostics: OpportunityDiagnostics,
-): Promise<SkyQuestPushPayload | null> {
-  const latitude = subscription.latitudeRounded;
-  const longitude = subscription.longitudeRounded;
-  if (latitude === undefined || longitude === undefined) {
-    diagnostics.reason = "missing_location";
-    return null;
-  }
-
+): Promise<PushOpportunity | null> {
   const reminderAt = subscription.reminderAt
     ? new Date(subscription.reminderAt).getTime()
     : Number.NaN;
@@ -90,17 +91,30 @@ async function createOpportunity(
     const targetText = subscription.reminderTarget
       ? ` Commence par ${subscription.reminderTarget}.`
       : "";
+    const reminderWindowStartsAt =
+      subscription.reminderWindowStartsAt ?? subscription.reminderAt ?? "unknown";
     return {
-      title: "Ton meilleur créneau commence",
-      body: `Les conditions peuvent avoir changé : ouvre SkyQuest pour les recalculer.${targetText}`,
-      url: analysisUrl("sky_window_reminder", subscription.reminderTarget),
-      tag: `sky-window-reminder-${subscription.reminderWindowStartsAt ?? subscription.reminderAt}`,
-      data: {
-        type: "sky_window_reminder",
-        target: subscription.reminderTarget,
-        score: subscription.reminderScore,
+      dedupeKey: `reminder:${reminderWindowStartsAt}`,
+      intentionalReminder: true,
+      payload: {
+        title: "Ton meilleur créneau commence",
+        body: `Les conditions peuvent avoir changé : ouvre SkyQuest pour les recalculer.${targetText}`,
+        url: analysisUrl("sky_window_reminder", subscription.reminderTarget),
+        tag: `sky-window-reminder-${reminderWindowStartsAt}`,
+        data: {
+          type: "sky_window_reminder",
+          target: subscription.reminderTarget,
+          score: subscription.reminderScore,
+        },
       },
     };
+  }
+
+  const latitude = subscription.latitudeRounded;
+  const longitude = subscription.longitudeRounded;
+  if (latitude === undefined || longitude === undefined) {
+    diagnostics.reason = "missing_location";
+    return null;
   }
 
   const localHour = getLocalHour(now, subscription.timezone);
@@ -113,6 +127,11 @@ async function createOpportunity(
     diagnostics.reason = "outside_notification_window";
     return null;
   }
+  const localNight = getPushLocalNightKey(now, subscription.timezone ?? "UTC");
+  if (!localNight) {
+    diagnostics.reason = "invalid_timezone";
+    return null;
+  }
 
   diagnostics.calculations.push("celestial_events");
   const rareEvent = subscription.topics.includes("celestial_event")
@@ -120,11 +139,15 @@ async function createOpportunity(
     : undefined;
   if (rareEvent) {
     return {
-      title: `${rareEvent.title} approche`,
-      body: "Ouvre SkyQuest pour vérifier l’horaire et les conditions près de chez toi.",
-      url: "/#upcoming",
-      tag: `celestial-event-${rareEvent.id}`,
-      data: { type: "celestial_event" },
+      dedupeKey: `celestial_event:${rareEvent.id}`,
+      intentionalReminder: false,
+      payload: {
+        title: `${rareEvent.title} approche`,
+        body: "Ouvre SkyQuest pour vérifier l’horaire et les conditions près de chez toi.",
+        url: "/tonight#upcoming-sky-events-title",
+        tag: `celestial-event-${rareEvent.id}`,
+        data: { type: "celestial_event", eventId: rareEvent.id },
+      },
     };
   }
 
@@ -150,14 +173,18 @@ async function createOpportunity(
         ? ` À tenter : ${skyWindow.bestTargets.join(", ")}.`
         : "";
       return {
-        title:
-          minutesUntilWindow <= 5
-            ? "Très bon ciel maintenant"
-            : `Très bon ciel dans ${minutesUntilWindow} min`,
-        body: `Le meilleur créneau approche (indice ${skyWindow.score}/100).${targetText}`,
-        url: analysisUrl("approaching_sky_window", skyWindow.bestTargets[0]),
-        tag: `best-sky-window-${skyWindow.startsAt.slice(0, 13)}`,
-        data: { type: "clear_sky_evening" },
+        dedupeKey: `sky_window:${skyWindow.startsAt}`,
+        intentionalReminder: false,
+        payload: {
+          title:
+            minutesUntilWindow <= 5
+              ? "Très bon ciel maintenant"
+              : `Très bon ciel dans ${minutesUntilWindow} min`,
+          body: `Le meilleur créneau approche (indice ${skyWindow.score}/100).${targetText}`,
+          url: analysisUrl("approaching_sky_window", skyWindow.bestTargets[0]),
+          tag: `best-sky-window-${skyWindow.startsAt}`,
+          data: { type: "clear_sky_evening" },
+        },
       };
     }
   }
@@ -185,11 +212,15 @@ async function createOpportunity(
     .sort((left, right) => right.altitude - left.altitude)[0];
   if (planet && subscription.topics.includes("planet_visible")) {
     return {
-      title: `${PLANET_NAMES[planet.name] ?? planet.name} est tentable ce soir`,
-      body: "Une mission simple est disponible. La visibilité reste à confirmer sur place.",
-      url: analysisUrl("planet_visible", planet.name),
-      tag: `planet-visible-${planet.name.toLowerCase()}`,
-      data: { type: "planet_visible", target: planet.name },
+      dedupeKey: `planet_visible:${planet.name}:${localNight}`,
+      intentionalReminder: false,
+      payload: {
+        title: `${PLANET_NAMES[planet.name] ?? planet.name} est tentable ce soir`,
+        body: "Une mission simple est disponible. La visibilité reste à confirmer sur place.",
+        url: analysisUrl("planet_visible", planet.name),
+        tag: `planet-visible-${planet.name.toLowerCase()}-${localNight}`,
+        data: { type: "planet_visible", target: planet.name },
+      },
     };
   }
 
@@ -203,11 +234,15 @@ async function createOpportunity(
   );
   if (moon && subscription.topics.includes("moon_visible")) {
     return {
-      title: "La Lune est bien placée ce soir",
-      body: "Les conditions semblent favorables. Ouvre SkyQuest pour préparer ton observation.",
-      url: analysisUrl("moon_visible", "Moon"),
-      tag: "moon-visible",
-      data: { type: "moon_visible" },
+      dedupeKey: `moon_visible:${localNight}`,
+      intentionalReminder: false,
+      payload: {
+        title: "La Lune est bien placée ce soir",
+        body: "Les conditions semblent favorables. Ouvre SkyQuest pour préparer ton observation.",
+        url: analysisUrl("moon_visible", "Moon"),
+        tag: `moon-visible-${localNight}`,
+        data: { type: "moon_visible" },
+      },
     };
   }
 
@@ -223,25 +258,33 @@ async function createOpportunity(
         (brightTarget.name === "Moon" ? "la Lune" : brightTarget.name))
       : undefined;
     return {
-      title: targetName
-        ? `Ciel très clair : ${targetName} à tenter`
-        : "Le ciel est très clair maintenant",
-      body: targetName
-        ? `${Math.round(weather.cloudCover)} % de nuages estimés. Ouvre SkyQuest pour confirmer la mission.`
-        : `${Math.round(weather.cloudCover)} % de nuages estimés. Relance l’analyse avant de sortir.`,
-      url: analysisUrl("clear_sky_evening", brightTarget?.name),
-      tag: `clear-sky-evening-${now.toISOString().slice(0, 13)}`,
-      data: { type: "clear_sky_evening", target: brightTarget?.name },
+      dedupeKey: `clear_sky:${localNight}`,
+      intentionalReminder: false,
+      payload: {
+        title: targetName
+          ? `Ciel très clair : ${targetName} à tenter`
+          : "Le ciel est très clair maintenant",
+        body: targetName
+          ? `${Math.round(weather.cloudCover)} % de nuages estimés. Ouvre SkyQuest pour confirmer la mission.`
+          : `${Math.round(weather.cloudCover)} % de nuages estimés. Relance l’analyse avant de sortir.`,
+        url: analysisUrl("clear_sky_evening", brightTarget?.name),
+        tag: `clear-sky-evening-${localNight}`,
+        data: { type: "clear_sky_evening", target: brightTarget?.name },
+      },
     };
   }
 
   if (weather.cloudCover <= 25 && subscription.topics.includes("daily_mission")) {
     return {
-      title: "Mission du soir disponible",
-      body: "Ouvre SkyQuest et tente de trouver un astre visible maintenant.",
-      url: analysisUrl("daily_mission"),
-      tag: "daily-mission",
-      data: { type: "daily_mission" },
+      dedupeKey: `daily_mission:${localNight}`,
+      intentionalReminder: false,
+      payload: {
+        title: "Mission du soir disponible",
+        body: "Ouvre SkyQuest et tente de trouver un astre visible maintenant.",
+        url: analysisUrl("daily_mission"),
+        tag: `daily-mission-${localNight}`,
+        data: { type: "daily_mission" },
+      },
     };
   }
   diagnostics.reason =
@@ -256,7 +299,9 @@ export async function GET(request: Request) {
 
   const now = new Date();
   let subscriptions: StoredPushSubscription[];
+  let expiredRemindersCleaned = 0;
   try {
+    expiredRemindersCleaned = await cleanupExpiredSkyWindowReminders(now);
     subscriptions = await listPushSubscriptions();
   } catch {
     return NextResponse.json({ error: "Stockage push indisponible." }, { status: 503 });
@@ -267,6 +312,7 @@ export async function GET(request: Request) {
     sent: 0,
     failed: 0,
     expired: 0,
+    expiredRemindersCleaned,
     calculations: {} as Partial<Record<CalculationName, number>>,
     reasons: {} as Record<string, number>,
   };
@@ -278,7 +324,7 @@ export async function GET(request: Request) {
   for (const subscription of subscriptions) {
     const diagnostics: OpportunityDiagnostics = { calculations: [] };
     let calculationsRecorded = false;
-    let phase: "evaluation" | "hourly_claim" | "delivery" = "evaluation";
+    let phase: "evaluation" | "opportunity_claim" | "reminder_claim" | "delivery" = "evaluation";
     const recordCalculations = () => {
       if (calculationsRecorded) return;
       for (const calculation of diagnostics.calculations) {
@@ -287,28 +333,33 @@ export async function GET(request: Request) {
       calculationsRecorded = true;
     };
     try {
-      const payload = await createOpportunity(subscription, now, diagnostics);
+      const opportunity = await createOpportunity(subscription, now, diagnostics);
       recordCalculations();
-      if (!payload) {
+      if (!opportunity) {
         increment(totals.reasons, diagnostics.reason ?? "unknown");
         continue;
       }
-      // This atomic database claim prevents overlapping cron runs from sending twice this hour.
-      phase = "hourly_claim";
-      const isIntentionalReminder = payload.data?.type === "sky_window_reminder";
-      const claimed = isIntentionalReminder
-        ? await claimDueSkyWindowReminder(subscription.endpoint, now)
-        : await claimHourlyPushSlot(subscription.endpoint, now);
-      if (!claimed) {
-        increment(
-          totals.reasons,
-          isIntentionalReminder ? "reminder_already_claimed" : "hourly_slot_already_claimed",
-        );
-        continue;
+      if (opportunity.intentionalReminder) {
+        phase = "reminder_claim";
+        if (!(await claimDueSkyWindowReminder(subscription.endpoint, now))) {
+          increment(totals.reasons, "reminder_already_claimed");
+          continue;
+        }
+      } else {
+        phase = "opportunity_claim";
+        const claimResult = await claimPushOpportunity({
+          endpoint: subscription.endpoint,
+          dedupeKey: opportunity.dedupeKey,
+          now,
+        });
+        if (claimResult !== "claimed") {
+          increment(totals.reasons, claimResult);
+          continue;
+        }
       }
       totals.opportunities += 1;
       phase = "delivery";
-      const result = await sendPushToMany([subscription], payload);
+      const result = await sendPushToMany([subscription], opportunity.payload);
       totals.sent += result.sent;
       totals.failed += result.failed;
       totals.expired += result.expired;
