@@ -20,26 +20,23 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 import { AppButton } from "@/components/AppButton";
 import { AppCard, getAppCardClassName } from "@/components/AppCard";
-import { fetchAirQualityNow, getAirTransparencyEstimate } from "@/lib/air-quality";
+import { getAirTransparencyEstimate } from "@/lib/air-quality";
 import { AppHeader } from "@/components/AppHeader";
 import { BestSkyWindowCard } from "@/components/BestSkyWindowCard";
 import { Onboarding } from "@/components/Onboarding";
 import { VisibilityExplanationContent } from "@/components/VisibilityExplanationCard";
 import { getCurrentPosition, type GeoPosition } from "@/lib/browser-support";
 import { haptic } from "@/lib/haptics";
-import { fetchNextIssVisiblePass, isIssQuestGuidable } from "@/lib/iss";
-import { fetchTrackedSatellitePasses } from "@/lib/satellites";
-import { fetchLightPollutionEstimate } from "@/lib/light-pollution-client";
+import { isIssQuestGuidable } from "@/lib/iss";
 import type { LightPollutionEstimate } from "@/lib/light-pollution";
-import { fetchLightingPracticeEstimate } from "@/lib/lighting-practices-client";
 import type { LightingPracticeEstimate } from "@/lib/lighting-practices";
 import { selectEveningQuest } from "@/lib/evening-quest";
 import { getLocalNightKey } from "@/lib/progression";
-import { rankQuestsForRecommendation } from "@/lib/quest-ranking";
-import { calculateBestSkyWindow } from "@/lib/sky-window";
-import { isBestSkyWindowFresh } from "@/lib/sky-window-freshness";
 import { generateQuests } from "@/lib/quest-generator";
+import { rankQuestsForRecommendation } from "@/lib/quest-ranking";
+import { isBestSkyWindowFresh } from "@/lib/sky-window-freshness";
 import { isGeneratedAtFresh, isQuestFresh, SKY_DATA_TTL_MS } from "@/lib/quest-freshness";
+import { runSkyAnalysis, type SkyAnalysisSnapshot } from "@/lib/sky-analysis";
 import { parseDashboardAnalysis, type DashboardAnalysis } from "@/lib/storage-parsers";
 import {
   clearExpiredEveningQuestAssignment,
@@ -66,12 +63,7 @@ import {
   formatVisibilityScoreForAccessibility,
   normalizeVisibilityScore,
 } from "@/lib/visibility";
-import {
-  fetchWeatherForecast,
-  fetchWeatherNow,
-  getFallbackWeather,
-  getFallbackWeatherForecast,
-} from "@/lib/weather";
+import { getFallbackWeather } from "@/lib/weather";
 
 type LoadState = "idle" | "loading" | "ready";
 
@@ -367,143 +359,43 @@ export function Dashboard({
     setIsRefining(false);
     setNotice(null);
 
-    const currentDate = new Date();
-    let currentWeatherFailed = false;
-    let forecastFailed = false;
-    const currentWeatherPromise = fetchWeatherNow(coords.latitude, coords.longitude).catch(() => {
-      currentWeatherFailed = true;
-      return getFallbackWeather();
-    });
-    const forecastPromise = fetchWeatherForecast(coords.latitude, coords.longitude, 24).catch(
-      () => {
-        forecastFailed = true;
-        return getFallbackWeatherForecast(currentDate);
-      },
-    );
-    const enrichmentPromise = Promise.all([
-      fetchNextIssVisiblePass({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        now: currentDate,
-      }).catch(() => null),
-      fetchTrackedSatellitePasses({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        now: currentDate,
-      }).catch(() => []),
-      fetchLightPollutionEstimate(coords.latitude, coords.longitude),
-      fetchLightingPracticeEstimate(coords.latitude, coords.longitude),
-      fetchAirQualityNow(coords.latitude, coords.longitude).catch(() => null),
-    ]);
-    const [currentWeather, forecast] = await Promise.all([currentWeatherPromise, forecastPromise]);
-    if (requestId !== activeAnalysisRequestRef.current) return;
-
-    const weatherNotice =
-      currentWeatherFailed && forecastFailed
-        ? "Météo indisponible : des estimations prudentes sont utilisées."
-        : currentWeatherFailed
-          ? "Météo actuelle indisponible : une estimation prudente est utilisée."
-          : forecastFailed
-            ? "Prévision horaire indisponible : le créneau est estimé prudemment."
-            : null;
-
-    const initialQuests = generateQuests({
-      latitude: coords.latitude,
-      longitude: coords.longitude,
-      weather: currentWeather,
-      now: currentDate,
-      limit: 20,
-    });
-    const initialBestSkyWindow = calculateBestSkyWindow({
-      latitude: coords.latitude,
-      longitude: coords.longitude,
-      forecast,
-      now: currentDate,
-    });
-
-    const savedAt = Date.now();
-    const generatedAt = currentDate.toISOString();
-    const analysis = {
-      savedAt,
-      generatedAt,
-      position: coords,
-      weather: currentWeather,
-      quests: initialQuests,
-      bestSkyWindow: initialBestSkyWindow,
+    const publishAnalysis = (analysis: SkyAnalysisSnapshot, weatherNotice: string | null) => {
+      setWeather(analysis.weather);
+      setQuests(analysis.quests);
+      setBestSkyWindow(analysis.bestSkyWindow ?? null);
+      setLightPollution(analysis.lightPollution ?? null);
+      setLightingPractice(analysis.lightingPractice ?? null);
+      setAirQuality(analysis.airQuality ?? null);
+      if (analysis.bestSkyWindow) saveBestSkyWindow(analysis.bestSkyWindow);
+      setAnalysisSavedAt(analysis.savedAt);
+      setAnalysisGeneratedAt(analysis.generatedAt);
+      setHasAnalysisExpired(false);
+      setIsGuidanceUnlocked(true);
+      unlockedAnalysisForRuntime = analysis.savedAt;
+      setNotice(weatherNotice);
+      setLoadState("ready");
+      cacheAnalysis(analysis);
     };
 
-    setWeather(currentWeather);
-    setQuests(initialQuests);
-    setBestSkyWindow(initialBestSkyWindow);
-    setLightPollution(null);
-    setLightingPractice(null);
-    setAirQuality(null);
-    saveBestSkyWindow(initialBestSkyWindow);
-    setAnalysisSavedAt(savedAt);
-    setAnalysisGeneratedAt(generatedAt);
-    setHasAnalysisExpired(false);
-    setIsGuidanceUnlocked(true);
-    unlockedAnalysisForRuntime = savedAt;
-    setNotice(weatherNotice);
-    setLoadState("ready");
-    cacheAnalysis(analysis);
-
-    setIsRefining(true);
-    void enrichmentPromise
-      .then(
-        ([
-          currentIssPass,
-          trackedSatellitePasses,
-          currentLightPollution,
-          currentLightingPractice,
-          currentAirQuality,
-        ]) => {
+    try {
+      const refinedUpdate = await runSkyAnalysis({
+        coords,
+        questLimit: 20,
+        onInitial: (initialUpdate) => {
           if (requestId !== activeAnalysisRequestRef.current) return;
-
-          const refinedQuests = generateQuests({
-            latitude: coords.latitude,
-            longitude: coords.longitude,
-            weather: currentWeather,
-            now: currentDate,
-            issPass: currentIssPass,
-            satellitePasses: trackedSatellitePasses,
-            lightPollution: currentLightPollution,
-            lightingPractice: currentLightingPractice,
-            airQuality: currentAirQuality,
-            limit: 20,
-          });
-          const refinedBestSkyWindow = calculateBestSkyWindow({
-            latitude: coords.latitude,
-            longitude: coords.longitude,
-            forecast,
-            lightPollution: currentLightPollution,
-            lightingPractice: currentLightingPractice,
-            now: currentDate,
-          });
-          const refinedAnalysis: DashboardAnalysis = {
-            ...analysis,
-            quests: refinedQuests,
-            bestSkyWindow: refinedBestSkyWindow,
-            lightPollution: currentLightPollution,
-            lightingPractice: currentLightingPractice ?? undefined,
-            airQuality: currentAirQuality ?? undefined,
-          };
-
-          setQuests(refinedQuests);
-          setBestSkyWindow(refinedBestSkyWindow);
-          setLightPollution(currentLightPollution);
-          setLightingPractice(currentLightingPractice);
-          setAirQuality(currentAirQuality);
-          saveBestSkyWindow(refinedBestSkyWindow);
-          cacheAnalysis(refinedAnalysis);
+          publishAnalysis(initialUpdate.analysis, initialUpdate.weatherNotice);
+          setIsRefining(true);
         },
-      )
-      .catch(() => {
-        // The initial weather and astronomy results remain usable without enrichment.
-      })
-      .finally(() => {
-        if (requestId === activeAnalysisRequestRef.current) setIsRefining(false);
       });
+      if (requestId !== activeAnalysisRequestRef.current) return;
+      publishAnalysis(refinedUpdate.analysis, refinedUpdate.weatherNotice);
+    } catch {
+      if (requestId !== activeAnalysisRequestRef.current) return;
+      setNotice("Analyse indisponible pour le moment. Tu peux réessayer dans quelques instants.");
+      setLoadState("idle");
+    } finally {
+      if (requestId === activeAnalysisRequestRef.current) setIsRefining(false);
+    }
   }, []);
 
   useEffect(() => {

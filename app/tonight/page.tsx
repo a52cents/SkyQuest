@@ -6,7 +6,7 @@ import { AppCard } from "@/components/AppCard";
 import { PageShell } from "@/components/PageShell";
 import { UpcomingSkyEvents } from "@/components/UpcomingSkyEvents";
 import { getCurrentPosition } from "@/lib/browser-support";
-import { calculateBestSkyWindow } from "@/lib/sky-window";
+import { runSkyAnalysis } from "@/lib/sky-analysis";
 import {
   BEST_SKY_WINDOW_TTL_MS,
   ESTIMATED_BEST_SKY_WINDOW_TTL_MS,
@@ -19,7 +19,6 @@ import {
   saveLastLocation,
 } from "@/lib/storage";
 import type { BestSkyWindow, FogRisk } from "@/lib/types";
-import { fetchWeatherForecast, getFallbackWeatherForecast } from "@/lib/weather";
 import { scheduleSkyWindowReminder } from "@/lib/push-client";
 import {
   formatVisibilityScore,
@@ -109,41 +108,37 @@ export default function TonightPage() {
     if (isLoading) return;
     setIsLoading(true);
     setNotice(null);
+    const publishSkyWindow = (result: BestSkyWindow) => {
+      saveBestSkyWindow(result);
+      setSkyWindow(result);
+    };
     try {
       const position = await getCurrentPosition();
       saveLastLocation(position);
-      let usedFallback = false;
-      const forecast = await fetchWeatherForecast(position.latitude, position.longitude, 24).catch(
-        () => {
-          usedFallback = true;
-          return getFallbackWeatherForecast();
-        },
-      );
-      const result = calculateBestSkyWindow({
-        latitude: position.latitude,
-        longitude: position.longitude,
-        forecast,
-      });
-      saveBestSkyWindow(result);
-      setSkyWindow(result);
-      if (usedFallback) {
-        setNotice(
-          "Prévision météo indisponible : estimation prudente, à revérifier avant de sortir.",
-        );
-      }
+      const update = await runSkyAnalysis({ coords: position });
+      if (!update.analysis.bestSkyWindow) throw new Error("Best sky window unavailable");
+      publishSkyWindow(update.analysis.bestSkyWindow);
+      setNotice(update.weatherNotice);
     } catch (error) {
       const storedLocation = getLastLocation();
       if (storedLocation) {
-        const result = calculateBestSkyWindow({
-          latitude: storedLocation.latitude,
-          longitude: storedLocation.longitude,
-          forecast: getFallbackWeatherForecast(),
-        });
-        saveBestSkyWindow(result);
-        setSkyWindow(result);
-        setNotice(
-          "Position actuelle indisponible : estimation prudente depuis ta dernière zone connue.",
-        );
+        try {
+          const update = await runSkyAnalysis({ coords: storedLocation });
+          if (!update.analysis.bestSkyWindow) throw new Error("Best sky window unavailable");
+          publishSkyWindow(update.analysis.bestSkyWindow);
+          setNotice(
+            [
+              "Position actuelle indisponible : estimation prudente depuis ta dernière zone connue.",
+              update.weatherNotice,
+            ]
+              .filter(Boolean)
+              .join(" "),
+          );
+        } catch {
+          setNotice(
+            "Position actuelle indisponible. Reviens sur Maintenant quand la géolocalisation répondra.",
+          );
+        }
       } else {
         setNotice(
           error instanceof Error
