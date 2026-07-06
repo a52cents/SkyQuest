@@ -102,7 +102,10 @@ function EntryDetail({
   const tryHref = `/?app=1&target=${encodeURIComponent(entry.target)}`;
 
   return (
-    <AppCard padding="md" className="relative mx-auto my-3 w-full max-w-md">
+    <AppCard
+      padding="md"
+      className="relative mx-auto max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-b-none sm:my-3 sm:rounded-brand-lg"
+    >
       <button
         ref={closeButtonRef}
         type="button"
@@ -239,7 +242,7 @@ export function DiscoveryAtlas({
     <div className="grid gap-4">
       {selectedEntry ? (
         <div
-          className="fixed inset-0 z-[70] overflow-y-auto bg-background/92 p-3 backdrop-blur-xl"
+          className="fixed inset-0 z-[70] flex min-h-full items-end overflow-y-auto bg-background/92 pt-12 backdrop-blur-xl sm:items-center sm:p-3"
           role="dialog"
           aria-modal="true"
           aria-labelledby="atlas-entry-title"
@@ -305,57 +308,41 @@ export function DiscoveryAtlas({
             Objets du ciel
           </h2>
         </div>
-        <div
-          className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2"
-          aria-label="Filtres de catégorie"
-        >
-          <button
-            type="button"
-            onClick={() => setCategoryLabel(null)}
-            className={`min-h-11 shrink-0 rounded-full border px-4 text-xs font-semibold ${
-              categoryLabel === null
-                ? "border-accent/40 bg-accent/15 text-white"
-                : "border-white/[0.08] bg-surface text-muted"
-            }`}
-            aria-pressed={categoryLabel === null}
-          >
-            Toutes
-          </button>
-          {progress.categories.map((category) => (
-            <button
-              key={category.label}
-              type="button"
-              onClick={() => setCategoryLabel(category.label)}
-              className={`min-h-11 shrink-0 rounded-full border px-4 text-xs font-semibold ${
-                categoryLabel === category.label
-                  ? "border-accent/40 bg-accent/15 text-white"
-                  : "border-white/[0.08] bg-surface text-muted"
-              }`}
-              aria-pressed={categoryLabel === category.label}
+        <div className="mt-3 grid grid-cols-2 gap-2 pb-3">
+          <label className="grid min-w-0 gap-1 text-[10px] font-bold uppercase tracking-[0.08em] text-faint">
+            Catégorie
+            <select
+              value={categoryLabel ?? "all"}
+              onChange={(event) =>
+                setCategoryLabel(event.target.value === "all" ? null : event.target.value)
+              }
+              className="min-h-11 w-full min-w-0 rounded-[12px] border border-white/[0.1] bg-surface-strong px-3 text-xs font-semibold normal-case tracking-normal text-text outline-none focus:border-accent-cyan"
             >
-              {category.label} · {category.discoveredCount}/{category.totalCount}
-            </button>
-          ))}
-        </div>
-        <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-3" aria-label="Filtres de statut">
-          {filterOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => setFilter(option.value)}
-              className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold ${
-                filter === option.value
-                  ? "border-accent bg-accent text-white"
-                  : "border-white/[0.1] bg-surface text-muted"
-              }`}
-              aria-pressed={filter === option.value}
+              <option value="all">Toutes</option>
+              {progress.categories.map((category) => (
+                <option key={category.label} value={category.label}>
+                  {category.label} · {category.discoveredCount}/{category.totalCount}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid min-w-0 gap-1 text-[10px] font-bold uppercase tracking-[0.08em] text-faint">
+            État
+            <select
+              value={filter}
+              onChange={(event) => setFilter(event.target.value as AtlasFilter)}
+              className="min-h-11 w-full min-w-0 rounded-[12px] border border-white/[0.1] bg-surface-strong px-3 text-xs font-semibold normal-case tracking-normal text-text outline-none focus:border-accent-cyan"
             >
-              {option.label}
-            </button>
-          ))}
+              {filterOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         {visibleEntries.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
             {visibleEntries.map((entry) => (
               <DiscoveryAtlasCard key={entry.id} entry={entry} onSelect={setSelectedEntry} />
             ))}
