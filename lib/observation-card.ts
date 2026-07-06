@@ -261,7 +261,7 @@ export async function createObservationCardBlob(observation: Observation): Promi
   context.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
 
   const rarity = getObservationCardRarity(observation);
-  if (rarity === "rare") drawHolographicFoil(context);
+  // if (rarity === "rare") drawHolographicFoil(context);
   drawCardFrame(context, rarity);
   drawBrandMark(context, 82, 82);
 
