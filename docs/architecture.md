@@ -47,7 +47,6 @@ UI client
 | `/api/push/reminder`     | programmation d'un rappel de meilleur créneau  |
 | `/api/push/target-watch` | gestion des cibles à surveiller                |
 | `/api/cron/sky-alerts`   | évaluation et envoi planifiés des alertes      |
-| `/api/debug/open-meteo`  | diagnostic serveur Open-Meteo                  |
 
 ## Flux « Maintenant »
 
@@ -104,6 +103,8 @@ L'interface ne doit afficher un journal vide qu'après confirmation de l'effacem
 - `/api/push/subscribe` accepte seulement les endpoints de fournisseurs Web Push connus
   (FCM, Mozilla, Apple et WNS, extensibles par `PUSH_ENDPOINT_ALLOWED_HOSTS`) et applique un quota
   SQL atomique aux nouvelles subscriptions ;
+- le cron purge les claims Web Push de plus de 90 jours et supprime vraiment les subscriptions
+  désactivées depuis plus de 30 jours ;
 - les routes de gestion push utilisent un jeton aléatoire conservé dans le navigateur ; Supabase
   stocke uniquement son hash SHA-256 et l'endpoint n'apparaît jamais dans une query string ;
 - le middleware définit CSP, Permissions Policy, HSTS en production et protections anti-frame ;

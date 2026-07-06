@@ -42,6 +42,11 @@ seulement si ses clés Web Push `p256dh` et `auth` correspondent déjà à la li
 La même réexécution ajoute aussi `push_subscription_rate_limits` et la nouvelle signature
 `upsert_push_subscription` utilisée pour limiter les créations d'abonnements.
 
+La rétention Supabase est explicite : les subscriptions désactivées sont conservées 30 jours après
+leur dernière mise à jour, puis supprimées avec leurs données filles par cascade ; les entrées
+`push_notification_claims` restantes sont supprimées après 90 jours. Le cron protégé exécute
+`cleanup_push_retention` avant chaque évaluation d'alertes.
+
 Les topics SQL utilisent les identifiants réels du code : `clear_sky_evening`, `moon_visible`,
 `planet_visible`, `celestial_event` et `daily_mission`.
 
@@ -195,6 +200,8 @@ le réglage, sans redemander automatiquement la permission.
 - `POST /api/push/reminder` programme un rappel pour l'abonnement identifié par le jeton ;
 - `/api/push/target-watch` ne reçoit jamais l'endpoint dans sa query string ;
 - `GET /api/cron/sky-alerts` lit seulement les rows actives et exige `CRON_SECRET` ;
+- `GET /api/cron/sky-alerts` supprime aussi les claims de plus de 90 jours et les subscriptions
+  désactivées depuis plus de 30 jours ;
 - une réponse Web Push 404/410 désactive la subscription expirée ;
 - les coordonnées sont réarrondies à `0.1°` côté route et côté store ;
 - aucun endpoint connu ne permet à lui seul de lire ou modifier un abonnement ;

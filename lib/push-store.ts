@@ -34,6 +34,11 @@ export type StoredPushSubscription = {
 
 export type PushOpportunityClaimResult = "claimed" | "cooldown" | "duplicate" | "disabled";
 
+export type PushRetentionCleanupResult = {
+  disabledSubscriptionsDeleted: number;
+  notificationClaimsDeleted: number;
+};
+
 type PushSubscriptionRow = {
   id: string;
   endpoint: string;
@@ -296,6 +301,27 @@ export async function cleanupExpiredTargetWatches(now = new Date()): Promise<num
   });
   if (error) throwStoreError("cleanup target watches", error);
   return Number(data) || 0;
+}
+
+export async function cleanupPushRetention(now = new Date()): Promise<PushRetentionCleanupResult> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc("cleanup_push_retention", {
+    p_now: now.toISOString(),
+  });
+  if (error) throwStoreError("cleanup push retention", error);
+
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | {
+        disabled_subscriptions_deleted?: number | string | null;
+        notification_claims_deleted?: number | string | null;
+      }
+    | null
+    | undefined;
+
+  return {
+    disabledSubscriptionsDeleted: Number(row?.disabled_subscriptions_deleted) || 0,
+    notificationClaimsDeleted: Number(row?.notification_claims_deleted) || 0,
+  };
 }
 
 export async function scheduleSkyWindowReminder({

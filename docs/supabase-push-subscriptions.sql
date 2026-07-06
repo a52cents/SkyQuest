@@ -114,6 +114,10 @@ grant select, insert, update, delete on table public.push_notification_claims to
 create index if not exists push_subscriptions_enabled_idx
   on public.push_subscriptions (enabled);
 
+create index if not exists push_subscriptions_disabled_retention_idx
+  on public.push_subscriptions (updated_at)
+  where enabled = false;
+
 create unique index if not exists push_subscriptions_management_token_hash_idx
   on public.push_subscriptions (management_token_hash)
   where management_token_hash is not null;
@@ -150,6 +154,40 @@ grant select, insert, update, delete on table public.push_subscription_rate_limi
 
 create index if not exists push_subscription_rate_limits_window_idx
   on public.push_subscription_rate_limits (window_start);
+
+-- Retention policy:
+-- - disabled subscriptions are kept for 30 days after their last update, then deleted;
+-- - notification claims are kept for 90 days, well beyond the 12-hour cooldown and
+--   per-opportunity dedupe window, then deleted.
+-- Deleting a subscription cascades its claims and target watches.
+create or replace function public.cleanup_push_retention(
+  p_now timestamptz default now()
+)
+returns table (
+  disabled_subscriptions_deleted integer,
+  notification_claims_deleted integer
+)
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  delete from public.push_notification_claims
+  where claimed_at < p_now - interval '90 days';
+  get diagnostics notification_claims_deleted = row_count;
+
+  delete from public.push_subscriptions
+  where enabled = false
+    and updated_at < p_now - interval '30 days';
+  get diagnostics disabled_subscriptions_deleted = row_count;
+
+  return next;
+end;
+$$;
+
+revoke all on function public.cleanup_push_retention(timestamptz)
+  from public, anon, authenticated;
+grant execute on function public.cleanup_push_retention(timestamptz) to service_role;
 
 -- Creates a subscription or updates it only when the caller proves control with either
 -- the current management token or the exact Web Push keys already stored. The key fallback

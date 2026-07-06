@@ -8,6 +8,7 @@ import {
   claimPushOpportunity,
   cleanupExpiredSkyWindowReminders,
   cleanupExpiredTargetWatches,
+  cleanupPushRetention,
   claimTargetWatch,
   listActiveTargetWatches,
   listPushSubscriptions,
@@ -551,8 +552,13 @@ export async function GET(request: Request) {
   let subscriptions: StoredPushSubscription[];
   let expiredRemindersCleaned = 0;
   let expiredTargetWatchesCleaned = 0;
+  let disabledSubscriptionsDeleted = 0;
+  let notificationClaimsDeleted = 0;
   let targetWatches = [] as Awaited<ReturnType<typeof listActiveTargetWatches>>;
   try {
+    const retention = await cleanupPushRetention(now);
+    disabledSubscriptionsDeleted = retention.disabledSubscriptionsDeleted;
+    notificationClaimsDeleted = retention.notificationClaimsDeleted;
     expiredRemindersCleaned = await cleanupExpiredSkyWindowReminders(now);
     expiredTargetWatchesCleaned = await cleanupExpiredTargetWatches(now);
     targetWatches = await listActiveTargetWatches(now);
@@ -572,6 +578,8 @@ export async function GET(request: Request) {
     expired: 0,
     expiredRemindersCleaned,
     expiredTargetWatchesCleaned,
+    disabledSubscriptionsDeleted,
+    notificationClaimsDeleted,
     targetWatchesChecked: targetWatches.length,
     targetWatchesSent: 0,
     calculations: {} as Partial<Record<CalculationName, number>>,
