@@ -48,7 +48,12 @@ type OrientationPermissionEvent = typeof DeviceOrientationEvent & {
   requestPermission?: (absolute?: boolean) => Promise<PermissionState>;
 };
 
-export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
+export function CameraGuide({
+  quest,
+  persistenceError = null,
+  onSeen,
+  onMissed,
+}: CameraGuideProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -337,19 +342,30 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
     return true;
   }
 
-  function handleSeenWithoutPhoto() {
+  async function submitObservation(action: () => Promise<boolean>) {
     if (!beginSubmission()) return;
-    onSeen();
+    let succeeded = false;
+    try {
+      succeeded = await action();
+    } finally {
+      if (!succeeded) {
+        isSubmittingRef.current = false;
+        setIsSubmitting(false);
+      }
+    }
+  }
+
+  function handleSeenWithoutPhoto() {
+    void submitObservation(() => onSeen());
   }
 
   function handleSeenWithPhoto() {
-    if (!photoDraft || !beginSubmission()) return;
-    onSeen(photoDraft);
+    if (!photoDraft) return;
+    void submitObservation(() => onSeen(photoDraft));
   }
 
   function handleMissed() {
-    if (!beginSubmission()) return;
-    onMissed();
+    void submitObservation(onMissed);
   }
 
   function closePhotoPanel() {
@@ -453,6 +469,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
             camera={{ status: cameraStatus, error: cameraError }}
             zoom={{ range: zoomRange, value: currentZoom, error: zoomError }}
             submitting={isSubmitting}
+            persistenceError={persistenceError}
             nativePhotoError={!photoSheetOpen ? photoError : null}
             guidanceReliability={guidanceReliability}
             isCalibrated={horizontalCalibration !== 0}
@@ -503,7 +520,7 @@ export function CameraGuide({ quest, onSeen, onMissed }: CameraGuideProps) {
         open={photoSheetOpen}
         draft={photoDraft}
         status={photoCaptureStatus}
-        error={photoError}
+        error={photoError ?? persistenceError}
         submitting={isSubmitting}
         onSaveWithPhoto={handleSeenWithPhoto}
         onContinueWithoutPhoto={handleSeenWithoutPhoto}

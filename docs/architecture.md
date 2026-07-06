@@ -3,8 +3,9 @@
 ## Vue générale
 
 SkyQuest utilise Next.js App Router, React, TypeScript strict et Tailwind CSS. L'application ne
-possède ni compte ni authentification. Le journal et la progression restent dans `localStorage` ;
-une table Supabase optionnelle conserve uniquement les abonnements Web Push.
+possède ni compte ni authentification. Le journal et la progression restent dans le navigateur ;
+les tables Supabase optionnelles conservent uniquement les données techniques nécessaires au Web
+Push.
 
 ```text
 UI client
@@ -16,7 +17,9 @@ UI client
   ├─ /api/satellite-passes → CelesTrak : satellites brillants et Starlink récents
   ├─ /api/light-pollution → provider optionnel : qualité du ciel
   ├─ /api/lighting-practice → API Geo + index communal Cerema
-  └─ /api/push/* → abonnement Web Push optionnel
+  ├─ /api/nasa/highlights → NASA : sélection éditoriale mise en cache
+  ├─ /api/push/* → abonnements, rappels et surveillances Web Push
+  └─ /api/cron/sky-alerts ← crons Cloudflare et Vercel protégés par secret
 ```
 
 ## Routes
@@ -28,10 +31,23 @@ UI client
 | `/journal`               | observations stockées localement               |
 | `/explore`               | catalogue pédagogique                          |
 | `/profile`               | progression locale et réglages d’alertes       |
+| `/tonight`               | créneaux d'observation et événements à venir   |
+| `/atlas`                 | découvertes confirmées et progression locale   |
+| `/glossary`              | définitions pédagogiques                       |
+| `/support`               | soutien volontaire hors parcours principal     |
+| `/offline`               | état de secours sans réseau                    |
 | `/api/iss-pass`          | calcul serveur d'un passage ISS via CelesTrak  |
 | `/api/satellite-passes`  | passages brillants et trains Starlink prudents |
 | `/api/light-pollution`   | estimation de qualité du ciel et fallback      |
 | `/api/lighting-practice` | commune française et pratique d'éclairage      |
+| `/api/nasa/highlights`   | contenus NASA normalisés et mis en cache       |
+| `/api/push/subscribe`    | création ou mise à jour d'une subscription     |
+| `/api/push/unsubscribe`  | désactivation idempotente d'une subscription   |
+| `/api/push/test`         | notification de test protégée et limitée       |
+| `/api/push/reminder`     | programmation d'un rappel de meilleur créneau  |
+| `/api/push/target-watch` | gestion des cibles à surveiller                |
+| `/api/cron/sky-alerts`   | évaluation et envoi planifiés des alertes      |
+| `/api/debug/open-meteo`  | diagnostic serveur Open-Meteo                  |
 
 ## Flux « Maintenant »
 
@@ -62,6 +78,20 @@ Les fonctions de `lib/` doivent rester pures lorsqu'elles n'ont pas besoin d'une
 
 Les lectures doivent tolérer un stockage indisponible, corrompu ou provenant d'une ancienne version. Aucun module de stockage ne doit transmettre ces données à un serveur.
 
+`storage-parsers.ts` est la source unique de validation runtime pour la quête active, la dernière
+position, le cache d'analyse du tableau de bord et le meilleur créneau. Les objets imbriqués sont
+validés avant usage ; une valeur corrompue est ignorée et supprimée du stockage lorsqu'il est
+disponible.
+
+L'enregistrement d'une observation et de ses éventuelles photos forme une seule transaction
+IndexedDB. La progression et la quête du soir ne sont mises à jour qu'après son commit. En cas
+d'échec, l'interface doit indiquer que ni le journal ni la progression n'ont changé et permettre de
+réessayer.
+
+Le journal conserve strictement les 50 observations les plus récentes. La suppression des entrées
+plus anciennes et de leurs photos appartient à la même transaction que l'ajout ou la migration.
+L'interface ne doit afficher un journal vide qu'après confirmation de l'effacement IndexedDB.
+
 ## Réseau et sécurité
 
 - Open-Meteo est appelé directement par le navigateur ;
@@ -71,6 +101,8 @@ Les lectures doivent tolérer un stockage indisponible, corrompu ou provenant d'
 - l'API Geo reçoit côté serveur des coordonnées arrondies à `0,01°` et renvoie seulement la commune ;
 - les alertes sont activées uniquement après un clic explicite dans le Profil ; les thèmes et une
   position arrondie à `0,1°` sont synchronisés avec la subscription push ;
+- les routes de gestion push utilisent un jeton aléatoire conservé dans le navigateur ; Supabase
+  stocke uniquement son hash SHA-256 et l'endpoint n'apparaît jamais dans une query string ;
 - le middleware définit CSP, Permissions Policy, HSTS en production et protections anti-frame ;
 - GPS, caméra et orientation exigent HTTPS hors `localhost`.
 

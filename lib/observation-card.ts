@@ -1,23 +1,29 @@
-import { getPhoto } from "@/lib/photo-db";
-import type { Observation } from "@/lib/types";
-import { formatVisibilityScore } from "@/lib/visibility";
-import { getObservationReportLabel } from "@/lib/observation-report";
+import { getPhoto } from "./photo-db.ts";
+import type { AchievementId, Observation, QuestTargetType } from "./types.ts";
 
 const CARD_WIDTH = 1080;
 const CARD_HEIGHT = 1350;
 
-const MEMORY_BADGE_LABELS: Record<string, string> = {
-  "first-planet": "Première planète",
-  "first-constellation": "Première constellation",
-  "moon-hunter": "Chasseur de Lune",
-};
+const RARE_TARGET_TYPES = new Set<QuestTargetType>(["galaxy", "meteor_shower", "satellite"]);
+const RARE_ACHIEVEMENTS = new Set<AchievementId>([
+  "moon-hunter",
+  "planet-tour",
+  "night-landmarks",
+  "orbital-watcher",
+  "explorer",
+  "confirmed-watcher",
+]);
 
-export function getObservationBadgeLabels(observation: Observation): string[] {
-  const achievementBadges = (observation.unlockedAchievements ?? [])
-    .map((id) => MEMORY_BADGE_LABELS[id])
-    .filter((label): label is string => Boolean(label));
-  if (achievementBadges.length > 0) return achievementBadges;
-  return observation.isFirstDiscovery ? ["Nouvelle découverte"] : ["Observation confirmée"];
+export type ObservationCardRarity = "standard" | "discovery" | "rare";
+
+export function getObservationCardRarity(observation: Observation): ObservationCardRarity {
+  if (
+    (observation.targetType && RARE_TARGET_TYPES.has(observation.targetType)) ||
+    (observation.unlockedAchievements ?? []).some((id) => RARE_ACHIEVEMENTS.has(id))
+  ) {
+    return "rare";
+  }
+  return observation.isFirstDiscovery ? "discovery" : "standard";
 }
 
 export function getObservationTargetLabel(observation: Observation): string {
@@ -95,24 +101,135 @@ function drawCoverImage(
   context.drawImage(image, (CARD_WIDTH - width) / 2, (CARD_HEIGHT - height) / 2, width, height);
 }
 
-function drawPill(
-  context: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  options: { accent?: boolean } = {},
-): number {
-  context.font = "600 30px Arial, sans-serif";
-  const width = Math.ceil(context.measureText(text).width) + 52;
-  roundedRect(context, x, y, width, 58, 29);
-  context.fillStyle = options.accent ? "rgba(124,92,255,0.88)" : "rgba(9,9,15,0.66)";
+function drawFallbackSky(context: CanvasRenderingContext2D) {
+  const space = context.createRadialGradient(760, 220, 40, 540, 520, 980);
+  space.addColorStop(0, "#26326b");
+  space.addColorStop(0.42, "#121a3a");
+  space.addColorStop(1, "#07080f");
+  context.fillStyle = space;
+  context.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
+
+  for (let index = 0; index < 88; index += 1) {
+    const x = (index * 193) % CARD_WIDTH;
+    const y = (index * index * 47) % 920;
+    const radius = index % 13 === 0 ? 3.2 : index % 5 === 0 ? 2 : 1.1;
+    context.globalAlpha = index % 4 === 0 ? 0.8 : 0.42;
+    context.fillStyle = index % 7 === 0 ? "#b9dfff" : "#ffffff";
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fill();
+  }
+  context.globalAlpha = 1;
+}
+
+function drawBrandMark(context: CanvasRenderingContext2D, centerX: number, centerY: number) {
+  const gradient = context.createLinearGradient(
+    centerX - 30,
+    centerY - 30,
+    centerX + 30,
+    centerY + 30,
+  );
+  gradient.addColorStop(0, "#52dcff");
+  gradient.addColorStop(0.55, "#ffffff");
+  gradient.addColorStop(1, "#9b6cff");
+
+  context.save();
+  context.shadowColor = "rgba(106, 113, 255, 0.75)";
+  context.shadowBlur = 22;
+  context.fillStyle = gradient;
+  context.beginPath();
+  context.moveTo(centerX, centerY - 31);
+  context.lineTo(centerX + 8, centerY - 8);
+  context.lineTo(centerX + 31, centerY);
+  context.lineTo(centerX + 8, centerY + 8);
+  context.lineTo(centerX, centerY + 31);
+  context.lineTo(centerX - 8, centerY + 8);
+  context.lineTo(centerX - 31, centerY);
+  context.lineTo(centerX - 8, centerY - 8);
+  context.closePath();
   context.fill();
-  context.strokeStyle = options.accent ? "rgba(210,203,255,0.55)" : "rgba(255,255,255,0.2)";
+  context.restore();
+
+  context.strokeStyle = "rgba(205, 221, 255, 0.55)";
   context.lineWidth = 2;
+  context.beginPath();
+  context.arc(centerX, centerY, 43, 0.18 * Math.PI, 1.15 * Math.PI);
   context.stroke();
-  context.fillStyle = "#f8f8ff";
-  context.fillText(text, x + 26, y + 39);
-  return width;
+}
+
+function drawHolographicFoil(context: CanvasRenderingContext2D) {
+  context.save();
+  roundedRect(context, 24, 24, CARD_WIDTH - 48, CARD_HEIGHT - 48, 48);
+  context.clip();
+  context.globalCompositeOperation = "screen";
+
+  const foil = context.createLinearGradient(-160, 120, CARD_WIDTH + 180, CARD_HEIGHT - 80);
+  foil.addColorStop(0, "rgba(54, 221, 255, 0)");
+  foil.addColorStop(0.18, "rgba(54, 221, 255, 0.20)");
+  foil.addColorStop(0.36, "rgba(157, 105, 255, 0.05)");
+  foil.addColorStop(0.52, "rgba(255, 94, 205, 0.18)");
+  foil.addColorStop(0.68, "rgba(255, 218, 110, 0.08)");
+  foil.addColorStop(0.84, "rgba(104, 255, 189, 0.18)");
+  foil.addColorStop(1, "rgba(104, 255, 189, 0)");
+  context.fillStyle = foil;
+  context.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
+
+  for (let index = 0; index < 5; index += 1) {
+    context.save();
+    context.translate(-190 + index * 270, -100);
+    context.rotate(-0.38);
+    const beam = context.createLinearGradient(0, 0, 120, 0);
+    beam.addColorStop(0, "rgba(255,255,255,0)");
+    beam.addColorStop(0.5, "rgba(210,238,255,0.12)");
+    beam.addColorStop(1, "rgba(255,255,255,0)");
+    context.fillStyle = beam;
+    context.fillRect(0, 0, 120, 1700);
+    context.restore();
+  }
+
+  context.fillStyle = "rgba(255,255,255,0.68)";
+  for (let index = 0; index < 16; index += 1) {
+    const x = 92 + ((index * 269) % 900);
+    const y = 108 + ((index * index * 83) % 1030);
+    const radius = index % 4 === 0 ? 3 : 1.5;
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fill();
+  }
+  context.restore();
+}
+
+function drawCardFrame(context: CanvasRenderingContext2D, rarity: ObservationCardRarity) {
+  const frame = context.createLinearGradient(24, 24, CARD_WIDTH - 24, CARD_HEIGHT - 24);
+  if (rarity === "rare") {
+    frame.addColorStop(0, "rgba(76, 222, 255, 0.85)");
+    frame.addColorStop(0.34, "rgba(171, 119, 255, 0.68)");
+    frame.addColorStop(0.66, "rgba(255, 126, 214, 0.72)");
+    frame.addColorStop(1, "rgba(128, 255, 201, 0.75)");
+  } else {
+    frame.addColorStop(0, "rgba(255,255,255,0.42)");
+    frame.addColorStop(1, "rgba(255,255,255,0.10)");
+  }
+  roundedRect(context, 24, 24, CARD_WIDTH - 48, CARD_HEIGHT - 48, 48);
+  context.strokeStyle = frame;
+  context.lineWidth = rarity === "rare" ? 5 : 3;
+  context.stroke();
+}
+
+function fitTitleFont(context: CanvasRenderingContext2D, text: string, maxWidth: number): number {
+  let size = 88;
+  while (size > 50) {
+    context.font = `${size}px Georgia, serif`;
+    if (context.measureText(text).width <= maxWidth) return size;
+    size -= 2;
+  }
+  return size;
+}
+
+function getCardKicker(observation: Observation, rarity: ObservationCardRarity): string {
+  if (rarity === "rare") return "DÉCOUVERTE RARE";
+  if (observation.isFirstDiscovery) return "PREMIÈRE DÉCOUVERTE";
+  return "SOUVENIR D’OBSERVATION";
 }
 
 export async function createObservationCardBlob(observation: Observation): Promise<Blob> {
@@ -122,56 +239,33 @@ export async function createObservationCardBlob(observation: Observation): Promi
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Création de la carte indisponible.");
 
-  const background = context.createLinearGradient(0, 0, CARD_WIDTH, CARD_HEIGHT);
-  background.addColorStop(0, "#171332");
-  background.addColorStop(0.48, "#0b1530");
-  background.addColorStop(1, "#09090d");
-  context.fillStyle = background;
+  context.fillStyle = "#07080f";
   context.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
 
   const photoId = observation.photoId ?? observation.photoThumbnailId;
-  if (photoId) {
-    const photo = await getPhoto(photoId).catch(() => null);
-    if (photo) {
-      const image = await blobToImage(photo);
-      drawCoverImage(context, image);
-      if ("close" in image && typeof image.close === "function") image.close();
-    }
+  const photo = photoId ? await getPhoto(photoId).catch(() => null) : null;
+  if (photo) {
+    const image = await blobToImage(photo);
+    drawCoverImage(context, image);
+    if ("close" in image && typeof image.close === "function") image.close();
   } else {
-    context.fillStyle = "rgba(255,255,255,0.42)";
-    for (let index = 0; index < 74; index += 1) {
-      const x = (index * 193) % CARD_WIDTH;
-      const y = (index * index * 47) % 880;
-      const radius = index % 9 === 0 ? 3 : 1.5;
-      context.beginPath();
-      context.arc(x, y, radius, 0, Math.PI * 2);
-      context.fill();
-    }
+    drawFallbackSky(context);
   }
 
-  const shade = context.createLinearGradient(0, 220, 0, CARD_HEIGHT);
-  shade.addColorStop(0, "rgba(4,5,13,0.04)");
-  shade.addColorStop(0.48, "rgba(4,5,13,0.18)");
-  shade.addColorStop(0.72, "rgba(7,7,13,0.82)");
-  shade.addColorStop(1, "rgba(7,7,11,0.98)");
+  const shade = context.createLinearGradient(0, 260, 0, CARD_HEIGHT);
+  shade.addColorStop(0, "rgba(5,7,16,0.06)");
+  shade.addColorStop(0.5, "rgba(5,7,16,0.12)");
+  shade.addColorStop(0.73, "rgba(5,7,16,0.62)");
+  shade.addColorStop(1, "rgba(5,7,13,0.96)");
   context.fillStyle = shade;
   context.fillRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
 
-  context.fillStyle = "rgba(9,9,15,0.68)";
-  roundedRect(context, 64, 62, 268, 74, 37);
-  context.fill();
-  context.strokeStyle = "rgba(255,255,255,0.2)";
-  context.lineWidth = 2;
-  context.stroke();
-  context.fillStyle = "#ffffff";
-  context.font = "700 34px Arial, sans-serif";
-  context.fillText("✦  SKYQUEST", 94, 111);
-  drawPill(context, getObservationBadgeLabels(observation)[0], 64, 158, { accent: true });
+  const rarity = getObservationCardRarity(observation);
+  if (rarity === "rare") drawHolographicFoil(context);
+  drawCardFrame(context, rarity);
+  drawBrandMark(context, 82, 82);
 
   const date = new Date(observation.createdAt);
-  const time = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(
-    date,
-  );
   const dateLabel = new Intl.DateTimeFormat("fr-FR", {
     day: "numeric",
     month: "long",
@@ -179,54 +273,21 @@ export async function createObservationCardBlob(observation: Observation): Promi
   }).format(date);
   const target = getObservationTargetLabel(observation);
 
-  context.fillStyle = "#a9a5ff";
-  context.font = "700 30px Arial, sans-serif";
-  context.fillText("J’AI REPÉRÉ", 72, 875);
-  context.fillStyle = "#ffffff";
-  context.font = "64px Georgia, serif";
-  context.fillText(target.slice(0, 25), 72, 952);
-  context.fillStyle = "rgba(255,255,255,0.72)";
-  context.font = "32px Arial, sans-serif";
-  context.fillText(`${dateLabel}  ·  ${time}`, 72, 1008);
-
-  const reportLabel = getObservationReportLabel(observation.observationReport);
-  if (reportLabel && reportLabel.length <= 24) {
-    context.fillStyle = "rgba(255,255,255,0.72)";
-    context.font = "28px Arial, sans-serif";
-    context.fillText(`Détail · ${reportLabel}`, 72, 1044);
-  }
-
-  let pillX = 72;
-  const weatherWidth = drawPill(context, getWeatherLabel(observation), pillX, 1070);
-  pillX += weatherWidth + 16;
-  drawPill(context, formatVisibilityScore(observation.visibilityScore), pillX, 1070, {
-    accent: true,
-  });
-
-  context.strokeStyle = "rgba(255,255,255,0.14)";
-  context.beginPath();
-  context.moveTo(72, 1150);
-  context.lineTo(CARD_WIDTH - 72, 1150);
-  context.stroke();
+  context.shadowColor = "rgba(0,0,0,0.75)";
+  context.shadowBlur = 18;
+  context.fillStyle = rarity === "rare" ? "#bff5ff" : "#b8b3ff";
+  context.font = "700 27px Arial, sans-serif";
+  context.fillText(getCardKicker(observation, rarity), 68, 1090);
 
   context.fillStyle = "#ffffff";
-  context.font = "700 31px Arial, sans-serif";
-  const xpLabel = observation.xpEarned
-    ? `+${observation.xpEarned} · ${observation.totalXp ?? 0} Éclats d’étoile`
-    : `${observation.totalXp ?? 0} Éclats d’étoile`;
-  context.fillText(xpLabel, 72, 1215);
-  context.fillText(
-    `${observation.streak ?? 0} semaine${observation.streak === 1 ? "" : "s"}`,
-    430,
-    1215,
-  );
-  context.textAlign = "right";
-  context.fillStyle = "#bdb7ff";
-  context.fillText(observation.rankName ?? "Curieux du ciel", CARD_WIDTH - 72, 1215);
-  context.textAlign = "left";
-  context.fillStyle = "rgba(255,255,255,0.5)";
-  context.font = "25px Arial, sans-serif";
-  context.fillText("Une observation locale · aucune photo envoyée", 72, 1286);
+  const titleSize = fitTitleFont(context, target, CARD_WIDTH - 136);
+  context.font = `${titleSize}px Georgia, serif`;
+  context.fillText(target, 68, 1184);
+
+  context.fillStyle = "rgba(255,255,255,0.68)";
+  context.font = "30px Arial, sans-serif";
+  context.fillText(dateLabel, 68, 1250);
+  context.shadowBlur = 0;
 
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(

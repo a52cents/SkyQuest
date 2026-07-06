@@ -166,16 +166,16 @@ Une modification des seuils doit être cohérente dans le scoring, les libellés
 
 SkyQuest doit toujours offrir une suite utile au parcours.
 
-| Échec                                | Comportement attendu                                                       |
-| ------------------------------------ | -------------------------------------------------------------------------- |
-| GPS refusé ou indisponible           | expliquer le problème et proposer une observation libre                    |
-| Open-Meteo indisponible              | utiliser une météo prudente de secours et prévenir l'utilisateur           |
-| CelesTrak indisponible et cache vide | omettre silencieusement les quêtes satellite                               |
-| caméra indisponible                  | conserver le guidage textuel et directionnel                               |
-| orientation indisponible             | afficher les repères cardinaux et d'altitude                               |
-| stockage local bloqué                | garder l'expérience utilisable en mémoire pour la session lorsque possible |
-| quête active absente                 | afficher une erreur actionnable et inviter à relancer « Maintenant »       |
-| aucune cible fiable                  | générer une `FreeObservation`                                              |
+| Échec                                | Comportement attendu                                                 |
+| ------------------------------------ | -------------------------------------------------------------------- |
+| GPS refusé ou indisponible           | expliquer le problème et proposer une observation libre              |
+| Open-Meteo indisponible              | utiliser une météo prudente de secours et prévenir l'utilisateur     |
+| CelesTrak indisponible et cache vide | omettre silencieusement les quêtes satellite                         |
+| caméra indisponible                  | conserver le guidage textuel et directionnel                         |
+| orientation indisponible             | afficher les repères cardinaux et d'altitude                         |
+| stockage local bloqué                | ne gagner aucun XP, expliquer l'échec et permettre de réessayer      |
+| quête active absente                 | afficher une erreur actionnable et inviter à relancer « Maintenant » |
+| aucune cible fiable                  | générer une `FreeObservation`                                        |
 
 Un échec de service externe ne doit pas provoquer un écran blanc, une exception non gérée ou bloquer les autres familles de quêtes.
 
@@ -209,8 +209,8 @@ Il faut distinguer les horaires calculés précisément des dates ou pics approx
 ## Données et confidentialité
 
 SkyQuest n'utilise ni compte ni authentification. Le journal, la progression et les préférences
-restent locaux. Une table Supabase optionnelle conserve uniquement les subscriptions Web Push ;
-elle ne constitue pas un profil utilisateur.
+restent locaux. Les tables Supabase optionnelles conservent uniquement les données techniques
+nécessaires au Web Push ; elles ne constituent pas un profil utilisateur.
 
 ### Données locales
 
@@ -230,7 +230,7 @@ Les positions persistées sont arrondies à deux décimales. Ne pas introduire d
 
 ### Photos
 
-Les photos sont redimensionnées côté navigateur puis enregistrées dans `localStorage` sous forme de Data URL. Elles ne doivent pas être téléversées, analysées ou envoyées à un tiers. La caméra doit être arrêtée dès que le composant de guidage est démonté.
+Les photos sont redimensionnées côté navigateur puis enregistrées comme blobs dans IndexedDB, dans la même transaction que l'observation. Elles ne doivent pas être téléversées, analysées ou envoyées à un tiers. La caméra doit être arrêtée dès que le composant de guidage est démonté.
 
 ### Services externes
 
@@ -372,7 +372,7 @@ Les essais réels de caméra et d'orientation doivent être effectués sur mobil
 Ne pas introduire sans décision produit explicite :
 
 - compte utilisateur ;
-- backend ou base de données obligatoire ;
+- compte, authentification ou backend généraliste de synchronisation des données utilisateur ;
 - synchronisation multi-appareil ;
 - paiement ;
 - vraie AR 3D ou WebXR obligatoire ;

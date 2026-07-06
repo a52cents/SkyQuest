@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { scheduleSkyWindowReminder } from "@/lib/push-store";
+import { getPushManagementTokenHash } from "@/lib/push-management-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type ReminderBody = {
-  endpoint?: unknown;
   reminderAt?: unknown;
   windowStartsAt?: unknown;
   windowEndsAt?: unknown;
@@ -20,6 +20,10 @@ function parseDate(value: unknown): Date | null {
 }
 
 export async function POST(request: Request) {
+  const managementTokenHash = getPushManagementTokenHash(request);
+  if (!managementTokenHash) {
+    return NextResponse.json({ error: "Jeton de gestion requis." }, { status: 401 });
+  }
   let body: ReminderBody;
   try {
     body = (await request.json()) as ReminderBody;
@@ -33,8 +37,6 @@ export async function POST(request: Request) {
   const now = Date.now();
   const latestAllowed = now + 26 * 60 * 60 * 1_000;
   if (
-    typeof body.endpoint !== "string" ||
-    body.endpoint.length > 2_048 ||
     !reminderAt ||
     !windowStartsAt ||
     !windowEndsAt ||
@@ -70,7 +72,7 @@ export async function POST(request: Request) {
 
   try {
     const scheduled = await scheduleSkyWindowReminder({
-      endpoint: body.endpoint,
+      managementTokenHash,
       reminderAt,
       windowStartsAt,
       windowEndsAt,

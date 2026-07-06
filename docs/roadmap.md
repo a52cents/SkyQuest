@@ -1,6 +1,6 @@
 # Roadmap
 
-Cette roadmap décrit une direction produit. Elle ne constitue pas une promesse de livraison et ne signifie pas que les fonctionnalités sont déjà disponibles.
+Cette roadmap décrit une direction produit. La v0 correspond à l'état actuel du dépôt : toute fonctionnalité présente, intégrée à l'interface ou à un flux opérationnel, et effectivement utilisée appartient à la v0. Les sections ultérieures décrivent une direction et ne constituent pas une promesse de livraison.
 
 ## MVP actuel — v0
 
@@ -12,7 +12,9 @@ Cette roadmap décrit une direction produit. Elle ne constitue pas une promesse 
 - journal et progression locale ;
 - mode dégradé sans GPS, météo, caméra ou orientation ;
 - alertes Web Push optionnelles et désactivables ;
-- aucune authentification ; Supabase conserve seulement les subscriptions push.
+- routes API Next.js pour les satellites, les données externes et les notifications ;
+- cron Cloudflare et secours Vercel pour l'évaluation planifiée des alertes ;
+- aucune authentification ; Supabase conserve seulement les données techniques du Web Push.
 
 ## v0.2 — Pertinence du moment
 
@@ -25,9 +27,9 @@ Cette roadmap décrit une direction produit. Elle ne constitue pas une promesse 
 Les notifications restent explicites, peu fréquentes et désactivables. Leur permission n’est
 demandée qu’après une action volontaire dans le Profil.
 
-## v0.3 — Continuité optionnelle
+## v0.3 — Continuité multi-appareil optionnelle
 
-- backend facultatif ;
+- backend de compte et de synchronisation facultatif, distinct des services serveur déjà présents en v0 ;
 - sauvegarde multi-appareil ;
 - compte utilisateur optionnel ;
 - conservation d'un mode local utilisable sans inscription.

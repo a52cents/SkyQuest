@@ -5,14 +5,11 @@ import { AppButton } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
 import {
   createObservationCardBlob,
-  getObservationBadgeLabels,
+  getObservationCardRarity,
   getObservationTargetLabel,
 } from "@/lib/observation-card";
 import type { Observation } from "@/lib/types";
-import { getRankProgress } from "@/lib/progression";
-import { getProgressProfile } from "@/lib/storage";
 import { formatVisibilityScoreForAccessibility } from "@/lib/visibility";
-import { getObservationReportLabel } from "@/lib/observation-report";
 
 type ObservationMemoryCardProps = {
   observation: Observation;
@@ -30,27 +27,12 @@ function getFileName(observation: Observation): string {
 }
 
 export function ObservationMemoryCard({ observation, onClose }: ObservationMemoryCardProps) {
-  const cardObservation = useMemo(() => {
-    if (
-      typeof observation.totalXp === "number" &&
-      typeof observation.rankName === "string" &&
-      typeof observation.streak === "number"
-    ) {
-      return observation;
-    }
-    const profile = getProgressProfile();
-    return {
-      ...observation,
-      totalXp: observation.totalXp ?? profile.totalXp,
-      rankName: observation.rankName ?? getRankProgress(profile.totalXp).current.name,
-      streak: observation.streak ?? profile.weeklyStreak,
-    };
-  }, [observation]);
   const [cardBlob, setCardBlob] = useState<Blob | null>(null);
   const [cardUrl, setCardUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const badges = useMemo(() => getObservationBadgeLabels(cardObservation), [cardObservation]);
+  const rarity = useMemo(() => getObservationCardRarity(observation), [observation]);
+  const isShiny = rarity === "rare";
 
   useEffect(() => {
     let active = true;
@@ -59,7 +41,7 @@ export function ObservationMemoryCard({ observation, onClose }: ObservationMemor
     setCardUrl(null);
     setError(null);
 
-    void createObservationCardBlob(cardObservation)
+    void createObservationCardBlob(observation)
       .then((blob) => {
         if (!active) return;
         objectUrl = URL.createObjectURL(blob);
@@ -74,7 +56,7 @@ export function ObservationMemoryCard({ observation, onClose }: ObservationMemor
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [cardObservation]);
+  }, [observation]);
 
   function saveCard() {
     if (!cardUrl) return;
@@ -109,15 +91,19 @@ export function ObservationMemoryCard({ observation, onClose }: ObservationMemor
   return (
     <AppCard
       as="section"
-      className="overflow-hidden border-accent/25 bg-surface bg-[radial-gradient(circle_at_100%_0%,color-mix(in_srgb,var(--accent)_16%,transparent),transparent_42%)]"
+      className={`overflow-hidden bg-surface ${
+        isShiny
+          ? "border-accent-cyan/35 shadow-[0_20px_70px_rgba(89,85,255,0.16)]"
+          : "border-white/[0.09]"
+      }`}
       padding="sm"
       aria-label={`Carte souvenir de l’observation. ${formatVisibilityScoreForAccessibility(observation.visibilityScore)}`}
     >
       <div className="flex items-start justify-between gap-3 px-1 pb-3">
         <div>
-          <p className="premium-kicker">Souvenir débloqué</p>
+          <p className="premium-kicker">{isShiny ? "Carte rare" : "Souvenir"}</p>
           <h2 className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-xl text-white">
-            Ta carte d’observation
+            {getObservationTargetLabel(observation)}
           </h2>
         </div>
         {onClose ? (
@@ -133,7 +119,7 @@ export function ObservationMemoryCard({ observation, onClose }: ObservationMemor
         ) : null}
       </div>
 
-      <div className="relative aspect-[4/5] overflow-hidden rounded-[18px] border border-white/[0.12] bg-[#0b0d18] shadow-[0_22px_60px_rgba(0,0,0,0.38)]">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-[22px] border border-white/[0.12] bg-[#0b0d18] shadow-[0_22px_60px_rgba(0,0,0,0.38)]">
         {cardUrl ? (
           // The canvas export is the source of truth, so the preview exactly matches the shared file.
           // eslint-disable-next-line @next/next/no-img-element
@@ -147,23 +133,8 @@ export function ObservationMemoryCard({ observation, onClose }: ObservationMemor
             {error ?? "Création de la carte…"}
           </div>
         )}
+        {cardUrl && isShiny ? <div className="observation-card-shine" aria-hidden="true" /> : null}
       </div>
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        {badges.map((badge) => (
-          <span
-            key={badge}
-            className="rounded-full border border-accent/25 bg-accent/[0.1] px-3 py-1 text-xs font-bold text-accent-cyan"
-          >
-            ✦ {badge}
-          </span>
-        ))}
-      </div>
-      {getObservationReportLabel(observation.observationReport) ? (
-        <p className="mt-3 rounded-[12px] border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-sm text-muted">
-          Détail noté · {getObservationReportLabel(observation.observationReport)}
-        </p>
-      ) : null}
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         <AppButton onClick={() => void shareCard()} disabled={!cardBlob} fullWidth>
@@ -178,9 +149,6 @@ export function ObservationMemoryCard({ observation, onClose }: ObservationMemor
           {message}
         </p>
       ) : null}
-      <p className="mt-2 text-center text-[11px] leading-4 text-faint">
-        Générée sur cet appareil. Aucune photo n’est envoyée.
-      </p>
     </AppCard>
   );
 }

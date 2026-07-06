@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import "fake-indexeddb/auto";
 import { selectEveningQuest } from "../lib/evening-quest.ts";
 import { rankQuestsForRecommendation } from "../lib/quest-ranking.ts";
 import {

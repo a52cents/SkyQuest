@@ -379,6 +379,27 @@ a:focus-visible {
   );
 }
 
+.observation-card-shine {
+  position: absolute;
+  inset: -35%;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      115deg,
+      transparent 30%,
+      rgba(83, 225, 255, 0.3) 40%,
+      rgba(175, 112, 255, 0.2) 47%,
+      rgba(255, 116, 213, 0.24) 54%,
+      rgba(129, 255, 198, 0.2) 61%,
+      transparent 71%
+    ),
+    radial-gradient(circle at 42% 45%, rgba(255, 255, 255, 0.24), transparent 22%);
+  background-size: 170% 170%;
+  mix-blend-mode: screen;
+  opacity: 0.62;
+  transform: translate3d(-16%, -10%, 0) rotate(5deg);
+}
+
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass-card {
     background: var(--surface-strong);
@@ -390,6 +411,10 @@ a:focus-visible {
     animation: soft-pulse 4s ease-in-out infinite;
   }
 
+  .observation-card-shine {
+    animation: observation-card-shine 5.8s ease-in-out infinite alternate;
+  }
+
   @keyframes soft-pulse {
     0%,
     100% {
@@ -399,6 +424,17 @@ a:focus-visible {
     50% {
       transform: scale(1.04);
       opacity: 1;
+    }
+  }
+
+  @keyframes observation-card-shine {
+    0% {
+      transform: translate3d(-18%, -12%, 0) rotate(5deg);
+      opacity: 0.4;
+    }
+    100% {
+      transform: translate3d(18%, 12%, 0) rotate(5deg);
+      opacity: 0.68;
     }
   }
 }

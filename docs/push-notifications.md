@@ -7,7 +7,9 @@ permet de choisir les cinq thèmes existants et de désactiver la subscription.
 
 Le précédent store mémoire a été remplacé parce qu’une fonction Vercel peut redémarrer à tout
 moment et que plusieurs instances ne partagent pas leur mémoire. Les subscriptions sont désormais
-persistantes et dédupliquées par leur `endpoint` unique.
+persistantes et dédupliquées par leur `endpoint` unique. Cet endpoint n'est toutefois jamais une
+preuve d'autorité : le navigateur génère un jeton de gestion aléatoire de 256 bits et Supabase n'en
+conserve que le hash SHA-256.
 
 ## 1. Préparer Supabase
 
@@ -19,6 +21,8 @@ persistantes et dédupliquées par leur `endpoint` unique.
 Les tables ont la RLS activée et aucune policy `anon` ou `authenticated`. C’est volontaire : le
 client web ne lit et n’écrit jamais `push_subscriptions` ni `push_notification_claims`. Toutes les
 opérations passent par les routes Next.js avec la clé `service_role`, strictement serveur. La
+lecture ou la modification d'un abonnement depuis le navigateur exige le jeton de gestion dans le
+header `Authorization`; il n'est jamais placé dans une URL ni stocké en clair dans Supabase. La
 fonction SQL `claim_push_notification_slot` verrouille atomiquement l’abonnement, applique le
 cooldown éditorial de 12 heures et enregistre une clé stable dans `push_notification_claims`. Deux
 crons concurrents ne peuvent donc réclamer la même occasion. Le serveur ne retient un créneau futur que si son indice
@@ -29,8 +33,9 @@ La fonction `claim_due_sky_window_reminder` réserve et efface atomiquement le r
 créé depuis l’écran **Plus tard**. Un rappel est donc envoyé une seule fois. Réexécuter le fichier SQL
 sur une installation existante pour ajouter les colonnes `reminder_*` et cette fonction.
 
-Si la table existait déjà avec l’ancienne limite quotidienne, réexécuter le fichier SQL : le
-`create or replace function` mettra le verrou à jour sans supprimer les subscriptions.
+Si la table existait déjà, réexécuter le fichier SQL : il ajoute `management_token_hash` sans
+supprimer les subscriptions. Au prochain contact, un ancien abonnement est rattaché au jeton
+seulement si ses clés Web Push `p256dh` et `auth` correspondent déjà à la ligne stockée.
 
 Les topics SQL utilisent les identifiants réels du code : `clear_sky_evening`, `moon_visible`,
 `planet_visible`, `celestial_event` et `daily_mission`.
@@ -108,9 +113,9 @@ Parcours local :
 6. Envoyer une notification de test et vérifier le clic vers SkyQuest.
 7. Désactiver les alertes et vérifier que `enabled` passe à `false`.
 
-La route test est libre uniquement en développement. En production, elle exige toujours
-`Authorization: Bearer <PUSH_TEST_SECRET>`. Elle utilise un limiteur séparé d’une heure et ne
-consomme jamais le cooldown éditorial de 12 heures.
+Le bouton de l'application s'authentifie avec le jeton de gestion. Pour un test administratif par
+endpoint, la production exige `Authorization: Bearer <PUSH_TEST_SECRET>`. La route utilise un
+limiteur séparé d’une heure et ne consomme jamais le cooldown éditorial de 12 heures.
 
 ## 5. Déployer sur Vercel
 
@@ -169,13 +174,15 @@ le réglage, sans redemander automatiquement la permission.
 
 ## 7. Endpoints et garanties
 
-- `POST /api/push/subscribe` valide puis fait un upsert Supabase sur `endpoint` ;
-- `POST /api/push/unsubscribe` désactive la row de façon idempotente ;
-- `POST /api/push/test` relit une subscription Supabase active et est protégé en production ;
-- `POST /api/push/reminder` programme un rappel unique pour le meilleur créneau des prochaines 24 h ;
+- `POST /api/push/subscribe` crée ou rattache le hash du jeton après preuve par les clés Web Push ;
+- `POST /api/push/unsubscribe` désactive la row identifiée par le hash du jeton ;
+- `POST /api/push/test` accepte le jeton du navigateur ou le secret administratif de production ;
+- `POST /api/push/reminder` programme un rappel pour l'abonnement identifié par le jeton ;
+- `/api/push/target-watch` ne reçoit jamais l'endpoint dans sa query string ;
 - `GET /api/cron/sky-alerts` lit seulement les rows actives et exige `CRON_SECRET` ;
 - une réponse Web Push 404/410 désactive la subscription expirée ;
 - les coordonnées sont réarrondies à `0.1°` côté route et côté store ;
+- aucun endpoint connu ne permet à lui seul de lire ou modifier un abonnement ;
 - la fonction SQL atomique impose 12 heures entre alertes éditoriales et déduplique chaque occasion ;
 - les rappels volontaires restent one-shot, prioritaires et repoussent ensuite les alertes éditoriales ;
 - les notifications de test ont leur propre limite d’une heure ;

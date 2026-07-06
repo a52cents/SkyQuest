@@ -8,6 +8,7 @@ type CameraControlsProps = {
   camera: { status: CameraStatus; error: string | null };
   zoom: { range: CameraZoomRange | null; value: number | null; error: string | null };
   submitting: boolean;
+  persistenceError: string | null;
   nativePhotoError: string | null;
   guidanceReliability: GuidanceReliability;
   isCalibrated: boolean;
@@ -29,6 +30,7 @@ export function CameraControls({
   camera,
   zoom,
   submitting,
+  persistenceError,
   nativePhotoError,
   guidanceReliability,
   isCalibrated,
@@ -77,6 +79,14 @@ export function CameraControls({
         </AppButton>
       </div>
       <CameraFallback cameraError={camera.error} zoomError={zoom.error} />
+      {persistenceError ? (
+        <p
+          className="mb-3 rounded-brand border border-danger/25 bg-danger/10 px-3 py-2 text-sm text-danger"
+          role="alert"
+        >
+          {persistenceError}
+        </p>
+      ) : null}
       {nativePhotoError ? (
         <p className="mb-3 rounded-brand border border-warning/25 bg-warning/10 px-3 py-2 text-sm text-warning">
           {nativePhotoError}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { AppButton, getAppButtonClassName } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
+import { ErrorState } from "@/components/ErrorState";
 import { PageShell } from "@/components/PageShell";
 import {
   formatFreeObservationTime,
@@ -17,6 +18,7 @@ type FreeObservationPhase = "preparation" | "observing" | "complete";
 type FreeObservationGuideProps = {
   onSeen: () => void;
   onMissed: () => void;
+  persistenceError?: string | null;
 };
 
 const PREPARATION_TIPS = [
@@ -31,7 +33,11 @@ const OBSERVATION_TIPS = [
   "Remarque les différences de lumière et de couleur.",
 ] as const;
 
-export function FreeObservationGuide({ onSeen, onMissed }: FreeObservationGuideProps) {
+export function FreeObservationGuide({
+  onSeen,
+  onMissed,
+  persistenceError = null,
+}: FreeObservationGuideProps) {
   const [phase, setPhase] = useState<FreeObservationPhase>("preparation");
   const [remainingSeconds, setRemainingSeconds] = useState(FREE_OBSERVATION_DURATION_SECONDS);
   const endsAtMsRef = useRef<number | null>(null);
@@ -189,6 +195,7 @@ export function FreeObservationGuide({ onSeen, onMissed }: FreeObservationGuideP
           Il n’y avait rien à réussir. Note simplement ton impression du moment.
         </p>
       </AppCard>
+      {persistenceError ? <ErrorState message={persistenceError} /> : null}
       <div className="grid gap-3">
         <AppButton size="lg" fullWidth onClick={onSeen}>
           J’ai remarqué quelque chose

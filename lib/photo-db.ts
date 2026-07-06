@@ -1,6 +1,6 @@
 import { deleteStoredPhoto, getStoredPhoto, saveStoredPhoto } from "./local-database.ts";
 
-function dataUrlToBlob(dataUrl: string): Blob {
+export function photoDataUrlToBlob(dataUrl: string): Blob {
   const match = /^data:([^;,]*)(;base64)?,([\s\S]*)$/.exec(dataUrl);
   if (!match) throw new Error("Data URL photo invalide.");
 
@@ -21,7 +21,7 @@ export const getPhoto = getStoredPhoto;
 export const deletePhoto = deleteStoredPhoto;
 
 export function savePhotoFromDataUrl(dataUrl: string, requestedId?: string): Promise<string> {
-  return savePhoto(dataUrlToBlob(dataUrl), requestedId);
+  return savePhoto(photoDataUrlToBlob(dataUrl), requestedId);
 }
 
 export async function getPhotoObjectUrl(photoId: string): Promise<string | null> {

@@ -8,6 +8,10 @@ import {
   type TargetWatch,
   type TargetWatchReason,
 } from "@/lib/push-types";
+import {
+  isValidPushManagementToken,
+  PUSH_MANAGEMENT_TOKEN_STORAGE_KEY,
+} from "@/lib/push-management";
 import { registerSkyQuestServiceWorker } from "@/lib/service-worker-client";
 
 export {
@@ -35,6 +39,56 @@ export type SkyWindowReminderInput = {
 };
 
 const PREFERENCES_STORAGE_KEY = "skyquest.notification-preferences.v1";
+let memoryManagementToken: string | null = null;
+
+function createPushManagementToken(): string {
+  const bytes = new Uint8Array(32);
+  window.crypto.getRandomValues(bytes);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return window.btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+
+function getPushManagementToken(createIfMissing = true): string | null {
+  if (memoryManagementToken) return memoryManagementToken;
+  try {
+    const stored = window.localStorage.getItem(PUSH_MANAGEMENT_TOKEN_STORAGE_KEY);
+    if (isValidPushManagementToken(stored)) {
+      memoryManagementToken = stored;
+      return stored;
+    }
+    if (stored) window.localStorage.removeItem(PUSH_MANAGEMENT_TOKEN_STORAGE_KEY);
+  } catch {
+    // A session-only token still keeps endpoint-based authority out of API routes.
+  }
+  if (!createIfMissing) return null;
+  const token = createPushManagementToken();
+  memoryManagementToken = token;
+  try {
+    window.localStorage.setItem(PUSH_MANAGEMENT_TOKEN_STORAGE_KEY, token);
+  } catch {
+    // The token remains available for this browser session.
+  }
+  return token;
+}
+
+function clearPushManagementToken(): void {
+  memoryManagementToken = null;
+  try {
+    window.localStorage.removeItem(PUSH_MANAGEMENT_TOKEN_STORAGE_KEY);
+  } catch {
+    // Nothing else can be done when storage is blocked.
+  }
+}
+
+function pushManagementHeaders(token: string): HeadersInit {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+}
 
 export function isPushSupported(): boolean {
   return (
@@ -65,13 +119,17 @@ export async function watchTarget({
 }): Promise<{ ok: boolean; error?: string }> {
   let subscription = await getExistingPushSubscription();
   if (!subscription) subscription = await subscribeToPush({ location });
-  else if (location) await saveSubscriptionOnServer(subscription, { location });
+  else if (!(await saveSubscriptionOnServer(subscription, { location }))) {
+    return { ok: false, error: "Impossible de vérifier cet abonnement." };
+  }
   if (!subscription) return { ok: false, error: "Active d’abord les alertes sur cet appareil." };
+  const managementToken = getPushManagementToken(false);
+  if (!managementToken) return { ok: false, error: "Abonnement local incomplet." };
   try {
     const response = await fetch("/api/push/target-watch", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ endpoint: subscription.endpoint, target, reason }),
+      headers: pushManagementHeaders(managementToken),
+      body: JSON.stringify({ target, reason }),
     });
     const payload = (await response.json().catch(() => ({}))) as { error?: string };
     return { ok: response.ok, error: payload.error };
@@ -83,10 +141,13 @@ export async function watchTarget({
 export async function getTargetWatches(): Promise<TargetWatch[]> {
   const subscription = await getExistingPushSubscription();
   if (!subscription) return [];
+  if (!(await saveSubscriptionOnServer(subscription))) return [];
+  const managementToken = getPushManagementToken(false);
+  if (!managementToken) return [];
   try {
-    const response = await fetch(
-      `/api/push/target-watch?endpoint=${encodeURIComponent(subscription.endpoint)}`,
-    );
+    const response = await fetch("/api/push/target-watch", {
+      headers: pushManagementHeaders(managementToken),
+    });
     const payload = (await response.json()) as { watches?: TargetWatch[] };
     return response.ok && Array.isArray(payload.watches) ? payload.watches : [];
   } catch {
@@ -97,11 +158,14 @@ export async function getTargetWatches(): Promise<TargetWatch[]> {
 export async function cancelTargetWatch(watchId?: string): Promise<boolean> {
   const subscription = await getExistingPushSubscription();
   if (!subscription) return true;
+  if (!(await saveSubscriptionOnServer(subscription))) return false;
+  const managementToken = getPushManagementToken(false);
+  if (!managementToken) return false;
   try {
     const response = await fetch("/api/push/target-watch", {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ endpoint: subscription.endpoint, watchId, all: !watchId }),
+      headers: pushManagementHeaders(managementToken),
+      body: JSON.stringify({ watchId, all: !watchId }),
     });
     return response.ok;
   } catch {
@@ -164,10 +228,12 @@ async function saveSubscriptionOnServer(
   options: PushSubscriptionOptions = {},
 ): Promise<boolean> {
   const preferences = options.preferences ?? getNotificationPreferences();
+  const managementToken = getPushManagementToken();
+  if (!managementToken) return false;
   try {
     const response = await fetch("/api/push/subscribe", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: pushManagementHeaders(managementToken),
       body: JSON.stringify({
         subscription: subscription.toJSON(),
         topics: getTopics(preferences),
@@ -234,17 +300,18 @@ export async function scheduleSkyWindowReminder(input: SkyWindowReminderInput): 
       preferences: getNotificationPreferences(),
       location: input.location,
     });
-  } else if (input.location) {
-    await saveSubscriptionOnServer(subscription, { location: input.location });
+  } else if (!(await saveSubscriptionOnServer(subscription, { location: input.location }))) {
+    return false;
   }
   if (!subscription) return false;
+  const managementToken = getPushManagementToken(false);
+  if (!managementToken) return false;
 
   try {
     const response = await fetch("/api/push/reminder", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: pushManagementHeaders(managementToken),
       body: JSON.stringify({
-        endpoint: subscription.endpoint,
         reminderAt: input.reminderAt,
         windowStartsAt: input.windowStartsAt,
         windowEndsAt: input.windowEndsAt,
@@ -272,7 +339,8 @@ export async function unsubscribeFromPush(): Promise<boolean> {
   const subscription = await getExistingPushSubscription();
   if (!subscription) return true;
 
-  const endpoint = subscription.endpoint;
+  await saveSubscriptionOnServer(subscription);
+  const managementToken = getPushManagementToken(false);
   let unsubscribed = false;
   try {
     unsubscribed = await subscription.unsubscribe();
@@ -281,15 +349,33 @@ export async function unsubscribeFromPush(): Promise<boolean> {
   }
 
   try {
-    await fetch("/api/push/unsubscribe", {
+    if (!managementToken) return unsubscribed;
+    const response = await fetch("/api/push/unsubscribe", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ endpoint }),
+      headers: pushManagementHeaders(managementToken),
     });
+    if (response.ok) clearPushManagementToken();
   } catch {
     // The provider will return 404/410 later, allowing the server to remove the stale endpoint.
   }
   return unsubscribed;
+}
+
+export async function sendTestPush(): Promise<boolean> {
+  const subscription = await getExistingPushSubscription();
+  if (!subscription || !(await saveSubscriptionOnServer(subscription))) return false;
+  const managementToken = getPushManagementToken(false);
+  if (!managementToken) return false;
+  try {
+    const response = await fetch("/api/push/test", {
+      method: "POST",
+      headers: pushManagementHeaders(managementToken),
+      body: "{}",
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 export function getNotificationPreferences(): NotificationPreferences {

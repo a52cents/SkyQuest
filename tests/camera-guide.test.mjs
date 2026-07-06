@@ -83,7 +83,7 @@ test("camera guidance exposes a temporary manual recalibration flow", () => {
 test("found target submits immediately without a photo or opening the photo panel", () => {
   assert.match(
     cameraGuideSource,
-    /function handleSeenWithoutPhoto\(\) \{[\s\S]*?if \(!beginSubmission\(\)\) return;[\s\S]*?onSeen\(\);[\s\S]*?\}/,
+    /function handleSeenWithoutPhoto\(\) \{[\s\S]*?submitObservation\(\(\) => onSeen\(\)\);[\s\S]*?\}/,
   );
   assert.match(cameraGuideSource, /onFound=\{handleSeenWithoutPhoto\}/);
   assert.doesNotMatch(cameraGuideSource, /handleTargetFound|capturePhotoFromVideo/);
@@ -106,7 +106,11 @@ test("optional photo flow can save a chosen image or continue without one", () =
 test("camera result submission stays single and preserves missed and stream cleanup", () => {
   assert.match(cameraGuideSource, /isSubmittingRef\.current/);
   assert.match(questPageSource, /isLoggingRef\.current/);
-  assert.match(cameraGuideSource, /function handleMissed\(\)[\s\S]*?onMissed\(\)/);
+  assert.match(cameraGuideSource, /function handleMissed\(\)[\s\S]*?submitObservation\(onMissed\)/);
+  assert.match(cameraGuideSource, /if \(!succeeded\)[\s\S]*?setIsSubmitting\(false\)/);
+  assert.match(questPageSource, /if \(!result\.persisted\)/);
+  assert.match(questPageSource, /Rien n’a été ajouté à ton journal ni à ta progression/);
+  assert.match(cameraControlsSource, /role="alert"/);
   assert.match(cameraGuideSource, /getTracks\(\)\.forEach\(\(track\) => track\.stop\(\)\)/);
   assert.doesNotMatch(cameraGuideSource, /haptic\("success"\)|haptic\("missed"\)/);
   assert.match(questPageSource, /haptic\(status === "seen" \? "success" : "missed"\)/);

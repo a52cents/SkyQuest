@@ -1,15 +1,22 @@
 import type { Observation } from "@/lib/types";
 
 const DATABASE_NAME = "skyquest.photos.v1";
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 const PHOTO_STORE_NAME = "photos";
 const OBSERVATION_STORE_NAME = "observations";
+
+export const MAX_STORED_OBSERVATIONS = 50;
 
 type StoredPhoto = {
   id: string;
   blob: Blob;
   mimeType: string;
   createdAt: string;
+};
+
+export type ObservationPhotoBlobs = {
+  photo?: Blob;
+  thumbnail?: Blob;
 };
 
 export type ObservationPageOptions = {
@@ -36,6 +43,7 @@ function openDatabase(): Promise<IDBDatabase> {
         store.createIndex("status", "status", { unique: false });
         store.createIndex("targetType", "targetType", { unique: false });
       }
+      if (request.transaction) queueObservationPrune(request.transaction);
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error("Impossible d'ouvrir IndexedDB."));
@@ -60,20 +68,105 @@ function waitForTransaction(transaction: IDBTransaction, message: string): Promi
   });
 }
 
-export function addStoredObservation(observation: Observation): Promise<void> {
+function createStoredPhoto(id: string, blob: Blob): StoredPhoto {
+  return {
+    id,
+    blob,
+    mimeType: blob.type || "application/octet-stream",
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function queueObservationPrune(
+  transaction: IDBTransaction,
+  onComplete: () => void = () => undefined,
+  onError: (error: Error) => void = () => undefined,
+) {
+  const observationStore = transaction.objectStore(OBSERVATION_STORE_NAME);
+  const photoStore = transaction.objectStore(PHOTO_STORE_NAME);
+  const request = observationStore.index("createdAt").openCursor(undefined, "prev");
+  let retainedCount = 0;
+
+  request.onsuccess = () => {
+    const cursor = request.result;
+    if (!cursor) {
+      onComplete();
+      return;
+    }
+
+    retainedCount += 1;
+    if (retainedCount > MAX_STORED_OBSERVATIONS) {
+      const observation = cursor.value as Observation;
+      cursor.delete();
+      if (observation.photoId) photoStore.delete(observation.photoId);
+      if (observation.photoThumbnailId) photoStore.delete(observation.photoThumbnailId);
+    }
+    cursor.continue();
+  };
+  request.onerror = () =>
+    onError(request.error ?? new Error("Impossible de limiter la taille du journal."));
+}
+
+function pruneOldestObservations(transaction: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => queueObservationPrune(transaction, resolve, reject));
+}
+
+export function addStoredObservationWithPhotos(
+  observation: Observation,
+  photos: ObservationPhotoBlobs,
+): Promise<Observation> {
   return withDatabase(async (database) => {
-    const transaction = database.transaction(OBSERVATION_STORE_NAME, "readwrite");
-    transaction.objectStore(OBSERVATION_STORE_NAME).add(observation);
-    await waitForTransaction(transaction, "Impossible d'enregistrer l'observation.");
+    const transaction = database.transaction(
+      [OBSERVATION_STORE_NAME, PHOTO_STORE_NAME],
+      "readwrite",
+    );
+    const transactionCompleted = waitForTransaction(
+      transaction,
+      "Impossible d'enregistrer l'observation et ses photos.",
+    );
+    // Le curseur de pruning peut rejeter avant que nous attendions la fin de la transaction.
+    // Attacher immédiatement un handler évite une rejection orpheline, puis l'await final
+    // conserve le résultat réel de la transaction.
+    void transactionCompleted.catch(() => undefined);
+    const photoStore = transaction.objectStore(PHOTO_STORE_NAME);
+    const storedObservation = { ...observation };
+
+    try {
+      if (photos.photo) {
+        storedObservation.photoId = `${observation.id}-photo`;
+        photoStore.put(createStoredPhoto(storedObservation.photoId, photos.photo));
+      }
+      if (photos.thumbnail) {
+        storedObservation.photoThumbnailId = `${observation.id}-thumbnail`;
+        photoStore.put(createStoredPhoto(storedObservation.photoThumbnailId, photos.thumbnail));
+      }
+      transaction.objectStore(OBSERVATION_STORE_NAME).add(storedObservation);
+    } catch (error) {
+      transaction.abort();
+      throw error;
+    }
+
+    await pruneOldestObservations(transaction);
+    await transactionCompleted;
+    return storedObservation;
   });
 }
 
 export function importStoredObservations(observations: Observation[]): Promise<void> {
   return withDatabase(async (database) => {
-    const transaction = database.transaction(OBSERVATION_STORE_NAME, "readwrite");
+    const transaction = database.transaction(
+      [OBSERVATION_STORE_NAME, PHOTO_STORE_NAME],
+      "readwrite",
+    );
+    const transactionCompleted = waitForTransaction(
+      transaction,
+      "Impossible de migrer les observations.",
+    );
+    void transactionCompleted.catch(() => undefined);
     const store = transaction.objectStore(OBSERVATION_STORE_NAME);
     observations.forEach((observation) => store.put(observation));
-    await waitForTransaction(transaction, "Impossible de migrer les observations.");
+    await pruneOldestObservations(transaction);
+    await transactionCompleted;
   });
 }
 
@@ -95,7 +188,7 @@ export function getObservationPage({
   before,
   limit,
 }: ObservationPageOptions): Promise<Observation[]> {
-  const safeLimit = Math.max(1, Math.min(500, Math.trunc(limit)));
+  const safeLimit = Math.max(1, Math.min(MAX_STORED_OBSERVATIONS, Math.trunc(limit)));
   return withDatabase(
     (database) =>
       new Promise((resolve, reject) => {
@@ -150,8 +243,12 @@ export function updateStoredObservation(observation: Observation): Promise<void>
 
 export function clearStoredObservations(): Promise<void> {
   return withDatabase(async (database) => {
-    const transaction = database.transaction(OBSERVATION_STORE_NAME, "readwrite");
+    const transaction = database.transaction(
+      [OBSERVATION_STORE_NAME, PHOTO_STORE_NAME],
+      "readwrite",
+    );
     transaction.objectStore(OBSERVATION_STORE_NAME).clear();
+    transaction.objectStore(PHOTO_STORE_NAME).clear();
     await waitForTransaction(transaction, "Suppression du journal impossible.");
   });
 }
@@ -164,14 +261,8 @@ function createPhotoId(): string {
 export function saveStoredPhoto(blob: Blob, requestedId?: string): Promise<string> {
   return withDatabase(async (database) => {
     const id = requestedId || createPhotoId();
-    const photo: StoredPhoto = {
-      id,
-      blob,
-      mimeType: blob.type || "application/octet-stream",
-      createdAt: new Date().toISOString(),
-    };
     const transaction = database.transaction(PHOTO_STORE_NAME, "readwrite");
-    transaction.objectStore(PHOTO_STORE_NAME).put(photo);
+    transaction.objectStore(PHOTO_STORE_NAME).put(createStoredPhoto(id, blob));
     await waitForTransaction(transaction, "Impossible d'enregistrer la photo.");
     return id;
   });

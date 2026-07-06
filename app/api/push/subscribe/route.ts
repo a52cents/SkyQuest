@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { NOTIFICATION_TOPICS, type NotificationTopic } from "@/lib/push-types";
 import { upsertPushSubscription } from "@/lib/push-store";
+import { getPushManagementTokenHash } from "@/lib/push-management-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +34,10 @@ function roundApproximateCoordinate(value: unknown, min: number, max: number): n
 }
 
 export async function POST(request: Request) {
+  const managementTokenHash = getPushManagementTokenHash(request);
+  if (!managementTokenHash) {
+    return NextResponse.json({ error: "Jeton de gestion requis." }, { status: 401 });
+  }
   let body: SubscribeBody;
   try {
     body = (await request.json()) as SubscribeBody;
@@ -82,6 +87,7 @@ export async function POST(request: Request) {
       latitudeRounded,
       longitudeRounded,
       enabled: true,
+      managementTokenHash,
     });
 
     return NextResponse.json({

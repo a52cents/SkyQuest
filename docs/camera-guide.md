@@ -53,17 +53,17 @@ L'overlay complet n'est activé que si la caméra, l'orientation, la position et
 
 ## Fallbacks
 
-| Situation                 | Comportement attendu                                        |
-| ------------------------- | ----------------------------------------------------------- |
-| caméra refusée ou absente | afficher fond, direction, altitude et conseils texte        |
-| orientation refusée       | afficher direction cardinale et hauteur cible               |
-| orientation imprécise     | prévenir l'utilisateur et privilégier les indications texte |
-| position absente          | conserver les coordonnées enregistrées dans la quête        |
-| overlay non supporté      | masquer l'overlay sans bloquer le guidage                   |
-| zoom non supporté         | masquer le slider de zoom                                   |
-| torche non supportée      | masquer ou désactiver le contrôle correspondant             |
-| capture impossible        | proposer de choisir une image ou d'enregistrer sans photo   |
-| stockage local bloqué     | terminer la quête sans faire planter l'interface            |
+| Situation                 | Comportement attendu                                          |
+| ------------------------- | ------------------------------------------------------------- |
+| caméra refusée ou absente | afficher fond, direction, altitude et conseils texte          |
+| orientation refusée       | afficher direction cardinale et hauteur cible                 |
+| orientation imprécise     | prévenir l'utilisateur et privilégier les indications texte   |
+| position absente          | conserver les coordonnées enregistrées dans la quête          |
+| overlay non supporté      | masquer l'overlay sans bloquer le guidage                     |
+| zoom non supporté         | masquer le slider de zoom                                     |
+| torche non supportée      | masquer ou désactiver le contrôle correspondant               |
+| capture impossible        | proposer de choisir une image ou d'enregistrer sans photo     |
+| stockage local bloqué     | ne rien créditer, expliquer l'échec et permettre de réessayer |
 
 ## Validation d'une quête
 

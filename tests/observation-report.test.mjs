@@ -27,11 +27,16 @@ test("reports accept only values matching the observation status", () => {
   assert.equal(getObservationReportLabel(report), "Direction incertaine");
 });
 
-test("durable journal has no silent 50-item trim and migrates before removing local data", () => {
+test("durable journal enforces its documented 50-item limit and migrates before removing local data", () => {
   const storage = readFileSync(new URL("../lib/storage.ts", import.meta.url), "utf8");
   const database = readFileSync(new URL("../lib/local-database.ts", import.meta.url), "utf8");
-  assert.doesNotMatch(storage, /slice\(0,\s*50\)/);
+  const journalPage = readFileSync(new URL("../app/journal/page.tsx", import.meta.url), "utf8");
+  assert.match(database, /MAX_STORED_OBSERVATIONS = 50/);
+  assert.match(database, /pruneOldestObservations/);
   assert.match(storage, /await importStoredObservations\(observations\)[\s\S]+removeStoredValue/);
   assert.match(database, /createIndex\("createdAt"/);
   assert.match(database, /getObservationPage/);
+  assert.match(journalPage, /const result = await clearObservations\(\)/);
+  assert.match(journalPage, /if \(!result\.cleared\)/);
+  assert.match(journalPage, /setObservations\(\[\]\)/);
 });

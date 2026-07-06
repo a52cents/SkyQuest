@@ -47,8 +47,8 @@ test("real weather percentages and visual progress widths remain percentages", (
   assert.match(tonightSource, /style=\{\{ width: `\$\{hour\.score\}%` \}\}/);
 });
 
-test("memory canvas and accessible copy use canonical visibility formats", () => {
-  assert.match(canvasSource, /formatVisibilityScore\(observation\.visibilityScore\)/);
+test("the simplified memory card keeps visibility details out of the shared canvas", () => {
+  assert.doesNotMatch(canvasSource, /formatVisibilityScore|visibilityScore/);
   assert.doesNotMatch(canvasSource, /% visibilité/);
   assert.match(memorySource, /formatVisibilityScoreForAccessibility/);
   assert.match(journalSource, /formatVisibilityScoreForAccessibility/);

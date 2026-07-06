@@ -7,6 +7,7 @@ create table if not exists public.push_subscriptions (
   endpoint text not null unique,
   p256dh text not null,
   auth text not null,
+  management_token_hash text,
 
   enabled boolean not null default true,
   topics jsonb not null default '["clear_sky_evening", "moon_visible", "planet_visible", "celestial_event"]'::jsonb,
@@ -37,7 +38,9 @@ create table if not exists public.push_subscriptions (
   constraint push_subscriptions_longitude_check
     check (longitude_rounded is null or longitude_rounded between -180 and 180),
   constraint push_subscriptions_reminder_score_check
-    check (reminder_score is null or reminder_score between 0 and 100)
+    check (reminder_score is null or reminder_score between 0 and 100),
+  constraint push_subscriptions_management_token_hash_check
+    check (management_token_hash is null or management_token_hash ~ '^[0-9a-f]{64}$')
 );
 
 -- Safe to run again on an existing installation.
@@ -47,7 +50,22 @@ alter table public.push_subscriptions
   add column if not exists reminder_window_ends_at timestamptz,
   add column if not exists reminder_target text,
   add column if not exists reminder_score smallint,
-  add column if not exists last_test_notification_sent_at timestamptz;
+  add column if not exists last_test_notification_sent_at timestamptz,
+  add column if not exists management_token_hash text;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'push_subscriptions_management_token_hash_check'
+      and conrelid = 'public.push_subscriptions'::regclass
+  ) then
+    alter table public.push_subscriptions
+      add constraint push_subscriptions_management_token_hash_check
+      check (management_token_hash is null or management_token_hash ~ '^[0-9a-f]{64}$');
+  end if;
+end
+$$;
 
 alter table public.push_subscriptions enable row level security;
 
@@ -74,6 +92,10 @@ grant select, insert, update, delete on table public.push_notification_claims to
 create index if not exists push_subscriptions_enabled_idx
   on public.push_subscriptions (enabled);
 
+create unique index if not exists push_subscriptions_management_token_hash_idx
+  on public.push_subscriptions (management_token_hash)
+  where management_token_hash is not null;
+
 create index if not exists push_subscriptions_last_notification_idx
   on public.push_subscriptions (last_notification_sent_at);
 
@@ -86,6 +108,89 @@ create index if not exists push_subscriptions_reminder_idx
 
 create index if not exists push_notification_claims_claimed_at_idx
   on public.push_notification_claims (claimed_at);
+
+-- Creates a subscription or updates it only when the caller proves control with either
+-- the current management token or the exact Web Push keys already stored. The key fallback
+-- permits safe migration and recovery when browser localStorage was cleared.
+create or replace function public.upsert_push_subscription(
+  p_endpoint text,
+  p_p256dh text,
+  p_auth text,
+  p_management_token_hash text,
+  p_enabled boolean,
+  p_topics jsonb,
+  p_timezone text,
+  p_latitude_rounded numeric,
+  p_longitude_rounded numeric,
+  p_now timestamptz
+)
+returns setof public.push_subscriptions
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_subscription_id uuid;
+  v_endpoint text;
+  v_p256dh text;
+  v_auth text;
+  v_management_token_hash text;
+begin
+  if p_management_token_hash is null
+    or p_management_token_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'invalid_management_token_hash';
+  end if;
+
+  select id, endpoint, p256dh, auth, management_token_hash
+  into v_subscription_id, v_endpoint, v_p256dh, v_auth, v_management_token_hash
+  from public.push_subscriptions
+  where endpoint = p_endpoint
+    or management_token_hash = p_management_token_hash
+  order by (endpoint = p_endpoint) desc
+  limit 1
+  for update;
+
+  if found then
+    if v_management_token_hash is distinct from p_management_token_hash
+      and (v_p256dh is distinct from p_p256dh or v_auth is distinct from p_auth) then
+      raise exception 'push_subscription_management_forbidden';
+    end if;
+
+    update public.push_subscriptions
+    set endpoint = p_endpoint,
+        p256dh = p_p256dh,
+        auth = p_auth,
+        management_token_hash = p_management_token_hash,
+        enabled = p_enabled,
+        topics = p_topics,
+        timezone = p_timezone,
+        latitude_rounded = p_latitude_rounded,
+        longitude_rounded = p_longitude_rounded,
+        last_seen_at = p_now,
+        updated_at = p_now
+    where id = v_subscription_id;
+  else
+    insert into public.push_subscriptions (
+      endpoint, p256dh, auth, management_token_hash, enabled, topics, timezone,
+      latitude_rounded, longitude_rounded, last_seen_at, updated_at
+    ) values (
+      p_endpoint, p_p256dh, p_auth, p_management_token_hash, p_enabled, p_topics, p_timezone,
+      p_latitude_rounded, p_longitude_rounded, p_now, p_now
+    )
+    returning id into v_subscription_id;
+  end if;
+
+  return query
+  select * from public.push_subscriptions where id = v_subscription_id;
+end;
+$$;
+
+revoke all on function public.upsert_push_subscription(
+  text, text, text, text, boolean, jsonb, text, numeric, numeric, timestamptz
+) from public, anon, authenticated;
+grant execute on function public.upsert_push_subscription(
+  text, text, text, text, boolean, jsonb, text, numeric, numeric, timestamptz
+) to service_role;
 
 -- Remove the old hourly boolean overload before installing the explicit 12-hour claim result.
 drop function if exists public.claim_push_notification_slot(text, timestamptz);
@@ -311,8 +416,10 @@ create unique index if not exists push_target_watches_one_active_target_idx
   on public.push_target_watches (subscription_id, target)
   where enabled = true;
 
-create or replace function public.create_target_watch(
-  p_endpoint text,
+drop function if exists public.create_target_watch(text, text, text, text, smallint, timestamptz);
+
+create function public.create_target_watch(
+  p_management_token_hash text,
   p_target text,
   p_target_type text,
   p_reason text,
@@ -336,7 +443,7 @@ begin
 
   select id into v_subscription_id
   from public.push_subscriptions
-  where endpoint = p_endpoint
+  where management_token_hash = p_management_token_hash
     and enabled = true
     and latitude_rounded is not null
     and longitude_rounded is not null

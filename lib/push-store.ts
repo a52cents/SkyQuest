@@ -58,7 +58,7 @@ type UpsertPushSubscriptionInput = Pick<
 > &
   Partial<
     Pick<StoredPushSubscription, "timezone" | "latitudeRounded" | "longitudeRounded" | "enabled">
-  >;
+  > & { managementTokenHash: string };
 
 const SELECT_FIELDS =
   "id,endpoint,p256dh,auth,enabled,topics,timezone,latitude_rounded,longitude_rounded,last_seen_at,last_notification_sent_at,reminder_at,reminder_window_starts_at,reminder_window_ends_at,reminder_target,reminder_score,created_at,updated_at";
@@ -134,14 +134,14 @@ function watchFromRow(row: TargetWatchRow): TargetWatch {
 }
 
 export async function createTargetWatch({
-  endpoint,
+  managementTokenHash,
   target,
   targetType,
   reason,
   minimumScore = 60,
   now = new Date(),
 }: {
-  endpoint: string;
+  managementTokenHash: string;
   target: string;
   targetType: string;
   reason: TargetWatchReason;
@@ -152,7 +152,7 @@ export async function createTargetWatch({
   const { data: subscription, error: subscriptionError } = await supabase
     .from("push_subscriptions")
     .select("id,latitude_rounded,longitude_rounded")
-    .eq("endpoint", endpoint)
+    .eq("management_token_hash", managementTokenHash)
     .eq("enabled", true)
     .maybeSingle();
   if (subscriptionError || !subscription)
@@ -160,13 +160,13 @@ export async function createTargetWatch({
   if (subscription.latitude_rounded === null || subscription.longitude_rounded === null) {
     throw new Error("Target watch requires an approximate location");
   }
-  const existing = (await listTargetWatches(endpoint, now)).find(
+  const existing = (await listTargetWatches(managementTokenHash, now)).find(
     (watch) => watch.target.toLocaleLowerCase("fr-FR") === target.toLocaleLowerCase("fr-FR"),
   );
   if (existing) return existing;
 
   const { data, error } = await supabase.rpc("create_target_watch", {
-    p_endpoint: endpoint,
+    p_management_token_hash: managementTokenHash,
     p_target: target,
     p_target_type: targetType,
     p_reason: reason,
@@ -185,14 +185,14 @@ export async function createTargetWatch({
 }
 
 export async function listTargetWatches(
-  endpoint: string,
+  managementTokenHash: string,
   now = new Date(),
 ): Promise<TargetWatch[]> {
   const supabase = createSupabaseAdminClient();
   const { data: subscription, error: subscriptionError } = await supabase
     .from("push_subscriptions")
     .select("id")
-    .eq("endpoint", endpoint)
+    .eq("management_token_hash", managementTokenHash)
     .maybeSingle();
   if (subscriptionError) throwStoreError("find target watch subscription", subscriptionError);
   if (!subscription) return [];
@@ -207,12 +207,15 @@ export async function listTargetWatches(
   return (data ?? []).map((row) => watchFromRow(row as TargetWatchRow));
 }
 
-export async function disableTargetWatch(endpoint: string, watchId?: string): Promise<void> {
+export async function disableTargetWatch(
+  managementTokenHash: string,
+  watchId?: string,
+): Promise<void> {
   const supabase = createSupabaseAdminClient();
   const { data: subscription, error: subscriptionError } = await supabase
     .from("push_subscriptions")
     .select("id")
-    .eq("endpoint", endpoint)
+    .eq("management_token_hash", managementTokenHash)
     .maybeSingle();
   if (subscriptionError) throwStoreError("find target watch subscription", subscriptionError);
   if (!subscription) return;
@@ -270,14 +273,14 @@ export async function cleanupExpiredTargetWatches(now = new Date()): Promise<num
 }
 
 export async function scheduleSkyWindowReminder({
-  endpoint,
+  managementTokenHash,
   reminderAt,
   windowStartsAt,
   windowEndsAt,
   target,
   score,
 }: {
-  endpoint: string;
+  managementTokenHash: string;
   reminderAt: Date;
   windowStartsAt: Date;
   windowEndsAt: Date;
@@ -296,7 +299,7 @@ export async function scheduleSkyWindowReminder({
       reminder_score: Math.max(0, Math.min(100, Math.round(score))),
       updated_at: now,
     })
-    .eq("endpoint", endpoint)
+    .eq("management_token_hash", managementTokenHash)
     .eq("enabled", true)
     .select("endpoint")
     .maybeSingle();
@@ -314,31 +317,25 @@ export async function upsertPushSubscription(
   const longitudeRounded = normalizeCoordinate(input.longitudeRounded, -180, 180);
   const hasLocation = latitudeRounded !== null && longitudeRounded !== null;
 
-  const { data, error } = await supabase
-    .from("push_subscriptions")
-    .upsert(
-      {
-        endpoint: input.endpoint,
-        p256dh: input.p256dh,
-        auth: input.auth,
-        enabled: input.enabled ?? true,
-        topics: normalizeTopics(input.topics),
-        timezone: input.timezone?.trim() || null,
-        latitude_rounded: hasLocation ? latitudeRounded : null,
-        longitude_rounded: hasLocation ? longitudeRounded : null,
-        last_seen_at: now,
-        updated_at: now,
-      },
-      { onConflict: "endpoint" },
-    )
-    .select(SELECT_FIELDS)
-    .single();
+  const { data, error } = await supabase.rpc("upsert_push_subscription", {
+    p_endpoint: input.endpoint,
+    p_p256dh: input.p256dh,
+    p_auth: input.auth,
+    p_management_token_hash: input.managementTokenHash,
+    p_enabled: input.enabled ?? true,
+    p_topics: normalizeTopics(input.topics),
+    p_timezone: input.timezone?.trim() || null,
+    p_latitude_rounded: hasLocation ? latitudeRounded : null,
+    p_longitude_rounded: hasLocation ? longitudeRounded : null,
+    p_now: now,
+  });
 
-  if (error || !data) throwStoreError("upsert", error);
-  return fromRow(data as PushSubscriptionRow);
+  const row = (Array.isArray(data) ? data[0] : data) as PushSubscriptionRow | undefined;
+  if (error || !row) throwStoreError("authorized upsert", error);
+  return fromRow(row);
 }
 
-export async function getPushSubscription(
+export async function getPushSubscriptionByEndpoint(
   endpoint: string,
 ): Promise<StoredPushSubscription | undefined> {
   const supabase = createSupabaseAdminClient();
@@ -349,6 +346,20 @@ export async function getPushSubscription(
     .maybeSingle();
 
   if (error) throwStoreError("read", error);
+  return data ? fromRow(data as PushSubscriptionRow) : undefined;
+}
+
+export async function getPushSubscriptionByManagementTokenHash(
+  managementTokenHash: string,
+): Promise<StoredPushSubscription | undefined> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("push_subscriptions")
+    .select(SELECT_FIELDS)
+    .eq("management_token_hash", managementTokenHash)
+    .maybeSingle();
+
+  if (error) throwStoreError("read by management token", error);
   return data ? fromRow(data as PushSubscriptionRow) : undefined;
 }
 
@@ -385,6 +396,21 @@ export async function disablePushSubscription(endpoint: string): Promise<boolean
 
   if (error) throwStoreError("disable", error);
   return true;
+}
+
+export async function disablePushSubscriptionByManagementTokenHash(
+  managementTokenHash: string,
+): Promise<boolean> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("push_subscriptions")
+    .update({ enabled: false, updated_at: new Date().toISOString() })
+    .eq("management_token_hash", managementTokenHash)
+    .select("id")
+    .maybeSingle();
+
+  if (error) throwStoreError("disable by management token", error);
+  return Boolean(data);
 }
 
 // Kept for compatibility with the existing routes and push sender. Rows are retained but disabled.

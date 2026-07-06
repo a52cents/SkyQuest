@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { sendPushToMany } from "@/lib/push-server";
-import { claimTestPushSlot, getPushSubscription } from "@/lib/push-store";
+import {
+  claimTestPushSlot,
+  getPushSubscriptionByEndpoint,
+  getPushSubscriptionByManagementTokenHash,
+} from "@/lib/push-store";
+import { getPushManagementTokenHash } from "@/lib/push-management-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,23 +17,22 @@ function isAuthorized(request: Request): boolean {
 }
 
 export async function POST(request: Request) {
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ error: "Endpoint de test désactivé." }, { status: 403 });
-  }
-
-  let endpoint: unknown;
+  let endpoint: unknown = undefined;
   try {
     endpoint = ((await request.json()) as { endpoint?: unknown }).endpoint;
   } catch {
     return NextResponse.json({ error: "Corps JSON invalide." }, { status: 400 });
   }
-  if (typeof endpoint !== "string") {
-    return NextResponse.json({ error: "Endpoint requis." }, { status: 400 });
-  }
-
   let subscription;
   try {
-    subscription = await getPushSubscription(endpoint);
+    const managementTokenHash = getPushManagementTokenHash(request);
+    if (isAuthorized(request) && typeof endpoint === "string") {
+      subscription = await getPushSubscriptionByEndpoint(endpoint);
+    } else if (managementTokenHash) {
+      subscription = await getPushSubscriptionByManagementTokenHash(managementTokenHash);
+    } else {
+      return NextResponse.json({ error: "Jeton de gestion requis." }, { status: 401 });
+    }
   } catch {
     return NextResponse.json({ error: "Stockage push indisponible." }, { status: 503 });
   }

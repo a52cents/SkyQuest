@@ -32,6 +32,7 @@ export default function QuestGuidePage() {
     completedQuest: SkyQuest;
     showNotificationInvite: boolean;
   } | null>(null);
+  const [persistenceError, setPersistenceError] = useState<string | null>(null);
   const isLoggingRef = useRef(false);
 
   useEffect(() => {
@@ -53,14 +54,29 @@ export default function QuestGuidePage() {
     return () => window.clearInterval(intervalId);
   }, [params.id]);
 
+  function reportPersistenceFailure(): false {
+    isLoggingRef.current = false;
+    setPersistenceError(
+      "Impossible d’enregistrer cette observation sur l’appareil. Rien n’a été ajouté à ton journal ni à ta progression. Réessaie.",
+    );
+    return false;
+  }
+
   async function logAndReturn(status: "seen" | "missed", photo?: ObservationPhotoDraft) {
     if (!quest || isLoggingRef.current) {
-      return;
+      return false;
     }
     isLoggingRef.current = true;
+    setPersistenceError(null);
     const previousProfile = getProgressProfile();
     const previousRankName = getRankProgress(previousProfile.totalXp).current.name;
-    const result = await addObservation(quest, status, getLastLocation() ?? undefined, photo);
+    const result = await addObservation(quest, status, getLastLocation() ?? undefined, photo).catch(
+      () => null,
+    );
+    if (!result) return reportPersistenceFailure();
+    if (!result.persisted) {
+      return reportPersistenceFailure();
+    }
     haptic(status === "seen" ? "success" : "missed");
     setReward({
       reward: result.reward,
@@ -72,6 +88,7 @@ export default function QuestGuidePage() {
         quest.targetType !== "free_observation" &&
         previousProfile.discoveredTargets.length === 0,
     });
+    return true;
   }
 
   if (reward) {
@@ -172,6 +189,7 @@ export default function QuestGuidePage() {
   if (quest.targetType === "free_observation") {
     return (
       <FreeObservationGuide
+        persistenceError={persistenceError}
         onSeen={() => void logAndReturn("seen")}
         onMissed={() => void logAndReturn("missed")}
       />
@@ -181,6 +199,7 @@ export default function QuestGuidePage() {
   return (
     <CameraGuide
       quest={quest}
+      persistenceError={persistenceError}
       onSeen={(photo) => logAndReturn("seen", photo)}
       onMissed={() => logAndReturn("missed")}
     />

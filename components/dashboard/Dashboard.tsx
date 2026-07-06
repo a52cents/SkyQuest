@@ -40,6 +40,7 @@ import { calculateBestSkyWindow } from "@/lib/sky-window";
 import { isBestSkyWindowFresh } from "@/lib/sky-window-freshness";
 import { generateQuests } from "@/lib/quest-generator";
 import { isGeneratedAtFresh, isQuestFresh, SKY_DATA_TTL_MS } from "@/lib/quest-freshness";
+import { parseDashboardAnalysis, type DashboardAnalysis } from "@/lib/storage-parsers";
 import {
   clearExpiredEveningQuestAssignment,
   getOnboardingCompleted,
@@ -77,18 +78,6 @@ type LoadState = "idle" | "loading" | "ready";
 const DASHBOARD_ANALYSIS_KEY = "skyquest.dashboard-analysis.v1";
 let unlockedAnalysisForRuntime: number | null = null;
 
-type DashboardAnalysis = {
-  savedAt: number;
-  generatedAt: string;
-  position: GeoPosition;
-  weather: WeatherNow;
-  quests: SkyQuest[];
-  bestSkyWindow?: BestSkyWindow;
-  lightPollution?: LightPollutionEstimate;
-  lightingPractice?: LightingPracticeEstimate;
-  airQuality?: AirQualityNow;
-};
-
 const pageVariants: Variants = {
   hidden: {},
   visible: { transition: { staggerChildren: 0.08 } },
@@ -103,25 +92,15 @@ function readCachedAnalysis(): DashboardAnalysis | null {
   try {
     const raw = window.localStorage.getItem(DASHBOARD_ANALYSIS_KEY);
     if (!raw) return null;
-    const value = JSON.parse(raw) as Partial<DashboardAnalysis>;
-    if (
-      typeof value.savedAt !== "number" ||
-      !value.position ||
-      !Number.isFinite(value.position.latitude) ||
-      !Number.isFinite(value.position.longitude) ||
-      !value.weather ||
-      !Array.isArray(value.quests)
-    ) {
-      return null;
-    }
-    return {
-      ...value,
-      generatedAt:
-        typeof value.generatedAt === "string"
-          ? value.generatedAt
-          : new Date(value.savedAt).toISOString(),
-    } as DashboardAnalysis;
+    const analysis = parseDashboardAnalysis(JSON.parse(raw) as unknown);
+    if (!analysis) window.localStorage.removeItem(DASHBOARD_ANALYSIS_KEY);
+    return analysis;
   } catch {
+    try {
+      window.localStorage.removeItem(DASHBOARD_ANALYSIS_KEY);
+    } catch {
+      // Storage remains optional; a malformed cache simply stays ignored.
+    }
     return null;
   }
 }
@@ -135,7 +114,9 @@ function cacheAnalysis(analysis: DashboardAnalysis) {
         longitude: Math.round(analysis.position.longitude * 100) / 100,
       },
     };
-    window.localStorage.setItem(DASHBOARD_ANALYSIS_KEY, JSON.stringify(roundedAnalysis));
+    const parsed = parseDashboardAnalysis(roundedAnalysis);
+    if (!parsed) return;
+    window.localStorage.setItem(DASHBOARD_ANALYSIS_KEY, JSON.stringify(parsed));
   } catch {
     // The current analysis remains usable even when browser storage is unavailable.
   }

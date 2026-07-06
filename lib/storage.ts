@@ -2,8 +2,9 @@
  * Persistance locale
  *
  * Centralise la quête active, la dernière position, le journal et le profil de progression.
- * Les lectures valident les anciennes données avant de les réutiliser et les écritures gardent
- * un fallback mémoire lorsque `localStorage` est indisponible.
+ * Les lectures valident les anciennes données avant de les réutiliser. Les réglages gardent un
+ * fallback mémoire lorsque `localStorage` est indisponible ; une observation, ses photos et sa
+ * progression ne sont validées qu'après le commit IndexedDB de l'observation.
  *
  * Invariants de confidentialité :
  * - ne jamais envoyer les données stockées vers un serveur depuis ce module ;
@@ -12,14 +13,15 @@
  * - tolérer les données corrompues ou issues d'une ancienne version sans faire planter l'UI ;
  * - les photos restent locales dans IndexedDB ; localStorage ne garde que leurs identifiants.
  */
-import { deletePhoto, savePhotoFromDataUrl } from "./photo-db.ts";
+import { photoDataUrlToBlob, savePhotoFromDataUrl } from "./photo-db.ts";
 import {
-  addStoredObservation,
+  addStoredObservationWithPhotos,
   clearStoredObservations,
   countObservations as countDatabaseObservations,
   getObservation as getDatabaseObservation,
   getObservationPage as getDatabaseObservationPage,
   importStoredObservations,
+  MAX_STORED_OBSERVATIONS,
   updateStoredObservation,
   type ObservationPageOptions,
 } from "./local-database.ts";
@@ -28,6 +30,12 @@ import {
   getBestSkyWindowValidity,
   type BestSkyWindowValidityReason,
 } from "./sky-window-freshness.ts";
+import {
+  parseBestSkyWindow,
+  parseSkyQuest,
+  parseStoredLocation,
+  type StoredLocation,
+} from "./storage-parsers.ts";
 export {
   getOnboardingCompleted,
   resetOnboardingCompleted,
@@ -53,11 +61,6 @@ const PROGRESS_PROFILE_KEY = "skyquest.progression.v1";
 const BEST_SKY_WINDOW_KEY = "skyquest.bestSkyWindow.v1";
 const EVENING_QUEST_ASSIGNMENT_KEY = "skyquest.eveningQuestAssignment.v1";
 
-type StoredLocation = {
-  latitude: number;
-  longitude: number;
-};
-
 let memoryObservations: Observation[] = [];
 let memoryProfile = createEmptyProgressProfile();
 let memoryActiveQuest: SkyQuest | null = null;
@@ -76,10 +79,17 @@ function readJson<T>(key: string, fallback: T): T {
     return fallback;
   }
 
+  let raw: string | null;
   try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
+    raw = window.localStorage.getItem(key);
   } catch {
+    return fallback;
+  }
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    removeStoredValue(key);
     return fallback;
   }
 }
@@ -100,14 +110,16 @@ function writeJson<T>(key: string, value: T): boolean {
   }
 }
 
-function removeStoredValue(key: string): void {
-  if (!canUseStorage()) return;
+function removeStoredValue(key: string): boolean {
+  if (!canUseStorage()) return true;
 
   try {
     window.localStorage.removeItem(key);
     failedStorageKeys.delete(key);
+    return true;
   } catch {
     failedStorageKeys.add(key);
+    return false;
   }
 }
 
@@ -343,10 +355,12 @@ async function ensureLegacyObservationsMigrated(): Promise<void> {
     legacyMigrationPromise = Promise.all(
       readValidObservations().map(migrateLegacyObservation),
     ).then(async (observations) => {
-      memoryObservations = observations;
       await importStoredObservations(observations);
-      removeStoredValue(OBSERVATIONS_KEY);
-      return observations;
+      if (!removeStoredValue(OBSERVATIONS_KEY)) {
+        throw new Error("Impossible de terminer la migration du journal.");
+      }
+      memoryObservations = sortMemoryObservations(observations);
+      return memoryObservations;
     });
   }
   try {
@@ -357,10 +371,12 @@ async function ensureLegacyObservationsMigrated(): Promise<void> {
 }
 
 function sortMemoryObservations(observations: Observation[]): Observation[] {
-  return [...observations].sort(
-    (left, right) =>
-      right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id),
-  );
+  return [...observations]
+    .sort(
+      (left, right) =>
+        right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id),
+    )
+    .slice(0, MAX_STORED_OBSERVATIONS);
 }
 
 export async function getObservationPage(options: ObservationPageOptions): Promise<Observation[]> {
@@ -389,16 +405,7 @@ export async function getObservationPage(options: ObservationPageOptions): Promi
 }
 
 export async function getObservations(): Promise<Observation[]> {
-  const observations: Observation[] = [];
-  let before: ObservationPageOptions["before"];
-  do {
-    const page = await getObservationPage({ before, limit: 500 });
-    observations.push(...page);
-    const last = page.at(-1);
-    before = last ? { createdAt: last.createdAt, id: last.id } : undefined;
-    if (page.length < 500) break;
-  } while (before);
-  return observations;
+  return getObservationPage({ limit: MAX_STORED_OBSERVATIONS });
 }
 
 export async function countObservations(): Promise<number> {
@@ -489,12 +496,15 @@ export async function addObservation(
   location?: { latitude: number; longitude: number },
   photo?: ObservationPhotoDraft,
   now = new Date(),
-): Promise<{
-  observation: Observation;
-  profile: ProgressProfile;
-  reward: ProgressReward;
-  persisted: boolean;
-}> {
+): Promise<
+  | {
+      persisted: true;
+      observation: Observation;
+      profile: ProgressProfile;
+      reward: ProgressReward;
+    }
+  | { persisted: false; reason: "observation_persistence_failed" }
+> {
   const nightKey = getLocalNightKey(now);
   const eveningAssignment = getEveningQuestAssignment();
   const hasValidEveningAssignment =
@@ -508,15 +518,7 @@ export async function addObservation(
     ? quest
     : { ...quest, questKind: "standard", eveningQuestNightKey: undefined };
   const { profile, reward } = applyQuestReward(getProgressProfile(), rewardQuest, status, now);
-  const [photoId, photoThumbnailId] = await Promise.all([
-    photo?.photoDataUrl
-      ? savePhotoFromDataUrl(photo.photoDataUrl).catch(() => undefined)
-      : Promise.resolve(undefined),
-    photo?.photoThumbnailDataUrl
-      ? savePhotoFromDataUrl(photo.photoThumbnailDataUrl).catch(() => undefined)
-      : Promise.resolve(undefined),
-  ]);
-  const observation: Observation = {
+  const observationDraft: Observation = {
     id: `${quest.id}-${status}-${Date.now()}`,
     createdAt: now.toISOString(),
     questTitle: rewardQuest.title,
@@ -534,12 +536,26 @@ export async function addObservation(
     weather: rewardQuest.weather,
     latitude: location ? roundCoordinate(location.latitude) : undefined,
     longitude: location ? roundCoordinate(location.longitude) : undefined,
-    photoId,
-    photoThumbnailId,
     questKind: rewardQuest.questKind,
     eveningQuestBonusXp: reward.eveningQuestBonusXp,
   };
 
+  let observation: Observation;
+  try {
+    const photoBlob = photo?.photoDataUrl ? photoDataUrlToBlob(photo.photoDataUrl) : undefined;
+    const thumbnailBlob = photo?.photoThumbnailDataUrl
+      ? photoDataUrlToBlob(photo.photoThumbnailDataUrl)
+      : undefined;
+    await ensureLegacyObservationsMigrated();
+    observation = await addStoredObservationWithPhotos(observationDraft, {
+      photo: photoBlob,
+      thumbnail: thumbnailBlob,
+    });
+  } catch {
+    return { persisted: false, reason: "observation_persistence_failed" };
+  }
+
+  // La progression ne peut avancer qu'après le commit atomique de l'observation et des photos.
   saveProgressProfile(profile);
   if (reward.isEveningQuestCompleted) {
     completeEveningQuestAssignment(nightKey, rewardQuest.target, now);
@@ -548,33 +564,20 @@ export async function addObservation(
     observation,
     ...memoryObservations.filter((item) => item.id !== observation.id),
   ]);
-  let observationPersisted = false;
-  try {
-    await ensureLegacyObservationsMigrated();
-    await addStoredObservation(observation);
-    observationPersisted = true;
-  } catch {
-    // The in-memory journal keeps the flow usable when IndexedDB is unavailable.
-  }
-  return { observation, profile, reward, persisted: observationPersisted };
+  return { observation, profile, reward, persisted: true };
 }
 
-export async function clearObservations(): Promise<void> {
-  const observations = await getObservations();
-  memoryObservations = [];
-  removeStoredValue(OBSERVATIONS_KEY);
-  const databaseCleared = await clearStoredObservations().then(
-    () => true,
-    () => false,
-  );
-  if (!databaseCleared) return;
-  await Promise.allSettled(
-    observations.flatMap((observation) =>
-      [observation.photoId, observation.photoThumbnailId]
-        .filter((id): id is string => typeof id === "string")
-        .map(deletePhoto),
-    ),
-  );
+export async function clearObservations(): Promise<
+  { cleared: true } | { cleared: false; reason: "journal_clear_failed" }
+> {
+  try {
+    await ensureLegacyObservationsMigrated();
+    await clearStoredObservations();
+    memoryObservations = [];
+    return { cleared: true };
+  } catch {
+    return { cleared: false, reason: "journal_clear_failed" };
+  }
 }
 
 export async function updateObservationReport(
@@ -605,12 +608,20 @@ export async function updateObservationReport(
 }
 
 export function saveActiveQuest(quest: SkyQuest): void {
-  memoryActiveQuest = quest;
-  writeJson(ACTIVE_QUEST_KEY, quest);
+  const parsed = parseSkyQuest(quest);
+  if (!parsed) return;
+  memoryActiveQuest = parsed;
+  writeJson(ACTIVE_QUEST_KEY, parsed);
 }
 
 export function getActiveQuest(): SkyQuest | null {
-  const quest = readJson<SkyQuest | null>(ACTIVE_QUEST_KEY, memoryActiveQuest);
+  const value = readJson<unknown>(ACTIVE_QUEST_KEY, memoryActiveQuest);
+  const quest = parseSkyQuest(value);
+  if (!quest) {
+    memoryActiveQuest = null;
+    if (value !== null) removeStoredValue(ACTIVE_QUEST_KEY);
+    return null;
+  }
   memoryActiveQuest = quest;
   return quest;
 }
@@ -688,23 +699,32 @@ export function completeEveningQuestAssignment(
 }
 
 export function saveLastLocation(location: StoredLocation): void {
-  const roundedLocation = {
+  const roundedLocation = parseStoredLocation({
     latitude: roundCoordinate(location.latitude),
     longitude: roundCoordinate(location.longitude),
-  };
+  });
+  if (!roundedLocation) return;
   memoryLastLocation = roundedLocation;
   writeJson(LAST_LOCATION_KEY, roundedLocation);
 }
 
 export function getLastLocation(): StoredLocation | null {
-  const location = readJson<StoredLocation | null>(LAST_LOCATION_KEY, memoryLastLocation);
+  const value = readJson<unknown>(LAST_LOCATION_KEY, memoryLastLocation);
+  const location = parseStoredLocation(value);
+  if (!location) {
+    memoryLastLocation = null;
+    if (value !== null) removeStoredValue(LAST_LOCATION_KEY);
+    return null;
+  }
   memoryLastLocation = location;
   return location;
 }
 
 export function saveBestSkyWindow(window: BestSkyWindow): void {
-  memoryBestSkyWindow = window;
-  writeJson(BEST_SKY_WINDOW_KEY, window);
+  const parsed = parseBestSkyWindow(window);
+  if (!parsed) return;
+  memoryBestSkyWindow = parsed;
+  writeJson(BEST_SKY_WINDOW_KEY, parsed);
 }
 
 export type BestSkyWindowReadResult = {
@@ -713,35 +733,28 @@ export type BestSkyWindowReadResult = {
 };
 
 export function getBestSkyWindowStatus(now = new Date()): BestSkyWindowReadResult {
-  const value = readJson<BestSkyWindow | null>(BEST_SKY_WINDOW_KEY, memoryBestSkyWindow);
+  const value = readJson<unknown>(BEST_SKY_WINDOW_KEY, memoryBestSkyWindow);
   if (!value) {
     memoryBestSkyWindow = null;
     return { window: null, reason: "missing" };
   }
 
-  if (
-    typeof value.generatedAt !== "string" ||
-    typeof value.startsAt !== "string" ||
-    typeof value.endsAt !== "string" ||
-    typeof value.score !== "number" ||
-    !Array.isArray(value.hours) ||
-    !Array.isArray(value.bestTargets) ||
-    typeof value.isEstimated !== "boolean"
-  ) {
+  const parsed = parseBestSkyWindow(value);
+  if (!parsed) {
     memoryBestSkyWindow = null;
     removeStoredValue(BEST_SKY_WINDOW_KEY);
     return { window: null, reason: "invalid_structure" };
   }
 
-  const validity = getBestSkyWindowValidity(value, now);
+  const validity = getBestSkyWindowValidity(parsed, now);
   if (!validity.valid) {
     memoryBestSkyWindow = null;
     removeStoredValue(BEST_SKY_WINDOW_KEY);
     return { window: null, reason: validity.reason };
   }
 
-  memoryBestSkyWindow = value;
-  return { window: value, reason: "valid" };
+  memoryBestSkyWindow = parsed;
+  return { window: parsed, reason: "valid" };
 }
 
 export function getBestSkyWindow(now = new Date()): BestSkyWindow | null {

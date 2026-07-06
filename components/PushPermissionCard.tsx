@@ -11,6 +11,7 @@ import {
   isIosDevice,
   isPushSupported,
   isStandaloneDisplay,
+  sendTestPush,
   subscribeToPush,
   syncPushPreferences,
   unsubscribeFromPush,
@@ -142,13 +143,9 @@ export function PushPermissionCard({ className }: { className?: string }) {
     setMessage(null);
     const subscription = await getExistingPushSubscription();
     try {
-      const response = await fetch("/api/push/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ endpoint: subscription?.endpoint }),
-      });
+      const responseOk = subscription ? await sendTestPush() : false;
       setMessage(
-        response.ok
+        responseOk
           ? "Notification de test envoyée."
           : "La notification de test n’a pas pu être envoyée.",
       );

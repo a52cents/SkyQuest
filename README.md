@@ -36,7 +36,7 @@ La racine `/` affiche la page de présentation dans un navigateur classique et l
 - CelesTrak et `satellite.js` pour les passages de satellites
 - `localStorage` pour les données utilisateur
 
-Il n'y a ni compte utilisateur ni authentification. Supabase sert uniquement à persister les subscriptions Web Push côté serveur ; le journal et la progression restent locaux.
+Il n'y a ni compte utilisateur ni authentification. Supabase sert uniquement à persister les données techniques nécessaires au Web Push côté serveur ; le journal et la progression restent locaux.
 
 ## Installation
 
@@ -207,7 +207,7 @@ python scripts/generate-cerema-lighting-index.py chemin/vers/carte-extinction.gp
 - **Pratiques d'éclairage** : une position arrondie à deux décimales est envoyée côté serveur à l'API Geo pour identifier la commune française. Le signal Cerema est mis en cache 30 jours et aucune adresse ni position précise n'est demandée ou conservée.
 - **Caméra et orientation** : demandées au lancement du guidage. Les pistes caméra sont arrêtées au démontage du composant.
 - **Photos** : redimensionnées et stockées sous forme de données locales ; elles ne sont ni analysées ni téléversées par SkyQuest.
-- **Journal et progression** : conservés dans `localStorage`, limités aux 50 observations les plus récentes et effaçables depuis l'interface.
+- **Journal et progression** : conservés dans le navigateur ; IndexedDB garde au maximum les 50 observations les plus récentes et leurs photos, tandis que la progression reste dans `localStorage`. Le journal est effaçable depuis l'interface.
 - **Alertes** : consentement explicite, thèmes choisis par l’utilisateur et position arrondie à un chiffre après la virgule côté serveur.
 - **Publicité** : après consentement explicite, l'analyse peut ouvrir une page publicitaire externe. Un délai de dix minutes est mémorisé localement entre deux ouvertures.
 

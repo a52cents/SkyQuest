@@ -8,8 +8,9 @@ export type PhotoCaptureStatus = "idle" | "capturing" | "ready" | "error";
 
 export type CameraGuideProps = {
   quest: SkyQuest;
-  onSeen: (photo?: ObservationPhotoDraft) => void;
-  onMissed: () => void;
+  persistenceError?: string | null;
+  onSeen: (photo?: ObservationPhotoDraft) => Promise<boolean>;
+  onMissed: () => Promise<boolean>;
 };
 
 export type CameraZoomRange = { min: number; max: number; step: number };

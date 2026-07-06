@@ -6,6 +6,14 @@ Construire une PWA mobile-first qui propose une liste classée de quêtes d'obse
 
 Le produit doit rester une experience guidee simple : `Maintenant -> quoi regarder -> aide camera 2D -> journal`. Ne pas construire une carte du ciel complete.
 
+## Definition officielle de la v0
+
+La v0 est la version actuelle de SkyQuest telle qu'elle existe dans le depot. Toute fonctionnalite presente, reliee a l'interface ou a un flux operationnel, et effectivement utilisee fait partie de la v0. Une ancienne description plus restrictive du MVP ne doit pas servir a supprimer, desactiver ou reporter une fonctionnalite existante.
+
+La v0 comprend donc aussi les routes API Next.js, les services externes, Supabase pour le Web Push, les notifications, les taches planifiees et le worker Cloudflare deja integres. Ces briques peuvent rester optionnelles ou disposer d'un fallback, mais elles ne sont pas hors perimetre.
+
+La frontiere produit reste la suivante : aucun compte ni authentification, pas de synchronisation distante du journal ou de la progression, et pas de stockage serveur generaliste des donnees utilisateur. Supabase est limite aux donnees techniques necessaires aux notifications push.
+
 ## Stack technique
 
 - Next.js avec App Router.
@@ -13,9 +21,13 @@ Le produit doit rester une experience guidee simple : `Maintenant -> quoi regard
 - Tailwind CSS.
 - PWA avec manifest, theme sombre et service worker simple.
 - `astronomy-engine` pour Lune et planetes.
-- Open-Meteo pour meteo actuelle ou horaire proche.
-- `localStorage` pour le journal v0.
-- Aucun backend, aucune base de donnees, aucune authentification en v0.
+- Open-Meteo et Open-Meteo Air Quality pour la meteo et la transparence de l'air.
+- CelesTrak et `satellite.js` pour les passages de satellites.
+- Stockage navigateur pour le journal, la progression, les photos et les caches locaux.
+- Routes API Next.js pour les calculs serveur, les proxys et le Web Push.
+- Supabase/Postgres pour les subscriptions, verrous d'envoi et surveillances de cibles Web Push.
+- Web Push avec VAPID, cron protege et worker Cloudflare pour le declenchement planifie.
+- Aucun compte et aucune authentification en v0.
 
 ## Contraintes produit
 
@@ -31,6 +43,11 @@ Le produit doit rester une experience guidee simple : `Maintenant -> quoi regard
 - `app/page.tsx` pour l'accueil et la generation de quetes.
 - `app/journal/page.tsx` pour le journal.
 - `app/quest/[id]/page.tsx` pour le mode guidage d'une quete stockee localement.
+- `app/tonight/page.tsx` pour les meilleurs creneaux et evenements a venir.
+- `app/explore/*`, `app/atlas/page.tsx` et `app/glossary/page.tsx` pour la decouverte pedagogique.
+- `app/profile/page.tsx` pour la progression locale et les reglages de notifications.
+- `app/api/*` pour les integrations serveur existantes : satellites, qualite du ciel, pratiques d'eclairage, contenus NASA et Web Push.
+- `app/api/cron/sky-alerts/route.ts` et `workers/sky-alerts-cron/*` pour l'evaluation planifiee des alertes.
 - `components/*` pour UI reutilisable.
 - `lib/astro.ts` pour calculs astronomiques.
 - `lib/weather.ts` pour Open-Meteo.
@@ -38,7 +55,10 @@ Le produit doit rester une experience guidee simple : `Maintenant -> quoi regard
 - `lib/orientation.ts` pour helpers boussole et altitude.
 - `lib/storage.ts` pour journal et quete active.
 - `lib/quest-generator.ts` pour generation des quetes.
+- `lib/push-*.ts`, `lib/supabase-server.ts` et `lib/target-watch.ts` pour les notifications cote client et serveur.
 - `lib/types.ts` pour types partages.
+
+`docs/architecture.md` decrit le detail des routes et des flux. Toute nouvelle route API doit documenter les donnees recues, les services contactes, les secrets requis et son comportement de secours.
 
 ## Conventions de nommage
 
@@ -116,6 +136,7 @@ Le produit doit rester une experience guidee simple : `Maintenant -> quoi regard
 - Expliquer position, camera et orientation en langage simple.
 - Les etats loading, empty et error doivent etre utiles et actionnables.
 - Le journal doit etre local, simple, effacable.
+- Les alertes doivent etre optionnelles, personnalisables et desactivables.
 - Les hints camera doivent rester approximatifs et prudents.
 
 ## Securite et permissions navigateur
@@ -123,27 +144,31 @@ Le produit doit rester une experience guidee simple : `Maintenant -> quoi regard
 - GPS via `navigator.geolocation.getCurrentPosition` uniquement apres clic utilisateur.
 - Camera via `navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })` uniquement apres demarrage du guidage.
 - Orientation via permission explicite quand necessaire sur iOS/Safari.
+- Notifications via permission explicite, uniquement apres une action utilisateur dans le Profil.
 - Stopper les tracks camera au demontage du composant.
 - Ne pas collecter ni envoyer de photos.
-- Ne pas stocker de position precise au-dela du journal local ; arrondir latitude/longitude.
+- Ne pas stocker de position precise au-dela du navigateur ; arrondir latitude/longitude avant persistance ou envoi selon le flux documente.
+- Les subscriptions push, preferences d'alertes, positions arrondies, verrous d'envoi et surveillances de cibles associes sont les seules donnees persistees dans Supabase en v0.
+- Ne jamais utiliser l'endpoint push comme preuve d'autorite ni le placer dans une query string ; les routes navigateur exigent le jeton de gestion dont seul le hash est stocke cote serveur.
+- Garder `SUPABASE_SERVICE_ROLE_KEY`, `VAPID_PRIVATE_KEY`, `CRON_SECRET` et `PUSH_TEST_SECRET` strictement cote serveur.
+- Proteger les routes de cron et de test push par leurs secrets dedies.
 
 ## A ne pas faire en v0
 
 - Pas de compte utilisateur.
-- Pas de backend obligatoire.
+- Pas d'authentification ni de profil distant.
+- Pas de synchronisation distante du journal, de la progression ou des photos.
+- Pas de nouvelle base generaliste de donnees utilisateur au-dela du perimetre Web Push existant sans decision produit explicite.
 - Pas de paiement.
 - Pas de vraie AR 3D.
 - Pas de WebXR obligatoire.
 - Pas de reconnaissance automatique des photos.
 - Pas de carte du ciel complete.
-- Pas de notifications push.
-
+- Ne pas retirer les API, Supabase, le cron ou les notifications au motif qu'ils auraient ete prevus pour une version ulterieure : ils appartiennent a la v0 actuelle.
 
 ## Roadmap future
 
-- v0.2 : notifications push `Ciel degage maintenant`, `3 quetes disponibles ce soir`.
-- v0.2 : meilleure detection crepuscule/nuit et qualite de ciel.
-- v0.3 : backend optionnel pour sauvegarde multi-device.
-- v0.3 : compte utilisateur optionnel.
+- v0.2 : ameliorer la pertinence des alertes, du crepuscule et de la qualite de ciel ; les notifications existent deja en v0.
+- v0.3 : evaluer un compte et une sauvegarde multi-device optionnels, avec un backend de synchronisation distinct du backend operationnel deja present.
 - v0.4 : module AR 3D remplacant `CameraGuide`.
 - v0.4 : WebXR ou integration native si PWA insuffisante.

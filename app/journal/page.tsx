@@ -20,6 +20,8 @@ export default function JournalPage() {
   const [observations, setObservations] = useState<Observation[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isApplyingAction, setIsApplyingAction] = useState(false);
+  const [destructiveError, setDestructiveError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<"journal" | "progress" | null>(null);
 
   useEffect(() => {
@@ -37,6 +39,7 @@ export default function JournalPage() {
   }, []);
 
   function handleClear() {
+    setDestructiveError(null);
     setConfirmation("journal");
   }
 
@@ -56,17 +59,29 @@ export default function JournalPage() {
   }
 
   function handleResetProgress() {
+    setDestructiveError(null);
     setConfirmation("progress");
   }
 
   async function confirmDestructiveAction() {
+    if (isApplyingAction) return;
+    setIsApplyingAction(true);
+    setDestructiveError(null);
     if (confirmation === "journal") {
-      await clearObservations();
+      const result = await clearObservations();
+      if (!result.cleared) {
+        setDestructiveError(
+          "Le journal n’a pas pu être supprimé. Aucune observation n’a été masquée. Réessaie.",
+        );
+        setIsApplyingAction(false);
+        return;
+      }
       setObservations([]);
       setTotalCount(0);
     } else if (confirmation === "progress") {
       resetProgressProfile();
     }
+    setIsApplyingAction(false);
     setConfirmation(null);
   }
 
@@ -104,11 +119,29 @@ export default function JournalPage() {
                     ? "Les observations seront supprimées de cet appareil. La progression sera conservée."
                     : "Les rangs, découvertes et accomplissements seront remis à zéro. Le journal sera conservé."}
                 </p>
+                {destructiveError ? (
+                  <p
+                    className="mt-4 rounded-brand border border-danger/25 bg-danger/10 px-3 py-2 text-sm leading-6 text-danger"
+                    role="alert"
+                  >
+                    {destructiveError}
+                  </p>
+                ) : null}
                 <div className="mt-6 grid gap-2">
-                  <AppButton variant="danger" onClick={confirmDestructiveAction} fullWidth>
+                  <AppButton
+                    variant="danger"
+                    onClick={confirmDestructiveAction}
+                    isLoading={isApplyingAction}
+                    fullWidth
+                  >
                     Confirmer
                   </AppButton>
-                  <AppButton variant="ghost" onClick={() => setConfirmation(null)} fullWidth>
+                  <AppButton
+                    variant="ghost"
+                    onClick={() => setConfirmation(null)}
+                    disabled={isApplyingAction}
+                    fullWidth
+                  >
                     Annuler
                   </AppButton>
                 </div>
