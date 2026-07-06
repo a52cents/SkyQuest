@@ -21,7 +21,11 @@ import {
 import type { BestSkyWindow, FogRisk } from "@/lib/types";
 import { fetchWeatherForecast, getFallbackWeatherForecast } from "@/lib/weather";
 import { scheduleSkyWindowReminder } from "@/lib/push-client";
-import { formatVisibilityScore, formatVisibilityScoreForAccessibility } from "@/lib/visibility";
+import {
+  formatVisibilityScore,
+  formatVisibilityScoreForAccessibility,
+  normalizeVisibilityScore,
+} from "@/lib/visibility";
 
 const FOG_LABELS: Record<FogRisk, string> = {
   low: "faible",
@@ -187,52 +191,119 @@ export default function TonightPage() {
         <>
           <AppCard as="section" variant="glass" padding="lg" className="relative overflow-hidden">
             <div className="pointer-events-none absolute -top-20 -right-16 h-48 w-48 rounded-full bg-accent/15 blur-3xl" />
-            <p className="premium-kicker">Meilleur moment sur 24 h</p>
-            <h2 className="relative mt-3 font-[Georgia,'Times_New_Roman',serif] text-[2rem] leading-tight font-normal text-text">
-              {skyWindow.score >= 50 ? "Va dehors" : "Si tu veux tenter"} entre{" "}
+            <div className="relative flex items-start justify-between gap-4">
+              <div>
+                <p className="premium-kicker">Meilleur moment sur 24 h</p>
+                <p className="mt-2 text-sm font-semibold text-text">
+                  {scoreLabel(skyWindow.score)}
+                </p>
+              </div>
+              <div
+                className="flex shrink-0 items-baseline rounded-full border border-accent/25 bg-accent/[0.09] px-3 py-2 text-accent-cyan"
+                aria-label={formatVisibilityScoreForAccessibility(skyWindow.score)}
+              >
+                <strong className="text-xl leading-none">
+                  {normalizeVisibilityScore(skyWindow.score)}
+                </strong>
+                <span className="ml-0.5 text-[0.65rem] text-muted">/100</span>
+              </div>
+            </div>
+            <h2 className="relative mt-5 font-[Georgia,'Times_New_Roman',serif] text-[1.8rem] leading-tight font-normal text-text sm:text-[2rem]">
+              Le meilleur créneau se situe entre{" "}
               <span className="text-accent-cyan">
                 {formatTime(skyWindow.startsAt, skyWindow.timezone)} et{" "}
                 {formatTime(skyWindow.endsAt, skyWindow.timezone)}
               </span>
             </h2>
             <p className="relative mt-3 text-sm leading-6 text-muted">
-              {scoreLabel(skyWindow.score)} · {formatVisibilityScore(skyWindow.score)}. Cet indice
-              guide ton choix, il ne garantit jamais une observation.
+              {formatVisibilityScore(skyWindow.score)} pour choisir quand sortir, sans garantie
+              d’observation.
             </p>
             <div className="relative mt-5 border-t border-white/[0.07] pt-4">
               <p className="text-xs font-semibold tracking-[0.08em] text-faint uppercase">
-                Meilleures cibles
+                À regarder pendant ce créneau
               </p>
-              <p className="mt-2 text-base text-text">
-                {skyWindow.bestTargets.length
-                  ? skyWindow.bestTargets.join(" · ")
-                  : "Observation libre · horizon dégagé"}
-              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(skyWindow.bestTargets.length
+                  ? skyWindow.bestTargets
+                  : ["Observation libre", "Horizon dégagé"]
+                ).map((target) => (
+                  <span
+                    key={target}
+                    className="rounded-full border border-white/[0.09] bg-white/[0.035] px-3 py-1.5 text-xs font-medium text-text"
+                  >
+                    {target}
+                  </span>
+                ))}
+              </div>
             </div>
           </AppCard>
 
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <AppCard padding="sm" className="text-center">
-              <p className="text-lg font-semibold text-text">
-                {Math.round(bestHour?.cloudCover ?? 0)}%
-              </p>
-              <p className="mt-1 text-[0.68rem] text-faint uppercase">Nuages</p>
-            </AppCard>
-            <AppCard padding="sm" className="text-center">
-              <p className="text-lg font-semibold text-text">
-                {Math.round(bestHour?.relativeHumidity ?? 0)}%
-              </p>
-              <p className="mt-1 text-[0.68rem] text-faint uppercase">Humidité</p>
-            </AppCard>
-            <AppCard padding="sm" className="text-center">
-              <p className="text-lg font-semibold text-text">
-                {skyWindow.moonIlluminationPercent}%
-              </p>
-              <p className="mt-1 text-[0.68rem] text-faint uppercase">Lune</p>
-            </AppCard>
-          </div>
+          <AppCard as="section" variant="solid" padding="none" className="mt-3 overflow-hidden">
+            <div className="grid grid-cols-3 divide-x divide-white/[0.06]">
+              <div className="min-w-0 px-2 py-4 text-center">
+                <p className="text-lg font-semibold text-text">
+                  {Math.round(bestHour?.cloudCover ?? 0)}%
+                </p>
+                <p className="mt-1 text-[0.65rem] tracking-wide text-faint uppercase">Nuages</p>
+              </div>
+              <div className="min-w-0 px-2 py-4 text-center">
+                <p className="text-lg font-semibold text-text">
+                  {Math.round(bestHour?.relativeHumidity ?? 0)}%
+                </p>
+                <p className="mt-1 text-[0.65rem] tracking-wide text-faint uppercase">Humidité</p>
+              </div>
+              <div className="min-w-0 px-2 py-4 text-center">
+                <p className="text-lg font-semibold text-text">
+                  {skyWindow.moonIlluminationPercent}%
+                </p>
+                <p className="mt-1 text-[0.65rem] tracking-wide text-faint uppercase">Lune</p>
+              </div>
+            </div>
+          </AppCard>
 
-          <section className="mt-7" aria-labelledby="hourly-title">
+          <AppCard as="section" variant="glass" padding="md" className="mt-3">
+            <p className="premium-kicker">Préparer l’observation</p>
+            <h2 className="mt-1 text-base font-semibold text-text">Que veux-tu faire ?</h2>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              Reçois un rappel environ 15 minutes avant, ou actualise les conditions maintenant.
+            </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {isBestSkyWindowFresh(skyWindow) ? (
+                <AppButton
+                  fullWidth
+                  isLoading={isSchedulingReminder}
+                  onClick={() => void handleReminder()}
+                >
+                  Me prévenir
+                </AppButton>
+              ) : null}
+              <AppButton
+                variant={isBestSkyWindowFresh(skyWindow) ? "secondary" : "primary"}
+                fullWidth
+                isLoading={isLoading}
+                onClick={() => void calculate()}
+              >
+                Actualiser le créneau
+              </AppButton>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-faint">
+              Ta position est demandée seulement lorsque tu actualises.
+            </p>
+          </AppCard>
+
+          {notice ? (
+            <AppCard
+              variant="subtle"
+              padding="sm"
+              className="mt-3 border-warning/20 bg-warning/[0.06] text-sm leading-5 text-muted"
+              role="status"
+            >
+              <p>{notice}</p>
+            </AppCard>
+          ) : null}
+
+          <section className="mt-8" aria-labelledby="hourly-title">
             <div className="flex items-end justify-between gap-4">
               <div>
                 <p className="premium-kicker">Prévision heure par heure</p>
@@ -243,7 +314,7 @@ export default function TonightPage() {
                   Les prochaines 24 heures
                 </h2>
               </div>
-              <span className="text-xs text-faint">Glisse →</span>
+              <span className="shrink-0 text-xs text-faint">Glisse →</span>
             </div>
             <div className="-mx-5 mt-4 flex snap-x gap-2 overflow-x-auto px-5 pb-3">
               {skyWindow.hours.map((hour) => {
@@ -254,16 +325,21 @@ export default function TonightPage() {
                     variant="solid"
                     padding="sm"
                     key={hour.date}
-                    className={`min-w-[86px] snap-start text-center ${active ? "border-accent/60 bg-accent/[0.12]" : ""}`}
+                    className={`relative min-w-[104px] snap-start text-center ${active ? "border-accent/60 bg-accent/[0.12]" : ""}`}
                     aria-label={`${formatTime(hour.date, skyWindow.timezone)}. ${formatVisibilityScoreForAccessibility(hour.score)}`}
                   >
                     <p className="text-xs font-semibold text-muted">
                       {formatTime(hour.date, skyWindow.timezone)}
                     </p>
+                    {active ? (
+                      <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-accent-cyan shadow-[0_0_8px_var(--accent-cyan)]" />
+                    ) : null}
                     <p
-                      className={`mt-3 text-2xl font-semibold ${active ? "text-accent-cyan" : "text-text"}`}
+                      className={`mt-3 flex items-baseline justify-center ${active ? "text-accent-cyan" : "text-text"}`}
                     >
-                      {formatVisibilityScore(hour.score, "compact")}
+                      <strong className="text-[1.15rem] leading-none tracking-[-0.04em]">
+                        {formatVisibilityScore(hour.score, "compact")}
+                      </strong>
                     </p>
                     <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
                       <div
@@ -281,42 +357,33 @@ export default function TonightPage() {
           </section>
 
           <AppCard as="section" padding="md" className="mt-4">
-            <h2 className="text-sm font-semibold text-text">Ce qui pèse dans le choix</h2>
-            <div className="mt-3 grid gap-2 text-sm text-muted">
-              <p>
-                Obscurité :{" "}
-                {bestHour?.isAstronomicalDark
-                  ? "nuit astronomique"
-                  : "crépuscule ou nuit partielle"}
-              </p>
-              <p>Brume : risque {bestHour ? FOG_LABELS[bestHour.fogRisk] : "inconnu"}</p>
-              <p>
-                Lune : {skyWindow.moonPhaseLabel.toLowerCase()} ({skyWindow.moonIlluminationPercent}
-                % éclairée)
-              </p>
-            </div>
+            <p className="premium-kicker">Pourquoi ce créneau</p>
+            <h2 className="mt-1 text-base font-semibold text-text">
+              Les trois facteurs principaux
+            </h2>
+            <dl className="mt-4 divide-y divide-white/[0.06]">
+              <div className="flex items-start justify-between gap-4 py-3 first:pt-0">
+                <dt className="text-sm text-muted">Obscurité</dt>
+                <dd className="max-w-[62%] text-right text-sm font-semibold text-text">
+                  {bestHour?.isAstronomicalDark
+                    ? "Nuit astronomique"
+                    : "Crépuscule ou nuit partielle"}
+                </dd>
+              </div>
+              <div className="flex items-start justify-between gap-4 py-3">
+                <dt className="text-sm text-muted">Brume</dt>
+                <dd className="text-right text-sm font-semibold text-text">
+                  Risque {bestHour ? FOG_LABELS[bestHour.fogRisk] : "inconnu"}
+                </dd>
+              </div>
+              <div className="flex items-start justify-between gap-4 pt-3">
+                <dt className="text-sm text-muted">Lune</dt>
+                <dd className="max-w-[62%] text-right text-sm font-semibold text-text">
+                  {skyWindow.moonPhaseLabel} · {skyWindow.moonIlluminationPercent}%
+                </dd>
+              </div>
+            </dl>
           </AppCard>
-
-          {isBestSkyWindowFresh(skyWindow) ? (
-            <AppCard as="section" variant="glass" padding="md" className="mt-4">
-              <p className="premium-kicker">Au bon moment</p>
-              <h2 className="mt-1 text-base font-semibold text-text">
-                Ne laisse pas passer ce créneau
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-muted">
-                SkyQuest te préviendra environ 15 minutes avant, puis recalculera les conditions à
-                l’ouverture.
-              </p>
-              <AppButton
-                fullWidth
-                className="mt-4"
-                isLoading={isSchedulingReminder}
-                onClick={() => void handleReminder()}
-              >
-                Me prévenir
-              </AppButton>
-            </AppCard>
-          ) : null}
         </>
       ) : (
         <AppCard as="section" variant="glass" padding="lg" className="text-center">
@@ -332,7 +399,7 @@ export default function TonightPage() {
         </AppCard>
       )}
 
-      {notice ? (
+      {notice && !skyWindow ? (
         <AppCard
           variant="subtle"
           padding="sm"
@@ -342,12 +409,21 @@ export default function TonightPage() {
           <p>{notice}</p>
         </AppCard>
       ) : null}
-      <AppButton fullWidth className="mt-4" isLoading={isLoading} onClick={() => void calculate()}>
-        {skyWindow ? "Actualiser mon créneau" : "Calculer mon créneau"}
-      </AppButton>
-      <p className="mt-2 text-center text-xs leading-5 text-faint">
-        La position est demandée uniquement après ce clic.
-      </p>
+      {!skyWindow ? (
+        <>
+          <AppButton
+            fullWidth
+            className="mt-4"
+            isLoading={isLoading}
+            onClick={() => void calculate()}
+          >
+            Calculer mon créneau
+          </AppButton>
+          <p className="mt-2 text-center text-xs leading-5 text-faint">
+            La position est demandée uniquement après ce clic.
+          </p>
+        </>
+      ) : null}
 
       <UpcomingSkyEvents />
     </PageShell>

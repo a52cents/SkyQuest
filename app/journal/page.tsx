@@ -8,18 +8,29 @@ import { AppCard } from "@/components/AppCard";
 import { EmptyState } from "@/components/EmptyState";
 import { JournalList } from "@/components/JournalList";
 import { PageShell } from "@/components/PageShell";
-import { clearObservations, getObservations, resetProgressProfile } from "@/lib/storage";
+import {
+  clearObservations,
+  countObservations,
+  getObservationPage,
+  resetProgressProfile,
+} from "@/lib/storage";
 import type { Observation } from "@/lib/types";
 
 export default function JournalPage() {
   const [observations, setObservations] = useState<Observation[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [confirmation, setConfirmation] = useState<"journal" | "progress" | null>(null);
 
   useEffect(() => {
     let isActive = true;
-    void getObservations().then((storedObservations) => {
-      if (isActive) setObservations(storedObservations);
-    });
+    void Promise.all([getObservationPage({ limit: 20 }), countObservations()]).then(
+      ([storedObservations, count]) => {
+        if (!isActive) return;
+        setObservations(storedObservations);
+        setTotalCount(count);
+      },
+    );
     return () => {
       isActive = false;
     };
@@ -27,6 +38,21 @@ export default function JournalPage() {
 
   function handleClear() {
     setConfirmation("journal");
+  }
+
+  async function handleLoadMore() {
+    const last = observations.at(-1);
+    if (!last || isLoadingMore) return;
+    setIsLoadingMore(true);
+    const next = await getObservationPage({
+      before: { createdAt: last.createdAt, id: last.id },
+      limit: 20,
+    });
+    setObservations((current) => [
+      ...current,
+      ...next.filter((item) => !current.some((stored) => stored.id === item.id)),
+    ]);
+    setIsLoadingMore(false);
   }
 
   function handleResetProgress() {
@@ -37,6 +63,7 @@ export default function JournalPage() {
     if (confirmation === "journal") {
       await clearObservations();
       setObservations([]);
+      setTotalCount(0);
     } else if (confirmation === "progress") {
       resetProgressProfile();
     }
@@ -92,13 +119,40 @@ export default function JournalPage() {
       </AnimatePresence>
       <div className="grid gap-5">
         {observations.length > 0 ? (
-          <JournalList observations={observations} onClear={handleClear} />
+          <JournalList
+            observations={observations}
+            totalCount={totalCount}
+            onClear={handleClear}
+            onLoadMore={handleLoadMore}
+            isLoadingMore={isLoadingMore}
+          />
         ) : (
           <EmptyState
             title="Journal vide"
             message="Marque une quête comme vue ou pas trouvée pour garder une trace locale."
           />
         )}
+        <Link href="/atlas" className="block rounded-[20px]">
+          <AppCard
+            variant="subtle"
+            padding="sm"
+            className="transition-colors hover:border-accent/30"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-[Georgia,'Times_New_Roman',serif] text-lg text-text">
+                  Mon atlas du ciel
+                </p>
+                <p className="mt-1 text-sm leading-5 text-muted">
+                  Voir les découvertes et les prochaines cibles
+                </p>
+              </div>
+              <span className="text-xl text-accent" aria-hidden="true">
+                ✦
+              </span>
+            </div>
+          </AppCard>
+        </Link>
         <Link href="/glossary" className="block rounded-[20px]">
           <AppCard
             variant="subtle"

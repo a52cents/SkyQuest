@@ -73,7 +73,28 @@ export default function ExplorePage() {
           Maintenant » pour obtenir les cibles guidables.
         </p>
       </div>
-      <div className="mb-4">
+
+      <section className="mb-9" aria-labelledby="nasa-highlights-title">
+        <div className="mb-3 flex items-end justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent-cyan">
+              Actualités spatiales
+            </p>
+            <h2
+              id="nasa-highlights-title"
+              className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal text-text"
+            >
+              Aujourd’hui dans l’espace
+            </h2>
+          </div>
+          <span className="text-xl text-accent" aria-hidden="true">
+            ✦
+          </span>
+        </div>
+        <NasaHighlights />
+      </section>
+
+      <div className="mb-4 border-t border-white/[0.06] pt-7">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
           Repères à apprendre
         </p>
@@ -190,25 +211,6 @@ export default function ExplorePage() {
             </button>
           </AppCard>
         ) : null}
-      </section>
-      <section className="mt-10" aria-labelledby="nasa-highlights-title">
-        <div className="mb-3 flex items-end justify-between gap-4">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent-cyan">
-              Actualités spatiales
-            </p>
-            <h2
-              id="nasa-highlights-title"
-              className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal text-text"
-            >
-              Aujourd’hui dans l’espace
-            </h2>
-          </div>
-          <span className="text-xl text-accent" aria-hidden="true">
-            ✦
-          </span>
-        </div>
-        <NasaHighlights />
       </section>
     </PageShell>
   );

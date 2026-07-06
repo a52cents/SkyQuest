@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSkyObjects } from "@/lib/astro";
+import { equatorialJ2000ToHorizontal, getSkyObjects, getSunAltitude } from "@/lib/astro";
 import { getUpcomingCelestialEvents } from "@/lib/celestial-events";
 import { calculateBestSkyWindow } from "@/lib/sky-window";
 import { sendPushToMany, type SkyQuestPushPayload } from "@/lib/push-server";
@@ -7,9 +7,22 @@ import {
   claimDueSkyWindowReminder,
   claimPushOpportunity,
   cleanupExpiredSkyWindowReminders,
+  cleanupExpiredTargetWatches,
+  claimTargetWatch,
+  listActiveTargetWatches,
   listPushSubscriptions,
   type StoredPushSubscription,
 } from "@/lib/push-store";
+import { getCatalogSkyObject } from "@/lib/sky-catalog";
+import {
+  calculateCatalogVisibilityScore,
+  calculateMeteorShowerVisibilityScore,
+  calculateVisibilityScore,
+} from "@/lib/visibility";
+import { fetchIssOrbitalElements } from "@/lib/celestrak";
+import { calculateNextSatelliteVisiblePass } from "@/lib/satellite-pass";
+import { isMeteorShowerActive, isNearMeteorShowerPeak, meteorShowers } from "@/lib/meteor-showers";
+import { getWatchableTargetLabel } from "@/lib/target-watch";
 import {
   isExceptionalClearSky,
   getPushLocalNightKey,
@@ -74,6 +87,78 @@ function analysisUrl(intent: string, target?: string): string {
   const params = new URLSearchParams({ app: "1", intent });
   if (target) params.set("target", target);
   return `/?${params.toString()}`;
+}
+
+async function getTargetWatchScore(
+  target: string,
+  latitude: number,
+  longitude: number,
+  now: Date,
+): Promise<number> {
+  const [weather, sunAltitude] = await Promise.all([
+    fetchWeatherNow(latitude, longitude),
+    Promise.resolve(getSunAltitude(latitude, longitude, now)),
+  ]);
+  if (sunAltitude > -3) return 0;
+  if (target.toLocaleLowerCase("fr-FR") === "iss") {
+    const orbitalElements = await fetchIssOrbitalElements();
+    const pass = calculateNextSatelliteVisiblePass({
+      orbitalElements,
+      latitude,
+      longitude,
+      now,
+      horizonMinutes: 30,
+    });
+    if (!pass || new Date(pass.startTime).getTime() - now.getTime() > 20 * 60_000) return 0;
+    return Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(65 + Math.min(15, (pass.maxElevation - 15) / 2) - weather.cloudCover / 2),
+      ),
+    );
+  }
+  const normalizedTarget = target.toLocaleLowerCase("fr-FR");
+  const shower = meteorShowers.find(
+    (candidate) =>
+      normalizedTarget === `meteor-${candidate.name.toLocaleLowerCase("fr-FR")}` ||
+      normalizedTarget === `meteor-${candidate.id}`,
+  );
+  if (shower) {
+    if (!isMeteorShowerActive(shower, now)) return 0;
+    return calculateMeteorShowerVisibilityScore({
+      weather,
+      sunAltitude,
+      nearPeak: isNearMeteorShowerPeak(shower, now),
+    });
+  }
+  const skyObject = getSkyObjects(latitude, longitude, now).find(
+    (object) => object.name.toLocaleLowerCase("fr-FR") === target.toLocaleLowerCase("fr-FR"),
+  );
+  if (skyObject) return calculateVisibilityScore({ object: skyObject, weather, sunAltitude });
+
+  const catalogObject = getCatalogSkyObject(target);
+  if (
+    !catalogObject ||
+    catalogObject.rightAscensionHours === undefined ||
+    catalogObject.declinationDegrees === undefined
+  ) {
+    return 0;
+  }
+  const position = equatorialJ2000ToHorizontal({
+    rightAscensionHours: catalogObject.rightAscensionHours,
+    declinationDegrees: catalogObject.declinationDegrees,
+    latitude,
+    longitude,
+    date: now,
+  });
+  return calculateCatalogVisibilityScore({
+    object: catalogObject,
+    altitude: position.altitude,
+    weather,
+    sunAltitude,
+    now,
+  });
 }
 
 async function createOpportunity(
@@ -300,8 +385,12 @@ export async function GET(request: Request) {
   const now = new Date();
   let subscriptions: StoredPushSubscription[];
   let expiredRemindersCleaned = 0;
+  let expiredTargetWatchesCleaned = 0;
+  let targetWatches = [] as Awaited<ReturnType<typeof listActiveTargetWatches>>;
   try {
     expiredRemindersCleaned = await cleanupExpiredSkyWindowReminders(now);
+    expiredTargetWatchesCleaned = await cleanupExpiredTargetWatches(now);
+    targetWatches = await listActiveTargetWatches(now);
     subscriptions = await listPushSubscriptions();
   } catch {
     return NextResponse.json({ error: "Stockage push indisponible." }, { status: 503 });
@@ -313,6 +402,9 @@ export async function GET(request: Request) {
     failed: 0,
     expired: 0,
     expiredRemindersCleaned,
+    expiredTargetWatchesCleaned,
+    targetWatchesChecked: targetWatches.length,
+    targetWatchesSent: 0,
     calculations: {} as Partial<Record<CalculationName, number>>,
     reasons: {} as Record<string, number>,
   };
@@ -321,7 +413,46 @@ export async function GET(request: Request) {
     counters[name] = (counters[name] ?? 0) + amount;
   };
 
+  const targetWatchSentEndpoints = new Set<string>();
+  for (const watch of targetWatches) {
+    const { subscription } = watch;
+    const latitude = subscription.latitudeRounded;
+    const longitude = subscription.longitudeRounded;
+    const localHour = getLocalHour(now, subscription.timezone);
+    if (
+      latitude === undefined ||
+      longitude === undefined ||
+      localHour === null ||
+      (localHour < 19 && localHour >= 4)
+    ) {
+      continue;
+    }
+    try {
+      const score = await getTargetWatchScore(watch.target, latitude, longitude, now);
+      if (score < watch.minimumScore || !(await claimTargetWatch(watch.id, now))) continue;
+      const targetLabel = getWatchableTargetLabel(watch.target);
+      const result = await sendPushToMany([subscription], {
+        title: `Une meilleure occasion pour ${targetLabel}`,
+        body: "Les conditions semblent plus favorables. Ouvre SkyQuest pour les recalculer avant de sortir.",
+        url: analysisUrl("target_watch", watch.target),
+        tag: `target-watch-${watch.id}`,
+        data: { type: "target_watch", target: watch.target, score },
+      });
+      totals.sent += result.sent;
+      totals.failed += result.failed;
+      totals.expired += result.expired;
+      if (result.sent > 0) {
+        totals.targetWatchesSent += 1;
+        targetWatchSentEndpoints.add(subscription.endpoint);
+      }
+    } catch {
+      totals.failed += 1;
+      increment(totals.reasons, "target_watch_error");
+    }
+  }
+
   for (const subscription of subscriptions) {
+    if (targetWatchSentEndpoints.has(subscription.endpoint)) continue;
     const diagnostics: OpportunityDiagnostics = { calculations: [] };
     let calculationsRecorded = false;
     let phase: "evaluation" | "opportunity_claim" | "reminder_claim" | "delivery" = "evaluation";

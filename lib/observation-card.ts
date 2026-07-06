@@ -1,6 +1,7 @@
 import { getPhoto } from "@/lib/photo-db";
 import type { Observation } from "@/lib/types";
 import { formatVisibilityScore } from "@/lib/visibility";
+import { getObservationReportLabel } from "@/lib/observation-report";
 
 const CARD_WIDTH = 1080;
 const CARD_HEIGHT = 1350;
@@ -188,10 +189,17 @@ export async function createObservationCardBlob(observation: Observation): Promi
   context.font = "32px Arial, sans-serif";
   context.fillText(`${dateLabel}  ·  ${time}`, 72, 1008);
 
+  const reportLabel = getObservationReportLabel(observation.observationReport);
+  if (reportLabel && reportLabel.length <= 24) {
+    context.fillStyle = "rgba(255,255,255,0.72)";
+    context.font = "28px Arial, sans-serif";
+    context.fillText(`Détail · ${reportLabel}`, 72, 1044);
+  }
+
   let pillX = 72;
-  const weatherWidth = drawPill(context, getWeatherLabel(observation), pillX, 1050);
+  const weatherWidth = drawPill(context, getWeatherLabel(observation), pillX, 1070);
   pillX += weatherWidth + 16;
-  drawPill(context, formatVisibilityScore(observation.visibilityScore), pillX, 1050, {
+  drawPill(context, formatVisibilityScore(observation.visibilityScore), pillX, 1070, {
     accent: true,
   });
 
@@ -208,7 +216,7 @@ export async function createObservationCardBlob(observation: Observation): Promi
     : `${observation.totalXp ?? 0} Éclats d’étoile`;
   context.fillText(xpLabel, 72, 1215);
   context.fillText(
-    `${observation.streak ?? 0} nuit${observation.streak === 1 ? "" : "s"}`,
+    `${observation.streak ?? 0} semaine${observation.streak === 1 ? "" : "s"}`,
     430,
     1215,
   );

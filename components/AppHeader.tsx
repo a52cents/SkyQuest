@@ -77,6 +77,12 @@ export function AppHeader({ eyebrow, title, action, className }: AppHeaderProps)
                 Profil et progression
               </Link>
               <Link
+                href="/atlas"
+                className="flex min-h-11 items-center rounded-[12px] px-3 text-sm font-semibold text-text transition-colors hover:bg-white/[0.06]"
+              >
+                Mon atlas du ciel
+              </Link>
+              <Link
                 href="/glossary"
                 className="flex min-h-11 items-center rounded-[12px] px-3 text-sm font-semibold text-text transition-colors hover:bg-white/[0.06]"
               >

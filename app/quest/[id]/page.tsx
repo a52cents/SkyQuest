@@ -11,6 +11,7 @@ import { FreeObservationGuide } from "@/components/FreeObservationGuide";
 import { PageShell } from "@/components/PageShell";
 import { ObservationMemoryCard } from "@/components/ObservationMemoryCard";
 import { ProgressFeedback } from "@/components/ProgressFeedback";
+import { MissedObservationFeedback } from "@/components/MissedObservationFeedback";
 import { addObservation, getActiveQuest, getLastLocation, getProgressProfile } from "@/lib/storage";
 import { getRankProgress } from "@/lib/progression";
 import { haptic } from "@/lib/haptics";
@@ -28,6 +29,7 @@ export default function QuestGuidePage() {
     reward: ProgressReward;
     previousRankName: string | null;
     observation: Observation;
+    completedQuest: SkyQuest;
     showNotificationInvite: boolean;
   } | null>(null);
   const isLoggingRef = useRef(false);
@@ -64,6 +66,7 @@ export default function QuestGuidePage() {
       reward: result.reward,
       previousRankName,
       observation: result.observation,
+      completedQuest: quest,
       showNotificationInvite:
         status === "seen" &&
         quest.targetType !== "free_observation" &&
@@ -72,6 +75,8 @@ export default function QuestGuidePage() {
   }
 
   if (reward) {
+    const updateRewardObservation = (observation: Observation) =>
+      setReward((current) => (current ? { ...current, observation } : current));
     return (
       <PageShell
         eyebrow="Observation notée"
@@ -83,9 +88,24 @@ export default function QuestGuidePage() {
         reward.observation.targetType !== "free_observation" ? (
           <ObservationMemoryCard observation={reward.observation} />
         ) : null}
+        {reward.observation.status === "missed" ? (
+          <MissedObservationFeedback
+            observation={reward.observation}
+            quest={reward.completedQuest}
+            onObservationUpdated={updateRewardObservation}
+            onRetry={() => {
+              if (!isQuestFresh(reward.completedQuest)) return;
+              isLoggingRef.current = false;
+              setReward(null);
+            }}
+          />
+        ) : null}
         <ProgressFeedback
           reward={reward.reward}
           previousRankName={reward.previousRankName}
+          observation={reward.observation}
+          showObservationReport={reward.observation.status === "seen"}
+          onObservationUpdated={updateRewardObservation}
           showJournalLink
         />
         {reward.showNotificationInvite ? (

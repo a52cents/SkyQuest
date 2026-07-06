@@ -10,10 +10,12 @@ import {
   useTransform,
 } from "framer-motion";
 import { AppCard } from "@/components/AppCard";
+import { ObservationReportPicker } from "@/components/ObservationReportPicker";
 import { getAppButtonClassName } from "@/components/AppButton";
+import { resolveDiscoveryAtlasEntry } from "@/lib/discovery-atlas";
 import { ACHIEVEMENTS, getRankProgress } from "@/lib/progression";
 import { haptic } from "@/lib/haptics";
-import type { ProgressReward } from "@/lib/types";
+import type { Observation, ProgressReward } from "@/lib/types";
 
 function AnimatedXp({ value }: { value: number }) {
   const prefersReducedMotion = useReducedMotion() ?? false;
@@ -41,16 +43,27 @@ export function ProgressFeedback({
   reward,
   showJournalLink = false,
   previousRankName,
+  observation,
+  showObservationReport = true,
+  onObservationUpdated,
 }: {
   reward: ProgressReward;
   showJournalLink?: boolean;
   previousRankName?: string | null;
+  observation?: Observation;
+  showObservationReport?: boolean;
+  onObservationUpdated?: (observation: Observation) => void;
 }) {
   const rank = getRankProgress(reward.totalXp);
   const standardXpEarned = Math.max(0, reward.xpEarned - reward.eveningQuestBonusXp);
   const currentRankName = rank.current.name;
   const didAnnounceRef = useRef(false);
   const prefersReducedMotion = useReducedMotion() ?? false;
+  const newAtlasEntry =
+    reward.isFirstDiscovery && observation
+      ? resolveDiscoveryAtlasEntry(observation.target, observation.targetType)
+      : null;
+  const isMissed = observation?.status === "missed";
 
   useEffect(() => {
     if (didAnnounceRef.current) {
@@ -94,15 +107,24 @@ export function ProgressFeedback({
           aria-live="polite"
         >
           <p className="premium-kicker">
-            {reward.isEveningQuestCompleted ? "Quête du soir accomplie" : "Progression enregistrée"}
+            {isMissed
+              ? "Progression locale"
+              : reward.isEveningQuestCompleted
+                ? "Quête du soir accomplie"
+                : "Progression enregistrée"}
           </p>
           <h2 className="mt-2 font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal tracking-[-0.03em] text-white">
-            {standardXpEarned > 0 ? (
+            {isMissed ? (
+              "Tentative enregistrée"
+            ) : standardXpEarned > 0 ? (
               <AnimatedXp value={standardXpEarned} />
             ) : (
               "Déjà compté cette nuit"
             )}
           </h2>
+          {isMissed && standardXpEarned > 0 ? (
+            <p className="mt-2 text-xs text-muted">+{standardXpEarned} Éclats d’étoile</p>
+          ) : null}
           {reward.isEveningQuestCompleted ? (
             <p className="mt-2 text-sm font-semibold text-accent-cyan">
               +{reward.eveningQuestBonusXp} bonus du soir
@@ -111,10 +133,16 @@ export function ProgressFeedback({
           {reward.streakMessage ? (
             <p className="mt-2 text-sm font-semibold text-accent">{reward.streakMessage}</p>
           ) : null}
-          {reward.isFirstDiscovery ? (
-            <p className="mt-2 text-sm font-semibold text-accent">
-              Nouvelle cible dans ton ciel découvert.
-            </p>
+          {newAtlasEntry ? (
+            <div className="mt-3 rounded-[12px] border border-accent/25 bg-accent/[0.08] p-3">
+              <p className="text-sm font-semibold text-accent">Nouvelle entrée dans ton atlas</p>
+              <Link
+                href={`/atlas?entry=${encodeURIComponent(newAtlasEntry.id)}`}
+                className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent-cyan hover:underline"
+              >
+                Voir dans mon atlas
+              </Link>
+            </div>
           ) : null}
           {reward.unlockedAchievements.map((id) => (
             <p key={id} className="mt-2 text-sm font-semibold text-success">
@@ -141,6 +169,9 @@ export function ProgressFeedback({
               />
             </div>
           </div>
+          {observation && showObservationReport ? (
+            <ObservationReportPicker observation={observation} onUpdated={onObservationUpdated} />
+          ) : null}
           {showJournalLink ? (
             <Link href="/journal" className={getAppButtonClassName({ className: "mt-5 w-full" })}>
               Voir mon journal

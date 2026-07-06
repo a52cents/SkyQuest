@@ -130,6 +130,14 @@ export function createEmptyProgressProfile(now = new Date(0).toISOString()): Pro
     streakFreezeCount: 1,
     lastStreakFreezeUsedNightKey: null,
     lastFreezeRegenerationKey: null,
+    weeklyStreak: 0,
+    longestWeeklyStreak: 0,
+    currentWeek: {
+      weekKey: getLocalWeekKey(new Date(now)),
+      successfulNightKeys: [],
+      completed: false,
+    },
+    lastCompletedWeekKey: null,
     updatedAt: now,
   };
 }
@@ -141,6 +149,113 @@ export function getLocalNightKey(date: Date): string {
   const month = String(nightDate.getMonth() + 1).padStart(2, "0");
   const day = String(nightDate.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function localDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function getLocalWeekKey(date: Date): string {
+  const monday = new Date(date);
+  monday.setHours(12, 0, 0, 0);
+  const dayFromMonday = (monday.getDay() + 6) % 7;
+  monday.setDate(monday.getDate() - dayFromMonday);
+  return localDateKey(monday);
+}
+
+function parseLocalDateKey(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day, 12);
+}
+
+function weekDifference(currentWeekKey: string, previousWeekKey: string): number {
+  return Math.round(
+    (parseLocalDateKey(currentWeekKey).getTime() - parseLocalDateKey(previousWeekKey).getTime()) /
+      (7 * 86_400_000),
+  );
+}
+
+export function applyWeeklyObservation(
+  profile: ProgressProfile,
+  localNightKey: string,
+  now: Date,
+): ProgressProfile {
+  const weekKey = getLocalWeekKey(parseLocalDateKey(localNightKey));
+  const nowWeekKey = getLocalWeekKey(now);
+  if (weekKey !== nowWeekKey) return profile;
+
+  const isCurrentStoredWeek = profile.currentWeek.weekKey === weekKey;
+  const previousWeekWasIncomplete =
+    !isCurrentStoredWeek && profile.currentWeek.weekKey < weekKey && !profile.currentWeek.completed;
+  let weeklyStreak = previousWeekWasIncomplete ? 0 : profile.weeklyStreak;
+  if (
+    !isCurrentStoredWeek &&
+    profile.lastCompletedWeekKey &&
+    weekDifference(weekKey, profile.lastCompletedWeekKey) > 1
+  ) {
+    weeklyStreak = 0;
+  }
+
+  const successfulNightKeys = [
+    ...new Set([
+      ...(isCurrentStoredWeek ? profile.currentWeek.successfulNightKeys : []),
+      localNightKey,
+    ]),
+  ].sort();
+  const wasCompleted = isCurrentStoredWeek && profile.currentWeek.completed;
+  const completed = successfulNightKeys.length >= 2;
+  let lastCompletedWeekKey = profile.lastCompletedWeekKey;
+
+  if (completed && !wasCompleted) {
+    weeklyStreak =
+      lastCompletedWeekKey && weekDifference(weekKey, lastCompletedWeekKey) === 1
+        ? Math.max(1, weeklyStreak) + 1
+        : 1;
+    lastCompletedWeekKey = weekKey;
+  }
+
+  return {
+    ...profile,
+    weeklyStreak,
+    longestWeeklyStreak: Math.max(profile.longestWeeklyStreak, weeklyStreak),
+    currentWeek: { weekKey, successfulNightKeys, completed },
+    lastCompletedWeekKey,
+    updatedAt: now.toISOString(),
+  };
+}
+
+export type WeeklyStreakDisplayState = {
+  successfulNights: number;
+  goalNights: 2;
+  displayStreak: number;
+  message: string;
+};
+
+export function getWeeklyStreakDisplayState(
+  profile: ProgressProfile,
+  now: Date,
+): WeeklyStreakDisplayState {
+  const weekKey = getLocalWeekKey(now);
+  const isCurrentWeek = profile.currentWeek.weekKey === weekKey;
+  const successfulNights = isCurrentWeek ? profile.currentWeek.successfulNightKeys.length : 0;
+  const lastCompletionDistance = profile.lastCompletedWeekKey
+    ? weekDifference(weekKey, profile.lastCompletedWeekKey)
+    : Number.POSITIVE_INFINITY;
+  const displayStreak = lastCompletionDistance <= 1 ? profile.weeklyStreak : 0;
+  return {
+    successfulNights: Math.min(2, successfulNights),
+    goalNights: 2,
+    displayStreak,
+    message:
+      successfulNights >= 2
+        ? "Semaine validée."
+        : successfulNights === 1
+          ? "Encore une nuit pour valider cette semaine"
+          : "Deux nuits différentes valident ta semaine.",
+  };
 }
 
 export function getConditionsBonus(visibilityScore: number): number {
@@ -451,11 +566,16 @@ export function applyQuestReward(
     eveningQuestCompletionCount: eveningQuestCompletionCount + (isEveningQuestCompleted ? 1 : 0),
     updatedAt: timestamp,
   };
-  const streakResult =
+  const previousWeeklyStreak = intermediate.weeklyStreak;
+  // Legacy daily fields remain maintained for backward-compatible local profiles, but the product
+  // now displays and rewards only the weekly cadence below.
+  const legacyStreakProfile =
+    status === "seen" ? computeStreakOnSuccess(intermediate, now).profile : intermediate;
+  const streakProfile =
     status === "seen"
-      ? computeStreakOnSuccess(intermediate, now)
-      : { profile: intermediate, previousStreak: intermediate.currentStreak, streakMessage: null };
-  const streakProfile = streakResult.profile;
+      ? applyWeeklyObservation(legacyStreakProfile, localNight, now)
+      : legacyStreakProfile;
+  const weeklyProgress = getWeeklyStreakDisplayState(streakProfile, now);
   const newlyUnlocked = getAchievementProgress(streakProfile)
     .filter((achievement) => achievement.progress >= achievement.goal)
     .map((achievement) => achievement.id)
@@ -478,11 +598,11 @@ export function applyQuestReward(
       totalXp: nextProfile.totalXp,
       isFirstDiscovery,
       unlockedAchievements: newlyUnlocked,
-      previousStreak: streakResult.previousStreak,
-      currentStreak: nextProfile.currentStreak,
-      longestStreak: nextProfile.longestStreak,
+      previousStreak: previousWeeklyStreak,
+      currentStreak: nextProfile.weeklyStreak,
+      longestStreak: nextProfile.longestWeeklyStreak,
       streakFreezeCount: nextProfile.streakFreezeCount,
-      streakMessage: streakResult.streakMessage,
+      streakMessage: status === "seen" ? weeklyProgress.message : null,
       rankName: rank.current.name,
       nextRankName: rank.next?.name ?? null,
       xpToNextRank: rank.xpToNext,

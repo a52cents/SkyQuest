@@ -885,7 +885,7 @@ export function Dashboard({
                   aria-label="Détails sur la qualité du ciel"
                 >
                   {airTransparency ? (
-                    <div className="air-quality-detail">
+                    <div className="sky-quality-detail-item air-quality-detail">
                       <span>Transparence de l’air</span>
                       <strong>{airTransparency.label}</strong>
                       <p>{airTransparency.shortAdvice}</p>
@@ -893,7 +893,7 @@ export function Dashboard({
                     </div>
                   ) : null}
                   {lightingPractice ? (
-                    <div className="lighting-practice-detail">
+                    <div className="sky-quality-detail-item lighting-practice-detail">
                       <span>Éclairage à {lightingPractice.municipalityName}</span>
                       <strong>{lightingPractice.label}</strong>
                       <p>{lightingPractice.shortAdvice}</p>
@@ -914,9 +914,14 @@ export function Dashboard({
               className: `analysis-banner ${isGuidanceUnlocked ? "current" : "stale"}`,
             })}
           >
-            <div>
-              <strong>{isGuidanceUnlocked ? "Analyse actuelle" : "Dernière analyse"}</strong>
-              <span>{analysisDateLabel}</span>
+            <div className="analysis-banner-heading">
+              <span className="analysis-banner-status" aria-hidden="true">
+                <span />
+              </span>
+              <div>
+                <strong>{isGuidanceUnlocked ? "Analyse actuelle" : "Dernière analyse"}</strong>
+                <span>{analysisDateLabel}</span>
+              </div>
             </div>
             <p>
               {isGuidanceUnlocked

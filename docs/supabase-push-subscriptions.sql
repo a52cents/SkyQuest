@@ -278,3 +278,190 @@ grant execute on function public.cleanup_expired_sky_window_reminders(timestampt
 
 comment on table public.push_subscriptions is
   'Server-only SkyQuest Web Push subscriptions. Accessed with the Supabase service role.';
+
+-- One-shot reminders explicitly requested for one known target. No journal or atlas
+-- state is stored here: only the chosen target and the subscription's existing coarse area.
+create table if not exists public.push_target_watches (
+  id uuid primary key default gen_random_uuid(),
+  subscription_id uuid not null references public.push_subscriptions(id) on delete cascade,
+  target text not null,
+  target_type text not null,
+  reason text not null,
+  minimum_score smallint not null default 60,
+  expires_at timestamptz not null,
+  enabled boolean not null default true,
+  claimed_at timestamptz,
+  created_at timestamptz not null default now(),
+  constraint push_target_watches_target_length_check check (char_length(target) between 1 and 100),
+  constraint push_target_watches_target_type_length_check check (char_length(target_type) between 1 and 40),
+  constraint push_target_watches_reason_check check (reason in ('missed_retry', 'collection_gap')),
+  constraint push_target_watches_minimum_score_check check (minimum_score between 50 and 100),
+  constraint push_target_watches_expiration_check check (expires_at > created_at)
+);
+
+alter table public.push_target_watches enable row level security;
+revoke all on table public.push_target_watches from public, anon, authenticated;
+grant select, insert, update, delete on table public.push_target_watches to service_role;
+
+create index if not exists push_target_watches_active_idx
+  on public.push_target_watches (expires_at, subscription_id)
+  where enabled = true;
+
+create unique index if not exists push_target_watches_one_active_target_idx
+  on public.push_target_watches (subscription_id, target)
+  where enabled = true;
+
+create or replace function public.create_target_watch(
+  p_endpoint text,
+  p_target text,
+  p_target_type text,
+  p_reason text,
+  p_minimum_score smallint default 60,
+  p_now timestamptz default now()
+)
+returns setof public.push_target_watches
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_subscription_id uuid;
+begin
+  if p_reason not in ('missed_retry', 'collection_gap')
+    or char_length(p_target) not between 1 and 100
+    or char_length(p_target_type) not between 1 and 40
+    or p_minimum_score not between 50 and 100 then
+    raise exception 'invalid_target_watch';
+  end if;
+
+  select id into v_subscription_id
+  from public.push_subscriptions
+  where endpoint = p_endpoint
+    and enabled = true
+    and latitude_rounded is not null
+    and longitude_rounded is not null
+  for update;
+
+  if not found then
+    raise exception 'target_watch_subscription_unavailable';
+  end if;
+
+  update public.push_target_watches
+  set enabled = false
+  where subscription_id = v_subscription_id
+    and enabled = true
+    and expires_at <= p_now;
+
+  return query
+  select *
+  from public.push_target_watches
+  where subscription_id = v_subscription_id
+    and lower(target) = lower(p_target)
+    and enabled = true
+    and expires_at > p_now
+  limit 1;
+  if found then
+    return;
+  end if;
+
+  if (
+    select count(*)
+    from public.push_target_watches
+    where subscription_id = v_subscription_id
+      and enabled = true
+      and expires_at > p_now
+  ) >= 3 then
+    raise exception 'target_watch_limit';
+  end if;
+
+  return query
+  insert into public.push_target_watches (
+    subscription_id, target, target_type, reason, minimum_score, expires_at
+  ) values (
+    v_subscription_id,
+    p_target,
+    p_target_type,
+    p_reason,
+    p_minimum_score,
+    p_now + interval '14 days'
+  )
+  returning *;
+end;
+$$;
+
+revoke all on function public.create_target_watch(text, text, text, text, smallint, timestamptz)
+  from public, anon, authenticated;
+grant execute on function public.create_target_watch(text, text, text, text, smallint, timestamptz)
+  to service_role;
+
+create or replace function public.claim_target_watch(
+  p_watch_id uuid,
+  p_now timestamptz default now()
+)
+returns boolean
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_subscription_id uuid;
+  v_inserted integer;
+begin
+  select subscription_id into v_subscription_id
+  from public.push_target_watches
+  where id = p_watch_id
+    and enabled = true
+    and claimed_at is null
+    and expires_at > p_now
+  for update;
+
+  if not found then
+    return false;
+  end if;
+
+  insert into public.push_notification_claims (subscription_id, dedupe_key, claimed_at)
+  values (v_subscription_id, 'target_watch:' || p_watch_id::text, p_now)
+  on conflict do nothing;
+  get diagnostics v_inserted = row_count;
+
+  if v_inserted = 0 then
+    return false;
+  end if;
+
+  update public.push_target_watches
+  set enabled = false, claimed_at = p_now
+  where id = p_watch_id;
+
+  return true;
+end;
+$$;
+
+revoke all on function public.claim_target_watch(uuid, timestamptz)
+  from public, anon, authenticated;
+grant execute on function public.claim_target_watch(uuid, timestamptz) to service_role;
+
+create or replace function public.cleanup_expired_target_watches(
+  p_now timestamptz default now()
+)
+returns integer
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_cleaned integer;
+begin
+  update public.push_target_watches
+  set enabled = false
+  where enabled = true and expires_at <= p_now;
+  get diagnostics v_cleaned = row_count;
+  return v_cleaned;
+end;
+$$;
+
+revoke all on function public.cleanup_expired_target_watches(timestamptz)
+  from public, anon, authenticated;
+grant execute on function public.cleanup_expired_target_watches(timestamptz) to service_role;
+
+comment on table public.push_target_watches is
+  'One-shot target reminders explicitly requested by a device; contains no journal or progression data.';

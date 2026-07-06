@@ -1,9 +1,15 @@
 import "server-only";
 
 import { createSupabaseAdminClient } from "@/lib/supabase-server";
-import { NOTIFICATION_TOPICS, type NotificationTopic } from "@/lib/push-types";
+import {
+  NOTIFICATION_TOPICS,
+  type NotificationTopic,
+  type TargetWatch,
+  type TargetWatchReason,
+} from "@/lib/push-types";
 
 export type StoredPushSubscription = {
+  id: string;
   endpoint: string;
   p256dh: string;
   auth: string;
@@ -26,6 +32,7 @@ export type StoredPushSubscription = {
 export type PushOpportunityClaimResult = "claimed" | "cooldown" | "duplicate" | "disabled";
 
 type PushSubscriptionRow = {
+  id: string;
   endpoint: string;
   p256dh: string;
   auth: string;
@@ -54,7 +61,7 @@ type UpsertPushSubscriptionInput = Pick<
   >;
 
 const SELECT_FIELDS =
-  "endpoint,p256dh,auth,enabled,topics,timezone,latitude_rounded,longitude_rounded,last_seen_at,last_notification_sent_at,reminder_at,reminder_window_starts_at,reminder_window_ends_at,reminder_target,reminder_score,created_at,updated_at";
+  "id,endpoint,p256dh,auth,enabled,topics,timezone,latitude_rounded,longitude_rounded,last_seen_at,last_notification_sent_at,reminder_at,reminder_window_starts_at,reminder_window_ends_at,reminder_target,reminder_score,created_at,updated_at";
 const ACTIVE_SUBSCRIPTIONS_PAGE_SIZE = 1_000;
 const VALID_TOPICS = new Set<string>(NOTIFICATION_TOPICS);
 
@@ -82,6 +89,7 @@ function normalizeTopics(value: unknown): NotificationTopic[] {
 
 function fromRow(row: PushSubscriptionRow): StoredPushSubscription {
   return {
+    id: row.id,
     endpoint: row.endpoint,
     p256dh: row.p256dh,
     auth: row.auth,
@@ -100,6 +108,165 @@ function fromRow(row: PushSubscriptionRow): StoredPushSubscription {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+type TargetWatchRow = {
+  id: string;
+  subscription_id: string;
+  target: string;
+  target_type: string;
+  reason: TargetWatchReason;
+  minimum_score: number;
+  expires_at: string;
+  created_at: string;
+};
+
+function watchFromRow(row: TargetWatchRow): TargetWatch {
+  return {
+    id: row.id,
+    target: row.target,
+    targetType: row.target_type,
+    reason: row.reason,
+    minimumScore: Number(row.minimum_score),
+    expiresAt: row.expires_at,
+    createdAt: row.created_at,
+  };
+}
+
+export async function createTargetWatch({
+  endpoint,
+  target,
+  targetType,
+  reason,
+  minimumScore = 60,
+  now = new Date(),
+}: {
+  endpoint: string;
+  target: string;
+  targetType: string;
+  reason: TargetWatchReason;
+  minimumScore?: number;
+  now?: Date;
+}): Promise<TargetWatch> {
+  const supabase = createSupabaseAdminClient();
+  const { data: subscription, error: subscriptionError } = await supabase
+    .from("push_subscriptions")
+    .select("id,latitude_rounded,longitude_rounded")
+    .eq("endpoint", endpoint)
+    .eq("enabled", true)
+    .maybeSingle();
+  if (subscriptionError || !subscription)
+    throwStoreError("find target watch subscription", subscriptionError);
+  if (subscription.latitude_rounded === null || subscription.longitude_rounded === null) {
+    throw new Error("Target watch requires an approximate location");
+  }
+  const existing = (await listTargetWatches(endpoint, now)).find(
+    (watch) => watch.target.toLocaleLowerCase("fr-FR") === target.toLocaleLowerCase("fr-FR"),
+  );
+  if (existing) return existing;
+
+  const { data, error } = await supabase.rpc("create_target_watch", {
+    p_endpoint: endpoint,
+    p_target: target,
+    p_target_type: targetType,
+    p_reason: reason,
+    p_minimum_score: Math.max(50, Math.min(100, Math.round(minimumScore))),
+    p_now: now.toISOString(),
+  });
+  if (error || !data) {
+    if (String(error?.message).includes("target_watch_limit")) {
+      throw new Error("Target watch limit reached");
+    }
+    throwStoreError("create target watch", error);
+  }
+  const row = (Array.isArray(data) ? data[0] : data) as TargetWatchRow | undefined;
+  if (!row) throwStoreError("create target watch result", data);
+  return watchFromRow(row);
+}
+
+export async function listTargetWatches(
+  endpoint: string,
+  now = new Date(),
+): Promise<TargetWatch[]> {
+  const supabase = createSupabaseAdminClient();
+  const { data: subscription, error: subscriptionError } = await supabase
+    .from("push_subscriptions")
+    .select("id")
+    .eq("endpoint", endpoint)
+    .maybeSingle();
+  if (subscriptionError) throwStoreError("find target watch subscription", subscriptionError);
+  if (!subscription) return [];
+  const { data, error } = await supabase
+    .from("push_target_watches")
+    .select("id,subscription_id,target,target_type,reason,minimum_score,expires_at,created_at")
+    .eq("subscription_id", subscription.id)
+    .eq("enabled", true)
+    .gt("expires_at", now.toISOString())
+    .order("created_at", { ascending: false });
+  if (error) throwStoreError("list target watches", error);
+  return (data ?? []).map((row) => watchFromRow(row as TargetWatchRow));
+}
+
+export async function disableTargetWatch(endpoint: string, watchId?: string): Promise<void> {
+  const supabase = createSupabaseAdminClient();
+  const { data: subscription, error: subscriptionError } = await supabase
+    .from("push_subscriptions")
+    .select("id")
+    .eq("endpoint", endpoint)
+    .maybeSingle();
+  if (subscriptionError) throwStoreError("find target watch subscription", subscriptionError);
+  if (!subscription) return;
+  let query = supabase
+    .from("push_target_watches")
+    .update({ enabled: false })
+    .eq("subscription_id", subscription.id)
+    .eq("enabled", true);
+  if (watchId) query = query.eq("id", watchId);
+  const { error } = await query;
+  if (error) throwStoreError("disable target watch", error);
+}
+
+export type ActiveTargetWatch = TargetWatch & { subscription: StoredPushSubscription };
+
+export async function listActiveTargetWatches(now = new Date()): Promise<ActiveTargetWatch[]> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("push_target_watches")
+    .select(
+      "id,subscription_id,target,target_type,reason,minimum_score,expires_at,created_at,push_subscriptions!inner(id,endpoint,p256dh,auth,enabled,topics,timezone,latitude_rounded,longitude_rounded,last_seen_at,last_notification_sent_at,reminder_at,reminder_window_starts_at,reminder_window_ends_at,reminder_target,reminder_score,created_at,updated_at)",
+    )
+    .eq("enabled", true)
+    .gt("expires_at", now.toISOString())
+    .eq("push_subscriptions.enabled", true);
+  if (error) throwStoreError("list active target watches", error);
+  return (data ?? []).flatMap((raw) => {
+    const row = raw as unknown as TargetWatchRow & {
+      push_subscriptions: PushSubscriptionRow | PushSubscriptionRow[];
+    };
+    const subscription = Array.isArray(row.push_subscriptions)
+      ? row.push_subscriptions[0]
+      : row.push_subscriptions;
+    return subscription ? [{ ...watchFromRow(row), subscription: fromRow(subscription) }] : [];
+  });
+}
+
+export async function claimTargetWatch(watchId: string, now = new Date()): Promise<boolean> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc("claim_target_watch", {
+    p_watch_id: watchId,
+    p_now: now.toISOString(),
+  });
+  if (error) throwStoreError("claim target watch", error);
+  return data === true;
+}
+
+export async function cleanupExpiredTargetWatches(now = new Date()): Promise<number> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc("cleanup_expired_target_watches", {
+    p_now: now.toISOString(),
+  });
+  if (error) throwStoreError("cleanup target watches", error);
+  return Number(data) || 0;
 }
 
 export async function scheduleSkyWindowReminder({

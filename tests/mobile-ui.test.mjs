@@ -139,9 +139,9 @@ test("primary navigation prioritizes Now, Later, Explore, and Journal", () => {
   assert.match(appHeaderSource, /Profil et progression/);
 });
 
-test("Explore prioritizes the learning catalog and keeps space news secondary", () => {
+test("Explore opens with space news before the learning catalog", () => {
   assert.ok(
-    exploreSource.indexOf("Catalogue du ciel") < exploreSource.indexOf("Actualités spatiales"),
+    exploreSource.indexOf("Actualités spatiales") < exploreSource.indexOf("Catalogue du ciel"),
   );
   assert.match(exploreSource, /typeFilter/);
   assert.match(exploreSource, /difficultyFilter/);

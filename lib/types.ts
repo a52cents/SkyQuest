@@ -158,7 +158,20 @@ export type Observation = {
   photoThumbnailId?: string;
   questKind?: QuestKind;
   eveningQuestBonusXp?: number;
+  observationReport?: ObservationReport;
 };
+
+export type SeenObservationReportValue =
+  "bright" | "faint" | "color_noticed" | "shape_recognized" | "movement_seen";
+
+export type MissedObservationReportValue =
+  "clouds" | "blocked_horizon" | "uncertain_direction" | "too_faint" | "not_enough_time";
+
+export type ObservationReportValue = SeenObservationReportValue | MissedObservationReportValue;
+
+export type ObservationReport =
+  | { kind: "seen_detail"; value: SeenObservationReportValue; recordedAt: string }
+  | { kind: "missed_reason"; value: MissedObservationReportValue; recordedAt: string };
 
 export type ObservationPhotoDraft = {
   photoDataUrl?: string;
@@ -207,7 +220,17 @@ export type ProgressProfile = {
   streakFreezeCount: number;
   lastStreakFreezeUsedNightKey: string | null;
   lastFreezeRegenerationKey: string | null;
+  weeklyStreak: number;
+  longestWeeklyStreak: number;
+  currentWeek: WeeklyObservationProgress;
+  lastCompletedWeekKey: string | null;
   updatedAt: string;
+};
+
+export type WeeklyObservationProgress = {
+  weekKey: string;
+  successfulNightKeys: string[];
+  completed: boolean;
 };
 
 export type ProgressReward = {

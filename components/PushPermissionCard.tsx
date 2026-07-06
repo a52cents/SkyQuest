@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AppButton } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
 import { NotificationSettings } from "@/components/NotificationSettings";
+import { TargetWatchSettings } from "@/components/TargetWatchSettings";
 import {
   getExistingPushSubscription,
   getNotificationPreferences,
@@ -277,6 +278,7 @@ export function PushPermissionCard({ className }: { className?: string }) {
                 onChange={(next) => void updatePreferences(next)}
                 onDisable={() => void disable()}
               />
+              <TargetWatchSettings />
               {process.env.NODE_ENV !== "production" ? (
                 <AppButton
                   variant="ghost"

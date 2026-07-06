@@ -12,6 +12,7 @@ import type { Observation } from "@/lib/types";
 import { getRankProgress } from "@/lib/progression";
 import { getProgressProfile } from "@/lib/storage";
 import { formatVisibilityScoreForAccessibility } from "@/lib/visibility";
+import { getObservationReportLabel } from "@/lib/observation-report";
 
 type ObservationMemoryCardProps = {
   observation: Observation;
@@ -42,7 +43,7 @@ export function ObservationMemoryCard({ observation, onClose }: ObservationMemor
       ...observation,
       totalXp: observation.totalXp ?? profile.totalXp,
       rankName: observation.rankName ?? getRankProgress(profile.totalXp).current.name,
-      streak: observation.streak ?? profile.currentStreak,
+      streak: observation.streak ?? profile.weeklyStreak,
     };
   }, [observation]);
   const [cardBlob, setCardBlob] = useState<Blob | null>(null);
@@ -158,6 +159,11 @@ export function ObservationMemoryCard({ observation, onClose }: ObservationMemor
           </span>
         ))}
       </div>
+      {getObservationReportLabel(observation.observationReport) ? (
+        <p className="mt-3 rounded-[12px] border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-sm text-muted">
+          Détail noté · {getObservationReportLabel(observation.observationReport)}
+        </p>
+      ) : null}
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         <AppButton onClick={() => void shareCard()} disabled={!cardBlob} fullWidth>

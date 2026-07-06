@@ -8,11 +8,21 @@
  * Invariants de confidentialité :
  * - ne jamais envoyer les données stockées vers un serveur depuis ce module ;
  * - arrondir les coordonnées avant toute persistance ;
- * - limiter le journal aux 50 observations les plus récentes ;
+ * - ne jamais supprimer silencieusement une ancienne observation ;
  * - tolérer les données corrompues ou issues d'une ancienne version sans faire planter l'UI ;
  * - les photos restent locales dans IndexedDB ; localStorage ne garde que leurs identifiants.
  */
 import { deletePhoto, savePhotoFromDataUrl } from "./photo-db.ts";
+import {
+  addStoredObservation,
+  clearStoredObservations,
+  countObservations as countDatabaseObservations,
+  getObservation as getDatabaseObservation,
+  getObservationPage as getDatabaseObservationPage,
+  importStoredObservations,
+  updateStoredObservation,
+  type ObservationPageOptions,
+} from "./local-database.ts";
 import { applyQuestReward, createEmptyProgressProfile, getLocalNightKey } from "./progression.ts";
 import {
   getBestSkyWindowValidity,
@@ -29,6 +39,7 @@ import type {
   EveningQuestAssignment,
   Observation,
   ObservationPhotoDraft,
+  ObservationReport,
   ProgressProfile,
   ProgressReward,
   QuestTargetType,
@@ -151,6 +162,34 @@ function normalizeProgressProfile(
         )
         .slice(-180)
     : [];
+  const weeklyStreak =
+    typeof value.weeklyStreak === "number" && Number.isFinite(value.weeklyStreak)
+      ? Math.max(0, Math.trunc(value.weeklyStreak))
+      : 0;
+  const longestWeeklyStreak =
+    typeof value.longestWeeklyStreak === "number" && Number.isFinite(value.longestWeeklyStreak)
+      ? Math.max(weeklyStreak, Math.trunc(value.longestWeeklyStreak))
+      : weeklyStreak;
+  const emptyWeeklyProgress = createEmptyProgressProfile(fallbackUpdatedAt).currentWeek;
+  const currentWeek =
+    value.currentWeek &&
+    typeof value.currentWeek.weekKey === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value.currentWeek.weekKey) &&
+    Array.isArray(value.currentWeek.successfulNightKeys)
+      ? {
+          weekKey: value.currentWeek.weekKey,
+          successfulNightKeys: [
+            ...new Set(
+              value.currentWeek.successfulNightKeys.filter(
+                (key): key is string => typeof key === "string" && /^\d{4}-\d{2}-\d{2}$/.test(key),
+              ),
+            ),
+          ],
+          completed:
+            value.currentWeek.completed === true &&
+            new Set(value.currentWeek.successfulNightKeys).size >= 2,
+        }
+      : emptyWeeklyProgress;
 
   return {
     version: 1,
@@ -198,6 +237,11 @@ function normalizeProgressProfile(
     streakFreezeCount,
     lastStreakFreezeUsedNightKey,
     lastFreezeRegenerationKey,
+    weeklyStreak,
+    longestWeeklyStreak,
+    currentWeek,
+    lastCompletedWeekKey:
+      typeof value.lastCompletedWeekKey === "string" ? value.lastCompletedWeekKey : null,
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : fallbackUpdatedAt,
   };
 }
@@ -213,26 +257,61 @@ type LegacyObservation = Observation & {
   photoThumbnailDataUrl?: unknown;
 };
 
+function isObservationReport(value: unknown): value is ObservationReport {
+  if (!value || typeof value !== "object") return false;
+  const report = value as Partial<ObservationReport>;
+  const seenValues = ["bright", "faint", "color_noticed", "shape_recognized", "movement_seen"];
+  const missedValues = [
+    "clouds",
+    "blocked_horizon",
+    "uncertain_direction",
+    "too_faint",
+    "not_enough_time",
+  ];
+  return (
+    typeof report.recordedAt === "string" &&
+    Number.isFinite(new Date(report.recordedAt).getTime()) &&
+    ((report.kind === "seen_detail" && seenValues.includes(String(report.value))) ||
+      (report.kind === "missed_reason" && missedValues.includes(String(report.value))))
+  );
+}
+
+function normalizeObservation(value: unknown): LegacyObservation | null {
+  if (!value || typeof value !== "object") return null;
+  const observation = value as LegacyObservation;
+  if (
+    typeof observation.id !== "string" ||
+    typeof observation.createdAt !== "string" ||
+    !Number.isFinite(new Date(observation.createdAt).getTime()) ||
+    typeof observation.questTitle !== "string" ||
+    typeof observation.target !== "string" ||
+    (observation.status !== "seen" && observation.status !== "missed") ||
+    typeof observation.visibilityScore !== "number"
+  ) {
+    return null;
+  }
+  if (
+    observation.observationReport &&
+    (!isObservationReport(observation.observationReport) ||
+      (observation.status === "seen" && observation.observationReport.kind !== "seen_detail") ||
+      (observation.status === "missed" && observation.observationReport.kind !== "missed_reason"))
+  ) {
+    const cleanObservation = { ...observation };
+    delete cleanObservation.observationReport;
+    return cleanObservation;
+  }
+  return observation;
+}
+
 function readValidObservations(): LegacyObservation[] {
   const stored = readJson<unknown>(OBSERVATIONS_KEY, memoryObservations);
   if (!Array.isArray(stored)) {
     return [];
   }
 
-  return stored.filter((item): item is LegacyObservation => {
-    if (!item || typeof item !== "object") {
-      return false;
-    }
-    const value = item as Partial<Observation>;
-    return (
-      typeof value.id === "string" &&
-      typeof value.createdAt === "string" &&
-      typeof value.questTitle === "string" &&
-      typeof value.target === "string" &&
-      (value.status === "seen" || value.status === "missed") &&
-      typeof value.visibilityScore === "number"
-    );
-  });
+  return stored
+    .map(normalizeObservation)
+    .filter((item): item is LegacyObservation => Boolean(item));
 }
 
 async function migrateLegacyObservation(observation: LegacyObservation): Promise<Observation> {
@@ -243,44 +322,92 @@ async function migrateLegacyObservation(observation: LegacyObservation): Promise
   if (typeof migrated.photoThumbnailId !== "string") delete migrated.photoThumbnailId;
 
   if (!migrated.photoId && typeof photoDataUrl === "string") {
-    migrated.photoId = await savePhotoFromDataUrl(photoDataUrl).catch(() => undefined);
+    migrated.photoId = await savePhotoFromDataUrl(
+      photoDataUrl,
+      `legacy-${observation.id}-photo`,
+    ).catch(() => undefined);
   }
   if (!migrated.photoThumbnailId && typeof photoThumbnailDataUrl === "string") {
-    migrated.photoThumbnailId = await savePhotoFromDataUrl(photoThumbnailDataUrl).catch(
-      () => undefined,
-    );
+    migrated.photoThumbnailId = await savePhotoFromDataUrl(
+      photoThumbnailDataUrl,
+      `legacy-${observation.id}-thumbnail`,
+    ).catch(() => undefined);
   }
 
   return migrated;
 }
 
-export async function getObservations(): Promise<Observation[]> {
-  const stored = readValidObservations();
-  const needsMigration = stored.some(
-    (observation) =>
-      Object.prototype.hasOwnProperty.call(observation, "photoDataUrl") ||
-      Object.prototype.hasOwnProperty.call(observation, "photoThumbnailDataUrl"),
-  );
-  if (needsMigration) {
-    if (!legacyMigrationPromise) {
-      legacyMigrationPromise = Promise.all(stored.map(migrateLegacyObservation)).then(
-        (observations) => {
-          memoryObservations = observations;
-          writeJson(OBSERVATIONS_KEY, observations);
-          return observations;
-        },
-      );
-    }
-
-    try {
-      return await legacyMigrationPromise;
-    } finally {
-      legacyMigrationPromise = null;
-    }
+async function ensureLegacyObservationsMigrated(): Promise<void> {
+  if (!canUseStorage() || window.localStorage.getItem(OBSERVATIONS_KEY) === null) return;
+  if (!legacyMigrationPromise) {
+    legacyMigrationPromise = Promise.all(
+      readValidObservations().map(migrateLegacyObservation),
+    ).then(async (observations) => {
+      memoryObservations = observations;
+      await importStoredObservations(observations);
+      removeStoredValue(OBSERVATIONS_KEY);
+      return observations;
+    });
   }
+  try {
+    await legacyMigrationPromise;
+  } finally {
+    legacyMigrationPromise = null;
+  }
+}
 
-  memoryObservations = stored;
-  return stored;
+function sortMemoryObservations(observations: Observation[]): Observation[] {
+  return [...observations].sort(
+    (left, right) =>
+      right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id),
+  );
+}
+
+export async function getObservationPage(options: ObservationPageOptions): Promise<Observation[]> {
+  try {
+    await ensureLegacyObservationsMigrated();
+    const observations = (await getDatabaseObservationPage(options))
+      .map(normalizeObservation)
+      .filter((item): item is Observation => Boolean(item));
+    memoryObservations = sortMemoryObservations([
+      ...memoryObservations.filter((item) => !observations.some((stored) => stored.id === item.id)),
+      ...observations,
+    ]);
+    return observations;
+  } catch {
+    const sorted = sortMemoryObservations(memoryObservations);
+    const start = options.before
+      ? sorted.findIndex(
+          (item) =>
+            item.createdAt < options.before!.createdAt ||
+            (item.createdAt === options.before!.createdAt && item.id < options.before!.id),
+        )
+      : 0;
+    const safeStart = start < 0 ? sorted.length : start;
+    return sorted.slice(safeStart, safeStart + options.limit);
+  }
+}
+
+export async function getObservations(): Promise<Observation[]> {
+  const observations: Observation[] = [];
+  let before: ObservationPageOptions["before"];
+  do {
+    const page = await getObservationPage({ before, limit: 500 });
+    observations.push(...page);
+    const last = page.at(-1);
+    before = last ? { createdAt: last.createdAt, id: last.id } : undefined;
+    if (page.length < 500) break;
+  } while (before);
+  return observations;
+}
+
+export async function countObservations(): Promise<number> {
+  try {
+    await ensureLegacyObservationsMigrated();
+    return await countDatabaseObservations();
+  } catch {
+    return memoryObservations.length;
+  }
 }
 
 function isTargetType(value: unknown): value is QuestTargetType {
@@ -338,7 +465,11 @@ export function getProgressProfile(): ProgressProfile {
     !(
       value.lastFreezeRegenerationKey === null ||
       typeof value.lastFreezeRegenerationKey === "string"
-    );
+    ) ||
+    typeof value.weeklyStreak !== "number" ||
+    typeof value.longestWeeklyStreak !== "number" ||
+    !value.currentWeek ||
+    !(value.lastCompletedWeekKey === null || typeof value.lastCompletedWeekKey === "string");
 
   memoryProfile = profile;
   if (needsMigration) {
@@ -409,29 +540,34 @@ export async function addObservation(
     eveningQuestBonusXp: reward.eveningQuestBonusXp,
   };
 
-  const previous = await getObservations();
-  const next = [observation, ...previous].slice(0, 50);
-  const discarded = previous.slice(49);
   saveProgressProfile(profile);
   if (reward.isEveningQuestCompleted) {
     completeEveningQuestAssignment(nightKey, rewardQuest.target, now);
   }
-  memoryObservations = next;
-  const observationPersisted = writeJson(OBSERVATIONS_KEY, next);
-  await Promise.allSettled(
-    discarded.flatMap((item) =>
-      [item.photoId, item.photoThumbnailId]
-        .filter((id): id is string => typeof id === "string")
-        .map(deletePhoto),
-    ),
-  );
+  memoryObservations = sortMemoryObservations([
+    observation,
+    ...memoryObservations.filter((item) => item.id !== observation.id),
+  ]);
+  let observationPersisted = false;
+  try {
+    await ensureLegacyObservationsMigrated();
+    await addStoredObservation(observation);
+    observationPersisted = true;
+  } catch {
+    // The in-memory journal keeps the flow usable when IndexedDB is unavailable.
+  }
   return { observation, profile, reward, persisted: observationPersisted };
 }
 
 export async function clearObservations(): Promise<void> {
   const observations = await getObservations();
   memoryObservations = [];
-  writeJson(OBSERVATIONS_KEY, []);
+  removeStoredValue(OBSERVATIONS_KEY);
+  const databaseCleared = await clearStoredObservations().then(
+    () => true,
+    () => false,
+  );
+  if (!databaseCleared) return;
   await Promise.allSettled(
     observations.flatMap((observation) =>
       [observation.photoId, observation.photoThumbnailId]
@@ -439,6 +575,33 @@ export async function clearObservations(): Promise<void> {
         .map(deletePhoto),
     ),
   );
+}
+
+export async function updateObservationReport(
+  observationId: string,
+  report: ObservationReport,
+): Promise<Observation | null> {
+  if (!observationId || !isObservationReport(report)) return null;
+  let observation: Observation | null = null;
+  try {
+    await ensureLegacyObservationsMigrated();
+    observation = await getDatabaseObservation(observationId);
+  } catch {
+    observation = memoryObservations.find((item) => item.id === observationId) ?? null;
+  }
+  const expectedKind = observation?.status === "seen" ? "seen_detail" : "missed_reason";
+  if (!observation || report.kind !== expectedKind) return null;
+
+  const updated = { ...observation, observationReport: report };
+  memoryObservations = memoryObservations.map((item) =>
+    item.id === observationId ? updated : item,
+  );
+  try {
+    await updateStoredObservation(updated);
+  } catch {
+    // Memory fallback already contains the update for this session.
+  }
+  return updated;
 }
 
 export function saveActiveQuest(quest: SkyQuest): void {

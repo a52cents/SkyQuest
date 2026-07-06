@@ -1,18 +1,29 @@
+import Link from "next/link";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { AppCard } from "@/components/AppCard";
+import { getAppButtonClassName } from "@/components/AppButton";
+import { buildDiscoveryAtlasProgress } from "@/lib/discovery-atlas";
 import {
   ACHIEVEMENTS,
-  COLLECTION_CATEGORIES,
   getAchievementProgress,
   getRankProgress,
-  getStreakDisplayState,
+  getWeeklyStreakDisplayState,
 } from "@/lib/progression";
-import type { ProgressProfile } from "@/lib/types";
+import type { Observation, ProgressProfile } from "@/lib/types";
 
-export function ProgressDashboard({ profile }: { profile: ProgressProfile }) {
+export function ProgressDashboard({
+  profile,
+  observations,
+}: {
+  profile: ProgressProfile;
+  observations: Observation[];
+}) {
   const rank = getRankProgress(profile.totalXp);
   const achievements = getAchievementProgress(profile);
-  const streakDisplay = getStreakDisplayState(profile, new Date());
+  // Legacy profiles used getStreakDisplayState(profile, new Date()); their fields stay stored but
+  // are intentionally absent from this UI.
+  const streakDisplay = getWeeklyStreakDisplayState(profile, new Date());
+  const atlas = buildDiscoveryAtlasProgress({ profile, observations });
   const prefersReducedMotion = useReducedMotion() ?? false;
 
   const containerVariants: Variants = prefersReducedMotion
@@ -71,38 +82,36 @@ export function ProgressDashboard({ profile }: { profile: ProgressProfile }) {
       </AppCard>
 
       <AppCard as="section">
-        <p className="premium-kicker">Mon ciel découvert</p>
-        <h2 className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-xl font-normal tracking-[-0.02em] text-white">
-          {profile.discoveredTargets.length} cible
-          {profile.discoveredTargets.length !== 1 ? "s" : ""} unique
-          {profile.discoveredTargets.length !== 1 ? "s" : ""}
-        </h2>
-        <motion.div
-          className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3"
-          variants={containerVariants}
-          initial="hidden"
-          animate="show"
+        <p className="premium-kicker">Mon atlas du ciel</p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="rounded-[12px] border border-accent/20 bg-accent/[0.07] p-3">
+            <p className="text-2xl font-semibold text-white">{atlas.discoveredCount}</p>
+            <p className="mt-1 text-xs text-muted">objets découverts</p>
+          </div>
+          <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.02] p-3">
+            <p className="text-2xl font-semibold text-accent-cyan">
+              {Math.round(atlas.completionPercent)}%
+            </p>
+            <p className="mt-1 text-xs text-muted">de l’atlas complété</p>
+          </div>
+        </div>
+        <p className="mt-3 text-sm text-muted">
+          {atlas.latestDiscovery
+            ? `Dernière découverte : ${atlas.latestDiscovery.frenchName}`
+            : "Ta première découverte t’attend."}
+        </p>
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.07]">
+          <div
+            className="h-full rounded-full bg-accent"
+            style={{ width: `${Math.round(atlas.completionPercent)}%` }}
+          />
+        </div>
+        <Link
+          href="/atlas"
+          className={getAppButtonClassName({ fullWidth: true, className: "mt-4" })}
         >
-          {COLLECTION_CATEGORIES.map((category) => {
-            const count = profile.discoveredTargets.filter(
-              (target) => target.targetType === category.type,
-            ).length;
-            return (
-              <motion.div
-                key={category.type}
-                className={`rounded-[12px] border p-3 ${count > 0 ? "border-accent/20 bg-accent/[0.07]" : "border-white/[0.06] bg-white/[0.02]"}`}
-                variants={itemVariants}
-              >
-                <p className={`text-sm font-semibold ${count > 0 ? "text-white" : "text-faint"}`}>
-                  {category.label}
-                </p>
-                <p className="mt-1 text-xs text-muted">
-                  {count > 0 ? `${count} découverte${count > 1 ? "s" : ""}` : "Non découvert"}
-                </p>
-              </motion.div>
-            );
-          })}
-        </motion.div>
+          Ouvrir mon atlas
+        </Link>
       </AppCard>
 
       <AppCard as="section" variant="solid">
@@ -110,10 +119,11 @@ export function ProgressDashboard({ profile }: { profile: ProgressProfile }) {
         <div className="mt-3 flex items-start justify-between gap-4">
           <div>
             <h2 className="font-[Georgia,'Times_New_Roman',serif] text-2xl font-normal tracking-[-0.03em] text-white">
-              {streakDisplay.displayStreak} nuit{streakDisplay.displayStreak > 1 ? "s" : ""}
+              {streakDisplay.successfulNights}/2 nuits cette semaine
             </h2>
             <p className="mt-1 text-sm text-muted">
-              Record · {profile.longestStreak} nuit{profile.longestStreak > 1 ? "s" : ""}
+              Série · {streakDisplay.displayStreak} semaine
+              {streakDisplay.displayStreak > 1 ? "s" : ""}
             </p>
           </div>
           <span className="text-3xl text-accent" aria-hidden="true">
@@ -123,18 +133,10 @@ export function ProgressDashboard({ profile }: { profile: ProgressProfile }) {
         {streakDisplay.message ? (
           <p className="mt-3 text-sm font-medium text-accent">{streakDisplay.message}</p>
         ) : null}
-        <div className="mt-4 flex items-center justify-between rounded-[12px] border border-white/[0.06] bg-white/[0.025] px-3 py-2">
-          <div>
-            <p className="text-sm font-semibold text-white">Streak Freeze</p>
-            <p className="text-xs text-muted">Protège une nuit manquée.</p>
-          </div>
-          <div
-            className={`flex items-center gap-2 text-sm font-bold ${profile.streakFreezeCount > 0 ? "text-white" : "text-faint"}`}
-          >
-            <span aria-hidden="true">❄</span>
-            <span>{profile.streakFreezeCount}/1</span>
-          </div>
-        </div>
+        <p className="mt-3 text-xs text-faint">
+          Record · {profile.longestWeeklyStreak} semaine
+          {profile.longestWeeklyStreak > 1 ? "s" : ""}
+        </p>
       </AppCard>
 
       <AppCard as="section">

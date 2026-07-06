@@ -5,6 +5,8 @@ import {
   NOTIFICATION_TOPICS,
   type NotificationPreferences,
   type NotificationTopic,
+  type TargetWatch,
+  type TargetWatchReason,
 } from "@/lib/push-types";
 import { registerSkyQuestServiceWorker } from "@/lib/service-worker-client";
 
@@ -13,6 +15,8 @@ export {
   NOTIFICATION_TOPICS,
   type NotificationPreferences,
   type NotificationTopic,
+  type TargetWatch,
+  type TargetWatchReason,
 } from "@/lib/push-types";
 
 export type PushSubscriptionOptions = {
@@ -40,6 +44,69 @@ export function isPushSupported(): boolean {
     "PushManager" in window &&
     "Notification" in window
   );
+}
+
+export function isTargetWatchSupported(): boolean {
+  return (
+    isPushSupported() &&
+    !(isIosDevice() && !isStandaloneDisplay()) &&
+    Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim())
+  );
+}
+
+export async function watchTarget({
+  target,
+  reason,
+  location,
+}: {
+  target: string;
+  reason: TargetWatchReason;
+  location?: PushSubscriptionOptions["location"];
+}): Promise<{ ok: boolean; error?: string }> {
+  let subscription = await getExistingPushSubscription();
+  if (!subscription) subscription = await subscribeToPush({ location });
+  else if (location) await saveSubscriptionOnServer(subscription, { location });
+  if (!subscription) return { ok: false, error: "Active d’abord les alertes sur cet appareil." };
+  try {
+    const response = await fetch("/api/push/target-watch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: subscription.endpoint, target, reason }),
+    });
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    return { ok: response.ok, error: payload.error };
+  } catch {
+    return { ok: false, error: "Connexion indisponible." };
+  }
+}
+
+export async function getTargetWatches(): Promise<TargetWatch[]> {
+  const subscription = await getExistingPushSubscription();
+  if (!subscription) return [];
+  try {
+    const response = await fetch(
+      `/api/push/target-watch?endpoint=${encodeURIComponent(subscription.endpoint)}`,
+    );
+    const payload = (await response.json()) as { watches?: TargetWatch[] };
+    return response.ok && Array.isArray(payload.watches) ? payload.watches : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function cancelTargetWatch(watchId?: string): Promise<boolean> {
+  const subscription = await getExistingPushSubscription();
+  if (!subscription) return true;
+  try {
+    const response = await fetch("/api/push/target-watch", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: subscription.endpoint, watchId, all: !watchId }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 export function isIosDevice(): boolean {

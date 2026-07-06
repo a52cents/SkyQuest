@@ -2,6 +2,7 @@ import { AppButton } from "@/components/AppButton";
 import { AppCard } from "@/components/AppCard";
 import { ObservationMemoryCard } from "@/components/ObservationMemoryCard";
 import { getObservationTargetLabel, getSeasonLabel, getWeatherLabel } from "@/lib/observation-card";
+import { getObservationReportLabel } from "@/lib/observation-report";
 import { getPhotoObjectUrl, revokePhotoObjectUrl } from "@/lib/photo-db";
 import type { Observation } from "@/lib/types";
 import { formatVisibilityScore, formatVisibilityScoreForAccessibility } from "@/lib/visibility";
@@ -10,7 +11,10 @@ import { motion, useReducedMotion, type Variants } from "framer-motion";
 
 type JournalListProps = {
   observations: Observation[];
+  totalCount: number;
   onClear: () => void;
+  onLoadMore: () => void;
+  isLoadingMore?: boolean;
 };
 
 type AlbumGroup = {
@@ -47,7 +51,13 @@ function groupAlbum(observations: Observation[]): AlbumGroup[] {
   return [...groups.values()];
 }
 
-export function JournalList({ observations, onClear }: JournalListProps) {
+export function JournalList({
+  observations,
+  totalCount,
+  onClear,
+  onLoadMore,
+  isLoadingMore = false,
+}: JournalListProps) {
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string | null>>({});
   const [memoryObservation, setMemoryObservation] = useState<Observation | null>(null);
   const [view, setView] = useState<"album" | "history">("album");
@@ -115,7 +125,7 @@ export function JournalList({ observations, onClear }: JournalListProps) {
               Mon ciel observé
             </h2>
             <p className="mt-1 text-sm text-faint">
-              {observations.length} souvenir{observations.length > 1 ? "s" : ""} sur cet appareil
+              {totalCount} souvenir{totalCount > 1 ? "s" : ""} sur cet appareil
             </p>
           </div>
           <AppButton variant="danger" size="sm" onClick={onClear}>
@@ -260,6 +270,11 @@ export function JournalList({ observations, onClear }: JournalListProps) {
                           +{observation.xpEarned} Éclats d’étoile
                         </span>
                       ) : null}
+                      {getObservationReportLabel(observation.observationReport) ? (
+                        <span className="rounded-md bg-white/[0.04] px-2 py-1 text-text">
+                          {getObservationReportLabel(observation.observationReport)}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                   {observation.status === "seen" && !isFreeObservation(observation) ? (
@@ -278,6 +293,11 @@ export function JournalList({ observations, onClear }: JournalListProps) {
           ))}
         </motion.div>
       )}
+      {observations.length < totalCount ? (
+        <AppButton fullWidth variant="secondary" isLoading={isLoadingMore} onClick={onLoadMore}>
+          Afficher plus
+        </AppButton>
+      ) : null}
     </div>
   );
 }
