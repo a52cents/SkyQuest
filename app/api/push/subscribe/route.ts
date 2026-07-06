@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { NOTIFICATION_TOPICS, type NotificationTopic } from "@/lib/push-types";
-import { upsertPushSubscription } from "@/lib/push-store";
+import { PushSubscriptionRateLimitError, upsertPushSubscription } from "@/lib/push-store";
 import { getPushManagementTokenHash } from "@/lib/push-management-server";
+import { isTrustedWebPushEndpoint } from "@/lib/push-endpoint";
+import { getPushSubscribeRateLimitKeyHash } from "@/lib/push-subscribe-rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,14 +19,6 @@ type SubscribeBody = {
 };
 
 const VALID_TOPICS = new Set<string>(NOTIFICATION_TOPICS);
-
-function isHttpsUrl(value: string): boolean {
-  try {
-    return new URL(value).protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
 function roundApproximateCoordinate(value: unknown, min: number, max: number): number | undefined {
   if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) {
@@ -51,7 +45,7 @@ export async function POST(request: Request) {
   if (
     typeof endpoint !== "string" ||
     endpoint.length > 2_048 ||
-    !isHttpsUrl(endpoint) ||
+    !isTrustedWebPushEndpoint(endpoint) ||
     typeof p256dh !== "string" ||
     p256dh.length < 16 ||
     p256dh.length > 512 ||
@@ -88,6 +82,7 @@ export async function POST(request: Request) {
       longitudeRounded,
       enabled: true,
       managementTokenHash,
+      rateLimitKeyHash: getPushSubscribeRateLimitKeyHash(request),
     });
 
     return NextResponse.json({
@@ -95,7 +90,14 @@ export async function POST(request: Request) {
       createdAt: stored.createdAt,
       updatedAt: stored.updatedAt,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof PushSubscriptionRateLimitError) {
+      return NextResponse.json(
+        { error: "Trop de tentatives d'activation. Reessaie dans quelques minutes." },
+        { status: 429 },
+      );
+    }
+
     return NextResponse.json({ error: "Stockage push indisponible." }, { status: 503 });
   }
 }

@@ -27,6 +27,9 @@ export type StoredPushSubscription = {
   reminderWindowEndsAt?: string;
   reminderTarget?: string;
   reminderScore?: number;
+  reminderDeliveryStatus?: "pending" | "sent";
+  reminderClaimedAt?: string;
+  reminderSentAt?: string;
 };
 
 export type PushOpportunityClaimResult = "claimed" | "cooldown" | "duplicate" | "disabled";
@@ -48,6 +51,9 @@ type PushSubscriptionRow = {
   reminder_window_ends_at: string | null;
   reminder_target: string | null;
   reminder_score: number | string | null;
+  reminder_delivery_status: "pending" | "sent" | null;
+  reminder_claimed_at: string | null;
+  reminder_sent_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -58,15 +64,22 @@ type UpsertPushSubscriptionInput = Pick<
 > &
   Partial<
     Pick<StoredPushSubscription, "timezone" | "latitudeRounded" | "longitudeRounded" | "enabled">
-  > & { managementTokenHash: string };
+  > & { managementTokenHash: string; rateLimitKeyHash: string };
 
 const SELECT_FIELDS =
-  "id,endpoint,p256dh,auth,enabled,topics,timezone,latitude_rounded,longitude_rounded,last_seen_at,last_notification_sent_at,reminder_at,reminder_window_starts_at,reminder_window_ends_at,reminder_target,reminder_score,created_at,updated_at";
+  "id,endpoint,p256dh,auth,enabled,topics,timezone,latitude_rounded,longitude_rounded,last_seen_at,last_notification_sent_at,reminder_at,reminder_window_starts_at,reminder_window_ends_at,reminder_target,reminder_score,reminder_delivery_status,reminder_claimed_at,reminder_sent_at,created_at,updated_at";
 const ACTIVE_SUBSCRIPTIONS_PAGE_SIZE = 1_000;
 const VALID_TOPICS = new Set<string>(NOTIFICATION_TOPICS);
 
 function throwStoreError(operation: string, cause: unknown): never {
   throw new Error(`Push subscription store failed during ${operation}`, { cause });
+}
+
+export class PushSubscriptionRateLimitError extends Error {
+  constructor() {
+    super("Push subscription rate limit reached");
+    this.name = "PushSubscriptionRateLimitError";
+  }
 }
 
 function normalizeCoordinate(value: number | undefined, min: number, max: number): number | null {
@@ -105,6 +118,9 @@ function fromRow(row: PushSubscriptionRow): StoredPushSubscription {
     reminderWindowEndsAt: row.reminder_window_ends_at ?? undefined,
     reminderTarget: row.reminder_target ?? undefined,
     reminderScore: parseCoordinate(row.reminder_score),
+    reminderDeliveryStatus: row.reminder_delivery_status ?? undefined,
+    reminderClaimedAt: row.reminder_claimed_at ?? undefined,
+    reminderSentAt: row.reminder_sent_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -236,7 +252,7 @@ export async function listActiveTargetWatches(now = new Date()): Promise<ActiveT
   const { data, error } = await supabase
     .from("push_target_watches")
     .select(
-      "id,subscription_id,target,target_type,reason,minimum_score,expires_at,created_at,push_subscriptions!inner(id,endpoint,p256dh,auth,enabled,topics,timezone,latitude_rounded,longitude_rounded,last_seen_at,last_notification_sent_at,reminder_at,reminder_window_starts_at,reminder_window_ends_at,reminder_target,reminder_score,created_at,updated_at)",
+      "id,subscription_id,target,target_type,reason,minimum_score,expires_at,created_at,push_subscriptions!inner(id,endpoint,p256dh,auth,enabled,topics,timezone,latitude_rounded,longitude_rounded,last_seen_at,last_notification_sent_at,reminder_at,reminder_window_starts_at,reminder_window_ends_at,reminder_target,reminder_score,reminder_delivery_status,reminder_claimed_at,reminder_sent_at,created_at,updated_at)",
     )
     .eq("enabled", true)
     .gt("expires_at", now.toISOString())
@@ -260,6 +276,16 @@ export async function claimTargetWatch(watchId: string, now = new Date()): Promi
     p_now: now.toISOString(),
   });
   if (error) throwStoreError("claim target watch", error);
+  return data === true;
+}
+
+export async function markTargetWatchSent(watchId: string, sentAt = new Date()): Promise<boolean> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc("mark_target_watch_sent", {
+    p_watch_id: watchId,
+    p_now: sentAt.toISOString(),
+  });
+  if (error) throwStoreError("mark target watch sent", error);
   return data === true;
 }
 
@@ -297,6 +323,9 @@ export async function scheduleSkyWindowReminder({
       reminder_window_ends_at: windowEndsAt.toISOString(),
       reminder_target: target?.slice(0, 100) || null,
       reminder_score: Math.max(0, Math.min(100, Math.round(score))),
+      reminder_delivery_status: null,
+      reminder_claimed_at: null,
+      reminder_sent_at: null,
       updated_at: now,
     })
     .eq("management_token_hash", managementTokenHash)
@@ -322,6 +351,7 @@ export async function upsertPushSubscription(
     p_p256dh: input.p256dh,
     p_auth: input.auth,
     p_management_token_hash: input.managementTokenHash,
+    p_rate_limit_key_hash: input.rateLimitKeyHash,
     p_enabled: input.enabled ?? true,
     p_topics: normalizeTopics(input.topics),
     p_timezone: input.timezone?.trim() || null,
@@ -331,7 +361,13 @@ export async function upsertPushSubscription(
   });
 
   const row = (Array.isArray(data) ? data[0] : data) as PushSubscriptionRow | undefined;
-  if (error || !row) throwStoreError("authorized upsert", error);
+  if (error) {
+    if (String(error.message).includes("push_subscription_rate_limit")) {
+      throw new PushSubscriptionRateLimitError();
+    }
+    throwStoreError("authorized upsert", error);
+  }
+  if (!row) throwStoreError("authorized upsert", data);
   return fromRow(row);
 }
 
@@ -481,6 +517,29 @@ export async function claimDueSkyWindowReminder(
   });
 
   if (error) throwStoreError("claim reminder", error);
+  return data === true;
+}
+
+export async function markSkyWindowReminderSent({
+  endpoint,
+  dedupeKey,
+  sentAt = new Date(),
+}: {
+  endpoint: string;
+  dedupeKey: string;
+  sentAt?: Date;
+}): Promise<boolean> {
+  if (!dedupeKey || dedupeKey.length > 200) {
+    throw new Error("Invalid reminder dedupe key");
+  }
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc("mark_sky_window_reminder_sent", {
+    p_endpoint: endpoint,
+    p_dedupe_key: dedupeKey,
+    p_now: sentAt.toISOString(),
+  });
+
+  if (error) throwStoreError("mark reminder sent", error);
   return data === true;
 }
 

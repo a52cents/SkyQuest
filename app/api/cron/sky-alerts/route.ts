@@ -11,6 +11,8 @@ import {
   claimTargetWatch,
   listActiveTargetWatches,
   listPushSubscriptions,
+  markSkyWindowReminderSent,
+  markTargetWatchSent,
   type StoredPushSubscription,
 } from "@/lib/push-store";
 import { getCatalogSkyObject } from "@/lib/sky-catalog";
@@ -23,6 +25,7 @@ import { fetchIssOrbitalElements } from "@/lib/celestrak";
 import { calculateNextSatelliteVisiblePass } from "@/lib/satellite-pass";
 import { isMeteorShowerActive, isNearMeteorShowerPeak, meteorShowers } from "@/lib/meteor-showers";
 import { getWatchableTargetLabel } from "@/lib/target-watch";
+import type { SkyObject, WeatherForecast, WeatherNow } from "@/lib/types";
 import {
   isExceptionalClearSky,
   getPushLocalNightKey,
@@ -34,6 +37,8 @@ import { fetchWeatherForecast, fetchWeatherNow } from "@/lib/weather";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+const CRON_WORKER_CONCURRENCY = 8;
 
 const PLANET_NAMES: Record<string, string> = {
   Venus: "Vénus",
@@ -65,6 +70,30 @@ type PushOpportunity = {
   intentionalReminder: boolean;
 };
 
+type RoundedArea = {
+  key: string;
+  latitude: number;
+  longitude: number;
+};
+
+type AreaWorkGroup = RoundedArea & {
+  needsForecast: boolean;
+};
+
+type AreaContext = RoundedArea & {
+  weather: Promise<WeatherNow>;
+  forecast: Promise<WeatherForecast | null>;
+  getSunAltitude: () => number;
+  getSkyObjects: () => SkyObject[];
+  targetWatchScores: Map<string, Promise<number>>;
+};
+
+type SharedCronContext = {
+  rareEvent?: ReturnType<typeof getUpcomingCelestialEvents>[number];
+  getAreaContext: (area: RoundedArea) => AreaContext;
+  getIssOrbitalElements: () => ReturnType<typeof fetchIssOrbitalElements>;
+};
+
 function isAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
   return Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`);
@@ -89,23 +118,141 @@ function analysisUrl(intent: string, target?: string): string {
   return `/?${params.toString()}`;
 }
 
+function getRoundedArea(
+  subscription: Pick<StoredPushSubscription, "latitudeRounded" | "longitudeRounded">,
+): RoundedArea | null {
+  const latitude = subscription.latitudeRounded;
+  const longitude = subscription.longitudeRounded;
+  if (latitude === undefined || longitude === undefined) return null;
+
+  const roundedLatitude = Math.round(latitude * 10) / 10;
+  const roundedLongitude = Math.round(longitude * 10) / 10;
+  return {
+    key: `${roundedLatitude.toFixed(1)}:${roundedLongitude.toFixed(1)}`,
+    latitude: roundedLatitude,
+    longitude: roundedLongitude,
+  };
+}
+
+function buildAreaWorkGroups(
+  subscriptions: StoredPushSubscription[],
+  targetWatches: Awaited<ReturnType<typeof listActiveTargetWatches>>,
+): Map<string, AreaWorkGroup> {
+  const groups = new Map<string, AreaWorkGroup>();
+  const ensureGroup = (area: RoundedArea): AreaWorkGroup => {
+    const existing = groups.get(area.key);
+    if (existing) return existing;
+
+    const group: AreaWorkGroup = { ...area, needsForecast: false };
+    groups.set(area.key, group);
+    return group;
+  };
+
+  for (const subscription of subscriptions) {
+    const area = getRoundedArea(subscription);
+    if (!area) continue;
+    const group = ensureGroup(area);
+    if (subscription.topics.includes("clear_sky_evening")) {
+      group.needsForecast = true;
+    }
+  }
+
+  for (const watch of targetWatches) {
+    const area = getRoundedArea(watch.subscription);
+    if (area) ensureGroup(area);
+  }
+
+  return groups;
+}
+
+function createAreaContext(group: AreaWorkGroup, now: Date): AreaContext {
+  let sunAltitude: number | undefined;
+  let skyObjects: SkyObject[] | undefined;
+
+  return {
+    key: group.key,
+    latitude: group.latitude,
+    longitude: group.longitude,
+    weather: fetchWeatherNow(group.latitude, group.longitude),
+    forecast: group.needsForecast
+      ? fetchWeatherForecast(group.latitude, group.longitude, 24).catch(() => null)
+      : Promise.resolve(null),
+    getSunAltitude: () => {
+      sunAltitude ??= getSunAltitude(group.latitude, group.longitude, now);
+      return sunAltitude;
+    },
+    getSkyObjects: () => {
+      skyObjects ??= getSkyObjects(group.latitude, group.longitude, now);
+      return skyObjects;
+    },
+    targetWatchScores: new Map(),
+  };
+}
+
+function createSharedCronContext(
+  now: Date,
+  areaGroups: Map<string, AreaWorkGroup>,
+  subscriptions: StoredPushSubscription[],
+): SharedCronContext {
+  const areaContexts = new Map<string, AreaContext>();
+  let issOrbitalElements: ReturnType<typeof fetchIssOrbitalElements> | undefined;
+  const hasCelestialEventTopic = subscriptions.some((subscription) =>
+    subscription.topics.includes("celestial_event"),
+  );
+
+  return {
+    rareEvent: hasCelestialEventTopic ? getUpcomingCelestialEvents(now, 1)[0] : undefined,
+    getAreaContext: (area) => {
+      const existing = areaContexts.get(area.key);
+      if (existing) return existing;
+
+      const group = areaGroups.get(area.key) ?? { ...area, needsForecast: false };
+      const context = createAreaContext(group, now);
+      areaContexts.set(area.key, context);
+      return context;
+    },
+    getIssOrbitalElements: () => {
+      issOrbitalElements ??= fetchIssOrbitalElements();
+      return issOrbitalElements;
+    },
+  };
+}
+
+async function runWithBoundedConcurrency<T>(
+  items: T[],
+  worker: (item: T, index: number) => Promise<void>,
+  concurrency = CRON_WORKER_CONCURRENCY,
+): Promise<void> {
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      for (;;) {
+        const index = nextIndex;
+        nextIndex += 1;
+        if (index >= items.length) return;
+        await worker(items[index], index);
+      }
+    }),
+  );
+}
+
 async function getTargetWatchScore(
   target: string,
-  latitude: number,
-  longitude: number,
+  area: AreaContext,
   now: Date,
+  shared: SharedCronContext,
 ): Promise<number> {
-  const [weather, sunAltitude] = await Promise.all([
-    fetchWeatherNow(latitude, longitude),
-    Promise.resolve(getSunAltitude(latitude, longitude, now)),
-  ]);
+  const weather = await area.weather;
+  const sunAltitude = area.getSunAltitude();
   if (sunAltitude > -3) return 0;
   if (target.toLocaleLowerCase("fr-FR") === "iss") {
-    const orbitalElements = await fetchIssOrbitalElements();
+    const orbitalElements = await shared.getIssOrbitalElements();
     const pass = calculateNextSatelliteVisiblePass({
       orbitalElements,
-      latitude,
-      longitude,
+      latitude: area.latitude,
+      longitude: area.longitude,
       now,
       horizonMinutes: 30,
     });
@@ -132,9 +279,9 @@ async function getTargetWatchScore(
       nearPeak: isNearMeteorShowerPeak(shower, now),
     });
   }
-  const skyObject = getSkyObjects(latitude, longitude, now).find(
-    (object) => object.name.toLocaleLowerCase("fr-FR") === target.toLocaleLowerCase("fr-FR"),
-  );
+  const skyObject = area
+    .getSkyObjects()
+    .find((object) => object.name.toLocaleLowerCase("fr-FR") === target.toLocaleLowerCase("fr-FR"));
   if (skyObject) return calculateVisibilityScore({ object: skyObject, weather, sunAltitude });
 
   const catalogObject = getCatalogSkyObject(target);
@@ -148,8 +295,8 @@ async function getTargetWatchScore(
   const position = equatorialJ2000ToHorizontal({
     rightAscensionHours: catalogObject.rightAscensionHours,
     declinationDegrees: catalogObject.declinationDegrees,
-    latitude,
-    longitude,
+    latitude: area.latitude,
+    longitude: area.longitude,
     date: now,
   });
   return calculateCatalogVisibilityScore({
@@ -161,10 +308,26 @@ async function getTargetWatchScore(
   });
 }
 
+function getCachedTargetWatchScore(
+  target: string,
+  area: AreaContext,
+  now: Date,
+  shared: SharedCronContext,
+): Promise<number> {
+  const cacheKey = target.toLocaleLowerCase("fr-FR");
+  const existing = area.targetWatchScores.get(cacheKey);
+  if (existing) return existing;
+
+  const score = getTargetWatchScore(target, area, now, shared);
+  area.targetWatchScores.set(cacheKey, score);
+  return score;
+}
+
 async function createOpportunity(
   subscription: StoredPushSubscription,
   now: Date,
   diagnostics: OpportunityDiagnostics,
+  shared: SharedCronContext,
 ): Promise<PushOpportunity | null> {
   const reminderAt = subscription.reminderAt
     ? new Date(subscription.reminderAt).getTime()
@@ -219,9 +382,7 @@ async function createOpportunity(
   }
 
   diagnostics.calculations.push("celestial_events");
-  const rareEvent = subscription.topics.includes("celestial_event")
-    ? getUpcomingCelestialEvents(now, 1)[0]
-    : undefined;
+  const rareEvent = subscription.topics.includes("celestial_event") ? shared.rareEvent : undefined;
   if (rareEvent) {
     return {
       dedupeKey: `celestial_event:${rareEvent.id}`,
@@ -235,16 +396,20 @@ async function createOpportunity(
       },
     };
   }
+  const roundedArea = getRoundedArea(subscription);
+  if (!roundedArea) {
+    diagnostics.reason = "missing_location";
+    return null;
+  }
+  const area = shared.getAreaContext(roundedArea);
 
   diagnostics.calculations.push("weather");
   if (subscription.topics.includes("clear_sky_evening")) {
     diagnostics.calculations.push("forecast_requested");
   }
   const [weather, forecast] = await Promise.all([
-    fetchWeatherNow(latitude, longitude),
-    subscription.topics.includes("clear_sky_evening")
-      ? fetchWeatherForecast(latitude, longitude, 24).catch(() => null)
-      : Promise.resolve(null),
+    area.weather,
+    subscription.topics.includes("clear_sky_evening") ? area.forecast : Promise.resolve(null),
   ]);
 
   if (forecast) {
@@ -284,7 +449,7 @@ async function createOpportunity(
   }
 
   diagnostics.calculations.push("astronomy");
-  const skyObjects = getSkyObjects(latitude, longitude, now);
+  const skyObjects = area.getSkyObjects();
   const planet = skyObjects
     .filter(
       (object) =>
@@ -395,8 +560,12 @@ export async function GET(request: Request) {
   } catch {
     return NextResponse.json({ error: "Stockage push indisponible." }, { status: 503 });
   }
+  const areaGroups = buildAreaWorkGroups(subscriptions, targetWatches);
+  const shared = createSharedCronContext(now, areaGroups, subscriptions);
   const totals = {
     checked: subscriptions.length,
+    roundedAreas: areaGroups.size,
+    concurrency: CRON_WORKER_CONCURRENCY,
     opportunities: 0,
     sent: 0,
     failed: 0,
@@ -414,48 +583,56 @@ export async function GET(request: Request) {
   };
 
   const targetWatchSentEndpoints = new Set<string>();
-  for (const watch of targetWatches) {
+  await runWithBoundedConcurrency(targetWatches, async (watch) => {
     const { subscription } = watch;
-    const latitude = subscription.latitudeRounded;
-    const longitude = subscription.longitudeRounded;
+    const area = getRoundedArea(subscription);
     const localHour = getLocalHour(now, subscription.timezone);
-    if (
-      latitude === undefined ||
-      longitude === undefined ||
-      localHour === null ||
-      (localHour < 19 && localHour >= 4)
-    ) {
-      continue;
-    }
+    if (!area || localHour === null || (localHour < 19 && localHour >= 4)) return;
     try {
-      const score = await getTargetWatchScore(watch.target, latitude, longitude, now);
-      if (score < watch.minimumScore || !(await claimTargetWatch(watch.id, now))) continue;
+      const score = await getCachedTargetWatchScore(
+        watch.target,
+        shared.getAreaContext(area),
+        now,
+        shared,
+      );
+      if (score < watch.minimumScore || !(await claimTargetWatch(watch.id, now))) return;
       const targetLabel = getWatchableTargetLabel(watch.target);
-      const result = await sendPushToMany([subscription], {
-        title: `Une meilleure occasion pour ${targetLabel}`,
-        body: "Les conditions semblent plus favorables. Ouvre SkyQuest pour les recalculer avant de sortir.",
-        url: analysisUrl("target_watch", watch.target),
-        tag: `target-watch-${watch.id}`,
-        data: { type: "target_watch", target: watch.target, score },
-      });
+      const result = await sendPushToMany(
+        [subscription],
+        {
+          title: `Une meilleure occasion pour ${targetLabel}`,
+          body: "Les conditions semblent plus favorables. Ouvre SkyQuest pour les recalculer avant de sortir.",
+          url: analysisUrl("target_watch", watch.target),
+          tag: `target-watch-${watch.id}`,
+          data: { type: "target_watch", target: watch.target, score },
+        },
+        { markEditorialSent: false },
+      );
       totals.sent += result.sent;
       totals.failed += result.failed;
       totals.expired += result.expired;
       if (result.sent > 0) {
-        totals.targetWatchesSent += 1;
-        targetWatchSentEndpoints.add(subscription.endpoint);
+        if (await markTargetWatchSent(watch.id, now)) {
+          totals.targetWatchesSent += 1;
+          targetWatchSentEndpoints.add(subscription.endpoint);
+        } else {
+          totals.failed += 1;
+          increment(totals.reasons, "target_watch_confirm_failed");
+        }
       }
     } catch {
       totals.failed += 1;
       increment(totals.reasons, "target_watch_error");
     }
-  }
+  });
 
-  for (const subscription of subscriptions) {
-    if (targetWatchSentEndpoints.has(subscription.endpoint)) continue;
+  await runWithBoundedConcurrency(subscriptions, async (subscription) => {
+    if (targetWatchSentEndpoints.has(subscription.endpoint)) return;
     const diagnostics: OpportunityDiagnostics = { calculations: [] };
     let calculationsRecorded = false;
-    let phase: "evaluation" | "opportunity_claim" | "reminder_claim" | "delivery" = "evaluation";
+    let phase:
+      "evaluation" | "opportunity_claim" | "reminder_claim" | "reminder_confirm" | "delivery" =
+      "evaluation";
     const recordCalculations = () => {
       if (calculationsRecorded) return;
       for (const calculation of diagnostics.calculations) {
@@ -464,17 +641,17 @@ export async function GET(request: Request) {
       calculationsRecorded = true;
     };
     try {
-      const opportunity = await createOpportunity(subscription, now, diagnostics);
+      const opportunity = await createOpportunity(subscription, now, diagnostics, shared);
       recordCalculations();
       if (!opportunity) {
         increment(totals.reasons, diagnostics.reason ?? "unknown");
-        continue;
+        return;
       }
       if (opportunity.intentionalReminder) {
         phase = "reminder_claim";
         if (!(await claimDueSkyWindowReminder(subscription.endpoint, now))) {
           increment(totals.reasons, "reminder_already_claimed");
-          continue;
+          return;
         }
       } else {
         phase = "opportunity_claim";
@@ -485,15 +662,32 @@ export async function GET(request: Request) {
         });
         if (claimResult !== "claimed") {
           increment(totals.reasons, claimResult);
-          continue;
+          return;
         }
       }
       totals.opportunities += 1;
       phase = "delivery";
-      const result = await sendPushToMany([subscription], opportunity.payload);
+      const result = await sendPushToMany(
+        [subscription],
+        opportunity.payload,
+        opportunity.intentionalReminder ? { markEditorialSent: false } : undefined,
+      );
       totals.sent += result.sent;
       totals.failed += result.failed;
       totals.expired += result.expired;
+      if (opportunity.intentionalReminder && result.sent > 0) {
+        phase = "reminder_confirm";
+        if (
+          !(await markSkyWindowReminderSent({
+            endpoint: subscription.endpoint,
+            dedupeKey: opportunity.dedupeKey,
+            sentAt: now,
+          }))
+        ) {
+          totals.failed += 1;
+          increment(totals.reasons, "reminder_confirm_failed");
+        }
+      }
       if (result.failed > 0) increment(totals.reasons, "delivery_failed", result.failed);
       if (result.expired > 0) increment(totals.reasons, "subscription_expired", result.expired);
     } catch {
@@ -501,7 +695,7 @@ export async function GET(request: Request) {
       totals.failed += 1;
       increment(totals.reasons, `${phase}_error`);
     }
-  }
+  });
 
   return NextResponse.json(totals);
 }

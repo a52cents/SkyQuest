@@ -29,13 +29,18 @@ crons concurrents ne peuvent donc réclamer la même occasion. Le serveur ne ret
 atteint 75/100 et qu’il commence dans 10 minutes au maximum ; un ciel générique doit avoir au plus
 15 % de nuages.
 
-La fonction `claim_due_sky_window_reminder` réserve et efface atomiquement le rappel « Me prévenir »
-créé depuis l’écran **Plus tard**. Un rappel est donc envoyé une seule fois. Réexécuter le fichier SQL
-sur une installation existante pour ajouter les colonnes `reminder_*` et cette fonction.
+La fonction `claim_due_sky_window_reminder` réserve atomiquement le rappel « Me prévenir » en
+`pending`, sans l'effacer. Après un succès Web Push, `mark_sky_window_reminder_sent` passe le rappel
+à `sent`, le nettoie et applique le cooldown éditorial. Si l'envoi réseau échoue ou si la confirmation
+serveur ne termine pas, le rappel reste réessayable après 10 minutes tant que son créneau n'est pas
+expiré. Réexécuter le fichier SQL sur une installation existante pour ajouter les colonnes
+`reminder_*` et ces fonctions.
 
 Si la table existait déjà, réexécuter le fichier SQL : il ajoute `management_token_hash` sans
 supprimer les subscriptions. Au prochain contact, un ancien abonnement est rattaché au jeton
 seulement si ses clés Web Push `p256dh` et `auth` correspondent déjà à la ligne stockée.
+La même réexécution ajoute aussi `push_subscription_rate_limits` et la nouvelle signature
+`upsert_push_subscription` utilisée pour limiter les créations d'abonnements.
 
 Les topics SQL utilisent les identifiants réels du code : `clear_sky_evening`, `moon_visible`,
 `planet_visible`, `celestial_event` et `daily_mission`.
@@ -64,6 +69,8 @@ VAPID_SUBJECT=mailto:contact@skyquest.app
 
 CRON_SECRET=une-valeur-aleatoire-d-au-moins-16-caracteres
 PUSH_TEST_SECRET=une-autre-valeur-aleatoire
+PUSH_RATE_LIMIT_SECRET=un-secret-de-quota-optionnel
+PUSH_ENDPOINT_ALLOWED_HOSTS=fournisseur-push-interne.example
 ```
 
 Variables publiques :
@@ -78,7 +85,13 @@ Secrets strictement serveur :
 - `SUPABASE_SERVICE_ROLE_KEY` ;
 - `VAPID_PRIVATE_KEY` ;
 - `CRON_SECRET` ;
-- `PUSH_TEST_SECRET`.
+- `PUSH_TEST_SECRET` ;
+- `PUSH_RATE_LIMIT_SECRET`, optionnel mais recommandé pour isoler le hash de quota.
+
+`PUSH_ENDPOINT_ALLOWED_HOSTS` est optionnel. Sans cette variable, `/api/push/subscribe` accepte
+seulement les fournisseurs Web Push usuels : FCM, Mozilla Autopush, Apple Web Push et WNS. Ajouter
+un hôte ici uniquement pour un vrai fournisseur Push API maîtrisé ; ce n'est pas une liste
+d'origines web applicatives.
 
 Ne jamais ajouter `NEXT_PUBLIC_` à un secret et ne jamais les placer dans un composant client.
 
@@ -175,6 +188,8 @@ le réglage, sans redemander automatiquement la permission.
 ## 7. Endpoints et garanties
 
 - `POST /api/push/subscribe` crée ou rattache le hash du jeton après preuve par les clés Web Push ;
+- `POST /api/push/subscribe` refuse les endpoints hors fournisseurs Web Push connus et limite les
+  nouvelles lignes par client dans Supabase ;
 - `POST /api/push/unsubscribe` désactive la row identifiée par le hash du jeton ;
 - `POST /api/push/test` accepte le jeton du navigateur ou le secret administratif de production ;
 - `POST /api/push/reminder` programme un rappel pour l'abonnement identifié par le jeton ;
@@ -184,7 +199,8 @@ le réglage, sans redemander automatiquement la permission.
 - les coordonnées sont réarrondies à `0.1°` côté route et côté store ;
 - aucun endpoint connu ne permet à lui seul de lire ou modifier un abonnement ;
 - la fonction SQL atomique impose 12 heures entre alertes éditoriales et déduplique chaque occasion ;
-- les rappels volontaires restent one-shot, prioritaires et repoussent ensuite les alertes éditoriales ;
+- les rappels volontaires restent one-shot, prioritaires, réessayables en état `pending`, puis
+  repoussent les alertes éditoriales après confirmation `sent` ;
 - les notifications de test ont leur propre limite d’une heure ;
 - aucune opportunité n’est envoyée hors de la plage locale 19 h–3 h 59.
 

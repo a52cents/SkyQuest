@@ -184,20 +184,6 @@ export const glossaryTerms: GlossaryTerm[] = [
     category: "phenomena",
     shortDefinition: "Nom courant d’un météore. Malgré son nom, ce n’est pas une étoile.",
   },
-  {
-    id: "jumelles",
-    term: "Jumelles",
-    category: "equipment",
-    shortDefinition:
-      "Instrument à deux oculaires qui grossit le ciel tout en gardant un champ de vision assez large.",
-  },
-  {
-    id: "telescope",
-    term: "Télescope",
-    category: "equipment",
-    shortDefinition:
-      "Instrument qui recueille davantage de lumière pour révéler des objets plus faibles ou plus détaillés.",
-  },
 ];
 
 const glossaryById = new Map(glossaryTerms.map((item) => [item.id, item]));

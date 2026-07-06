@@ -23,7 +23,10 @@ test("target watches are private, bounded, expiring, and atomically one-shot", (
   assert.match(sql, /expires_at[\s\S]+interval '14 days'/);
   assert.match(sql, /count\(\*\)[\s\S]+>= 3/);
   assert.match(sql, /create or replace function public\.claim_target_watch/);
-  assert.match(sql, /claimed_at is null/);
+  assert.match(sql, /create or replace function public\.mark_target_watch_sent/);
+  assert.match(sql, /delivery_status = 'pending'/);
+  assert.match(sql, /delivery_status = 'sent'/);
+  assert.match(sql, /p_now - interval '10 minutes'/);
   assert.match(
     sql,
     /revoke all on table public\.push_target_watches from public, anon, authenticated/,
@@ -36,4 +39,5 @@ test("watch API transmits one explicit target and cron requires a fresh score", 
   assert.match(cron, /score < watch\.minimumScore/);
   assert.match(cron, /analysisUrl\("target_watch", watch\.target\)/);
   assert.match(cron, /claimTargetWatch\(watch\.id, now\)/);
+  assert.match(cron, /markTargetWatchSent\(watch\.id, now\)/);
 });

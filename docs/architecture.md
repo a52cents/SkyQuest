@@ -101,6 +101,9 @@ L'interface ne doit afficher un journal vide qu'après confirmation de l'effacem
 - l'API Geo reçoit côté serveur des coordonnées arrondies à `0,01°` et renvoie seulement la commune ;
 - les alertes sont activées uniquement après un clic explicite dans le Profil ; les thèmes et une
   position arrondie à `0,1°` sont synchronisés avec la subscription push ;
+- `/api/push/subscribe` accepte seulement les endpoints de fournisseurs Web Push connus
+  (FCM, Mozilla, Apple et WNS, extensibles par `PUSH_ENDPOINT_ALLOWED_HOSTS`) et applique un quota
+  SQL atomique aux nouvelles subscriptions ;
 - les routes de gestion push utilisent un jeton aléatoire conservé dans le navigateur ; Supabase
   stocke uniquement son hash SHA-256 et l'endpoint n'apparaît jamais dans une query string ;
 - le middleware définit CSP, Permissions Policy, HSTS en production et protections anti-frame ;

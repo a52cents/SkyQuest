@@ -41,6 +41,10 @@ const editorialClaimSql = migrationSource.slice(
 );
 const reminderClaimSql = migrationSource.slice(
   migrationSource.indexOf("create or replace function public.claim_due_sky_window_reminder"),
+  migrationSource.indexOf("create or replace function public.mark_sky_window_reminder_sent"),
+);
+const reminderSentSql = migrationSource.slice(
+  migrationSource.indexOf("create or replace function public.mark_sky_window_reminder_sent"),
   migrationSource.indexOf("create or replace function public.cleanup_expired_sky_window_reminders"),
 );
 
@@ -144,6 +148,19 @@ test("scheduled alerts reserve editorial opportunities before delivery", () => {
   assert.match(cronRouteSource, /claimResult !== "claimed"/);
 });
 
+test("scheduled alerts share rounded-area calculations with bounded concurrency", () => {
+  assert.match(cronRouteSource, /const CRON_WORKER_CONCURRENCY = 8/);
+  assert.match(cronRouteSource, /function buildAreaWorkGroups/);
+  assert.match(cronRouteSource, /function createAreaContext/);
+  assert.match(cronRouteSource, /weather: fetchWeatherNow\(group\.latitude, group\.longitude\)/);
+  assert.match(cronRouteSource, /forecast: group\.needsForecast/);
+  assert.match(cronRouteSource, /skyObjects \?\?= getSkyObjects\(group\.latitude/);
+  assert.match(cronRouteSource, /targetWatchScores: new Map\(\)/);
+  assert.match(cronRouteSource, /roundedAreas: areaGroups\.size/);
+  assert.match(cronRouteSource, /await runWithBoundedConcurrency\(targetWatches/);
+  assert.match(cronRouteSource, /await runWithBoundedConcurrency\(subscriptions/);
+});
+
 test("scheduled push logs explain skipped notifications and executed calculations", () => {
   assert.match(cronRouteSource, /calculations: \{\} as Partial<Record<CalculationName, number>>/);
   assert.match(cronRouteSource, /reasons: \{\} as Record<string, number>/);
@@ -152,6 +169,7 @@ test("scheduled push logs explain skipped notifications and executed calculation
   assert.match(cronRouteSource, /diagnostics\.reason = "cloud_cover_too_high"/);
   assert.match(cronRouteSource, /increment\(totals\.reasons, claimResult\)/);
   assert.match(cronRouteSource, /"reminder_already_claimed"/);
+  assert.match(cronRouteSource, /"reminder_confirm_failed"/);
   assert.match(cronRouteSource, /"delivery_failed"/);
   assert.match(cronRouteSource, /"subscription_expired"/);
 });
@@ -189,22 +207,28 @@ test("scheduled clear-sky alerts only announce an imminent strong window", () =>
   assert.match(cronRouteSource, /analysisUrl\("approaching_sky_window"/);
 });
 
-test("intentional sky-window reminders are claimed once and open a fresh analysis", () => {
+test("intentional sky-window reminders move pending to sent and retry stale claims", () => {
   assert.match(migrationSource, /claim_due_sky_window_reminder/i);
+  assert.match(migrationSource, /mark_sky_window_reminder_sent/i);
+  assert.match(migrationSource, /reminder_delivery_status/i);
   assert.match(migrationSource, /on conflict do nothing/i);
   assert.match(migrationSource, /reminder_window_ends_at >= p_now/i);
+  assert.match(migrationSource, /reminder_delivery_status = 'pending'/i);
+  assert.match(migrationSource, /reminder_delivery_status = 'sent'/i);
+  assert.match(migrationSource, /p_now - interval '10 minutes'/i);
   assert.match(migrationSource, /cleanup_expired_sky_window_reminders/i);
   assert.match(migrationSource, /reminder_window_ends_at < p_now/i);
   assert.match(migrationSource, /reminder_at is not null and reminder_window_ends_at is null/i);
   assert.match(storeSource, /reminder_window_starts_at/);
+  assert.match(storeSource, /markSkyWindowReminderSent/);
   assert.match(cronRouteSource, /type: "sky_window_reminder"/);
   assert.match(cronRouteSource, /analysisUrl\("sky_window_reminder"/);
   assert.match(cronRouteSource, /opportunity\.intentionalReminder/);
+  assert.match(cronRouteSource, /markSkyWindowReminderSent\(\{/);
+  assert.match(cronRouteSource, /markEditorialSent: false/);
   assert.doesNotMatch(reminderClaimSql, /interval '12 hours'/i);
-  assert.match(
-    reminderClaimSql,
-    /last_notification_sent_at = case when v_inserted = 1 then p_now/i,
-  );
+  assert.doesNotMatch(reminderClaimSql, /reminder_at = null/i);
+  assert.match(reminderSentSql, /last_notification_sent_at = p_now/i);
   assert.ok(
     cronRouteSource.indexOf(
       "expiredRemindersCleaned = await cleanupExpiredSkyWindowReminders(now)",

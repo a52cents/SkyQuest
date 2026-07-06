@@ -27,6 +27,9 @@ create table if not exists public.push_subscriptions (
   reminder_window_ends_at timestamptz,
   reminder_target text,
   reminder_score smallint,
+  reminder_delivery_status text,
+  reminder_claimed_at timestamptz,
+  reminder_sent_at timestamptz,
 
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -39,6 +42,8 @@ create table if not exists public.push_subscriptions (
     check (longitude_rounded is null or longitude_rounded between -180 and 180),
   constraint push_subscriptions_reminder_score_check
     check (reminder_score is null or reminder_score between 0 and 100),
+  constraint push_subscriptions_reminder_delivery_status_check
+    check (reminder_delivery_status is null or reminder_delivery_status in ('pending', 'sent')),
   constraint push_subscriptions_management_token_hash_check
     check (management_token_hash is null or management_token_hash ~ '^[0-9a-f]{64}$')
 );
@@ -50,6 +55,9 @@ alter table public.push_subscriptions
   add column if not exists reminder_window_ends_at timestamptz,
   add column if not exists reminder_target text,
   add column if not exists reminder_score smallint,
+  add column if not exists reminder_delivery_status text,
+  add column if not exists reminder_claimed_at timestamptz,
+  add column if not exists reminder_sent_at timestamptz,
   add column if not exists last_test_notification_sent_at timestamptz,
   add column if not exists management_token_hash text;
 
@@ -63,6 +71,20 @@ begin
     alter table public.push_subscriptions
       add constraint push_subscriptions_management_token_hash_check
       check (management_token_hash is null or management_token_hash ~ '^[0-9a-f]{64}$');
+  end if;
+end
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'push_subscriptions_reminder_delivery_status_check'
+      and conrelid = 'public.push_subscriptions'::regclass
+  ) then
+    alter table public.push_subscriptions
+      add constraint push_subscriptions_reminder_delivery_status_check
+      check (reminder_delivery_status is null or reminder_delivery_status in ('pending', 'sent'));
   end if;
 end
 $$;
@@ -109,14 +131,39 @@ create index if not exists push_subscriptions_reminder_idx
 create index if not exists push_notification_claims_claimed_at_idx
   on public.push_notification_claims (claimed_at);
 
+create table if not exists public.push_subscription_rate_limits (
+  key_hash text not null,
+  window_start timestamptz not null,
+  attempts integer not null default 1,
+  updated_at timestamptz not null default now(),
+
+  primary key (key_hash, window_start),
+  constraint push_subscription_rate_limits_key_hash_check
+    check (key_hash ~ '^[0-9a-f]{64}$'),
+  constraint push_subscription_rate_limits_attempts_check
+    check (attempts between 1 and 1000)
+);
+
+alter table public.push_subscription_rate_limits enable row level security;
+revoke all on table public.push_subscription_rate_limits from public, anon, authenticated;
+grant select, insert, update, delete on table public.push_subscription_rate_limits to service_role;
+
+create index if not exists push_subscription_rate_limits_window_idx
+  on public.push_subscription_rate_limits (window_start);
+
 -- Creates a subscription or updates it only when the caller proves control with either
 -- the current management token or the exact Web Push keys already stored. The key fallback
 -- permits safe migration and recovery when browser localStorage was cleared.
+drop function if exists public.upsert_push_subscription(
+  text, text, text, text, boolean, jsonb, text, numeric, numeric, timestamptz
+);
+
 create or replace function public.upsert_push_subscription(
   p_endpoint text,
   p_p256dh text,
   p_auth text,
   p_management_token_hash text,
+  p_rate_limit_key_hash text,
   p_enabled boolean,
   p_topics jsonb,
   p_timezone text,
@@ -135,10 +182,17 @@ declare
   v_p256dh text;
   v_auth text;
   v_management_token_hash text;
+  v_rate_limit_window_start timestamptz;
+  v_rate_limit_attempts integer;
 begin
   if p_management_token_hash is null
     or p_management_token_hash !~ '^[0-9a-f]{64}$' then
     raise exception 'invalid_management_token_hash';
+  end if;
+
+  if p_rate_limit_key_hash is null
+    or p_rate_limit_key_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'invalid_push_subscription_rate_limit_key';
   end if;
 
   select id, endpoint, p256dh, auth, management_token_hash
@@ -170,6 +224,27 @@ begin
         updated_at = p_now
     where id = v_subscription_id;
   else
+    v_rate_limit_window_start := date_trunc('hour', p_now);
+
+    delete from public.push_subscription_rate_limits
+    where window_start < v_rate_limit_window_start - interval '24 hours';
+
+    insert into public.push_subscription_rate_limits (
+      key_hash, window_start, attempts, updated_at
+    ) values (
+      p_rate_limit_key_hash, v_rate_limit_window_start, 1, p_now
+    )
+    on conflict (key_hash, window_start)
+    do update
+      set attempts = public.push_subscription_rate_limits.attempts + 1,
+          updated_at = p_now
+      where public.push_subscription_rate_limits.attempts < 20
+    returning attempts into v_rate_limit_attempts;
+
+    if v_rate_limit_attempts is null then
+      raise exception 'push_subscription_rate_limit';
+    end if;
+
     insert into public.push_subscriptions (
       endpoint, p256dh, auth, management_token_hash, enabled, topics, timezone,
       latitude_rounded, longitude_rounded, last_seen_at, updated_at
@@ -186,10 +261,10 @@ end;
 $$;
 
 revoke all on function public.upsert_push_subscription(
-  text, text, text, text, boolean, jsonb, text, numeric, numeric, timestamptz
+  text, text, text, text, text, boolean, jsonb, text, numeric, numeric, timestamptz
 ) from public, anon, authenticated;
 grant execute on function public.upsert_push_subscription(
-  text, text, text, text, boolean, jsonb, text, numeric, numeric, timestamptz
+  text, text, text, text, text, boolean, jsonb, text, numeric, numeric, timestamptz
 ) to service_role;
 
 -- Remove the old hourly boolean overload before installing the explicit 12-hour claim result.
@@ -289,8 +364,8 @@ revoke all on function public.claim_push_test_slot(text, timestamptz)
 grant execute on function public.claim_push_test_slot(text, timestamptz)
   to service_role;
 
--- Claims and clears one intentional reminder atomically. Clearing it here makes
--- reminders one-shot even when two scheduler invocations overlap.
+-- Claims one intentional reminder atomically. A claim only moves the reminder to
+-- pending; the scheduler confirms it as sent after Web Push delivery succeeds.
 create or replace function public.claim_due_sky_window_reminder(
   p_endpoint text,
   p_now timestamptz default now()
@@ -303,8 +378,6 @@ as $$
 declare
   v_subscription_id uuid;
   v_window_starts_at timestamptz;
-  v_dedupe_key text;
-  v_inserted integer;
 begin
   select id, reminder_window_starts_at
   into v_subscription_id, v_window_starts_at
@@ -314,21 +387,79 @@ begin
     and reminder_at is not null
     and reminder_at <= p_now
     and reminder_window_ends_at >= p_now
+    and (
+      reminder_delivery_status is null
+      or (
+        reminder_delivery_status = 'pending'
+        and reminder_claimed_at <= p_now - interval '10 minutes'
+      )
+    )
   for update;
 
   if not found then
     return false;
   end if;
 
-  v_dedupe_key := 'reminder:' || coalesce(
+  update public.push_subscriptions
+  set
+    reminder_delivery_status = 'pending',
+    reminder_claimed_at = p_now,
+    updated_at = p_now
+  where id = v_subscription_id;
+
+  return true;
+end;
+$$;
+
+revoke all on function public.claim_due_sky_window_reminder(text, timestamptz)
+  from public, anon, authenticated;
+grant execute on function public.claim_due_sky_window_reminder(text, timestamptz)
+  to service_role;
+
+create or replace function public.mark_sky_window_reminder_sent(
+  p_endpoint text,
+  p_dedupe_key text,
+  p_now timestamptz default now()
+)
+returns boolean
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_subscription_id uuid;
+  v_window_starts_at timestamptz;
+  v_expected_dedupe_key text;
+begin
+  if p_dedupe_key is null or char_length(p_dedupe_key) not between 1 and 200 then
+    raise exception 'Invalid push dedupe key';
+  end if;
+
+  select id, reminder_window_starts_at
+  into v_subscription_id, v_window_starts_at
+  from public.push_subscriptions
+  where endpoint = p_endpoint
+    and enabled = true
+    and reminder_at is not null
+    and reminder_delivery_status = 'pending'
+  for update;
+
+  if not found then
+    return false;
+  end if;
+
+  v_expected_dedupe_key := 'reminder:' || coalesce(
     to_char(v_window_starts_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
     'unknown'
   );
 
+  if v_expected_dedupe_key is distinct from p_dedupe_key then
+    return false;
+  end if;
+
   insert into public.push_notification_claims (subscription_id, dedupe_key, claimed_at)
-  values (v_subscription_id, v_dedupe_key, p_now)
+  values (v_subscription_id, p_dedupe_key, p_now)
   on conflict do nothing;
-  get diagnostics v_inserted = row_count;
 
   update public.push_subscriptions
   set
@@ -337,17 +468,20 @@ begin
     reminder_window_ends_at = null,
     reminder_target = null,
     reminder_score = null,
-    last_notification_sent_at = case when v_inserted = 1 then p_now else last_notification_sent_at end,
+    reminder_delivery_status = 'sent',
+    reminder_claimed_at = null,
+    reminder_sent_at = p_now,
+    last_notification_sent_at = p_now,
     updated_at = p_now
   where id = v_subscription_id;
 
-  return v_inserted = 1;
+  return true;
 end;
 $$;
 
-revoke all on function public.claim_due_sky_window_reminder(text, timestamptz)
+revoke all on function public.mark_sky_window_reminder_sent(text, text, timestamptz)
   from public, anon, authenticated;
-grant execute on function public.claim_due_sky_window_reminder(text, timestamptz)
+grant execute on function public.mark_sky_window_reminder_sent(text, text, timestamptz)
   to service_role;
 
 create or replace function public.cleanup_expired_sky_window_reminders(
@@ -367,6 +501,9 @@ begin
       reminder_window_ends_at = null,
       reminder_target = null,
       reminder_score = null,
+      reminder_delivery_status = null,
+      reminder_claimed_at = null,
+      reminder_sent_at = null,
       updated_at = p_now
   where reminder_window_ends_at < p_now
     or (reminder_at is not null and reminder_window_ends_at is null);
@@ -395,14 +532,36 @@ create table if not exists public.push_target_watches (
   minimum_score smallint not null default 60,
   expires_at timestamptz not null,
   enabled boolean not null default true,
+  delivery_status text,
   claimed_at timestamptz,
+  sent_at timestamptz,
   created_at timestamptz not null default now(),
   constraint push_target_watches_target_length_check check (char_length(target) between 1 and 100),
   constraint push_target_watches_target_type_length_check check (char_length(target_type) between 1 and 40),
   constraint push_target_watches_reason_check check (reason in ('missed_retry', 'collection_gap')),
   constraint push_target_watches_minimum_score_check check (minimum_score between 50 and 100),
+  constraint push_target_watches_delivery_status_check
+    check (delivery_status is null or delivery_status in ('pending', 'sent')),
   constraint push_target_watches_expiration_check check (expires_at > created_at)
 );
+
+alter table public.push_target_watches
+  add column if not exists delivery_status text,
+  add column if not exists sent_at timestamptz;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'push_target_watches_delivery_status_check'
+      and conrelid = 'public.push_target_watches'::regclass
+  ) then
+    alter table public.push_target_watches
+      add constraint push_target_watches_delivery_status_check
+      check (delivery_status is null or delivery_status in ('pending', 'sent'));
+  end if;
+end
+$$;
 
 alter table public.push_target_watches enable row level security;
 revoke all on table public.push_target_watches from public, anon, authenticated;
@@ -512,31 +671,28 @@ set search_path = public
 as $$
 declare
   v_subscription_id uuid;
-  v_inserted integer;
 begin
   select subscription_id into v_subscription_id
   from public.push_target_watches
   where id = p_watch_id
     and enabled = true
-    and claimed_at is null
     and expires_at > p_now
+    and (
+      delivery_status is null
+      or (
+        delivery_status = 'pending'
+        and claimed_at <= p_now - interval '10 minutes'
+      )
+    )
   for update;
 
   if not found then
     return false;
   end if;
 
-  insert into public.push_notification_claims (subscription_id, dedupe_key, claimed_at)
-  values (v_subscription_id, 'target_watch:' || p_watch_id::text, p_now)
-  on conflict do nothing;
-  get diagnostics v_inserted = row_count;
-
-  if v_inserted = 0 then
-    return false;
-  end if;
-
   update public.push_target_watches
-  set enabled = false, claimed_at = p_now
+  set delivery_status = 'pending',
+      claimed_at = p_now
   where id = p_watch_id;
 
   return true;
@@ -546,6 +702,53 @@ $$;
 revoke all on function public.claim_target_watch(uuid, timestamptz)
   from public, anon, authenticated;
 grant execute on function public.claim_target_watch(uuid, timestamptz) to service_role;
+
+create or replace function public.mark_target_watch_sent(
+  p_watch_id uuid,
+  p_now timestamptz default now()
+)
+returns boolean
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_subscription_id uuid;
+begin
+  select subscription_id into v_subscription_id
+  from public.push_target_watches
+  where id = p_watch_id
+    and enabled = true
+    and delivery_status = 'pending'
+  for update;
+
+  if not found then
+    return false;
+  end if;
+
+  insert into public.push_notification_claims (subscription_id, dedupe_key, claimed_at)
+  values (v_subscription_id, 'target_watch:' || p_watch_id::text, p_now)
+  on conflict do nothing;
+
+  update public.push_target_watches
+  set enabled = false,
+      delivery_status = 'sent',
+      sent_at = p_now
+  where id = p_watch_id;
+
+  update public.push_subscriptions
+  set last_notification_sent_at = p_now,
+      updated_at = p_now
+  where id = v_subscription_id
+    and enabled = true;
+
+  return true;
+end;
+$$;
+
+revoke all on function public.mark_target_watch_sent(uuid, timestamptz)
+  from public, anon, authenticated;
+grant execute on function public.mark_target_watch_sent(uuid, timestamptz) to service_role;
 
 create or replace function public.cleanup_expired_target_watches(
   p_now timestamptz default now()
