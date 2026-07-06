@@ -133,7 +133,7 @@ export function ObservationMemoryCard({ observation, onClose }: ObservationMemor
             {error ?? "Création de la carte…"}
           </div>
         )}
-        {cardUrl && isShiny ? <div className="observation-card-shine" aria-hidden="true" /> : null}
+        {cardUrl && isShiny ? null: null}
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
