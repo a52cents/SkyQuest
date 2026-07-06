@@ -27,7 +27,7 @@ function AtlasIllustration({ entry }: { entry: DiscoveryAtlasProgressEntry }) {
         src={entry.imageSrc}
         alt=""
         fill
-        sizes="(max-width: 600px) calc(50vw - 30px), 260px"
+        sizes="(max-width: 600px) calc(50vw - 25px), 260px"
         className={`object-cover transition duration-300 ${entry.status === "discovered" ? "saturate-100" : "scale-105 saturate-[0.35]"}`}
       />
     );
@@ -74,7 +74,7 @@ export function DiscoveryAtlasCard({
       className="group min-h-11 overflow-hidden rounded-[18px] border border-white/[0.08] bg-surface-strong text-left shadow-[0_12px_32px_rgba(0,0,0,0.2)] transition hover:-translate-y-0.5 hover:border-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       aria-label={`${entry.frenchName}, ${statusLabels[entry.status]}. ${ctaLabel}`}
     >
-      <span className="relative block aspect-[4/3] overflow-hidden bg-[#0c0d17]">
+      <span className="relative block aspect-[16/10] overflow-hidden bg-[#0c0d17] sm:aspect-[4/3]">
         <AtlasIllustration entry={entry} />
         <span
           className={`absolute inset-0 bg-[linear-gradient(180deg,transparent_30%,rgba(6,6,12,0.72))] ${entry.status === "discovered" ? "" : "bg-black/35"}`}
@@ -91,8 +91,8 @@ export function DiscoveryAtlasCard({
           {statusLabels[entry.status]}
         </span>
       </span>
-      <span className="block p-3">
-        <span className="block min-h-11 font-[Georgia,'Times_New_Roman',serif] text-[1.05rem] leading-tight text-text">
+      <span className="block p-2.5 sm:p-3">
+        <span className="block min-h-10 font-[Georgia,'Times_New_Roman',serif] text-[0.98rem] leading-tight text-text sm:min-h-11 sm:text-[1.05rem]">
           {entry.frenchName}
         </span>
         {entry.status === "discovered" ? (
@@ -110,7 +110,7 @@ export function DiscoveryAtlasCard({
               : entry.categoryLabel}
           </span>
         )}
-        <span className="mt-3 flex min-h-11 items-center border-t border-white/[0.06] pt-2 text-xs font-semibold text-accent-cyan">
+        <span className="mt-2 flex min-h-10 items-center border-t border-white/[0.06] pt-1.5 text-[11px] font-semibold text-accent-cyan sm:mt-3 sm:min-h-11 sm:pt-2 sm:text-xs">
           {ctaLabel}{" "}
           <span className="ml-auto" aria-hidden="true">
             →

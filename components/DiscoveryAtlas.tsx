@@ -102,7 +102,7 @@ function EntryDetail({
   const tryHref = `/?app=1&target=${encodeURIComponent(entry.target)}`;
 
   return (
-    <AppCard padding="lg" className="relative mx-auto my-3 w-full max-w-md">
+    <AppCard padding="md" className="relative mx-auto my-3 w-full max-w-md">
       <button
         ref={closeButtonRef}
         type="button"
@@ -236,7 +236,7 @@ export function DiscoveryAtlas({
   const completionPercent = Math.round(progress.completionPercent);
 
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-4">
       {selectedEntry ? (
         <div
           className="fixed inset-0 z-[70] overflow-y-auto bg-background/92 p-3 backdrop-blur-xl"
@@ -251,30 +251,33 @@ export function DiscoveryAtlas({
         </div>
       ) : null}
 
-      <AppCard className="overflow-hidden border-accent/20 bg-surface-strong bg-[radial-gradient(circle_at_100%_0%,color-mix(in_srgb,var(--accent)_15%,transparent),transparent_48%)]">
-        <div className="flex items-end justify-between gap-4">
+      <AppCard
+        padding="sm"
+        className="overflow-hidden border-accent/20 bg-surface-strong bg-[radial-gradient(circle_at_100%_0%,color-mix(in_srgb,var(--accent)_15%,transparent),transparent_48%)]"
+      >
+        <div className="flex items-end justify-between gap-3">
           <div>
             <p className="premium-kicker">Progression de la collection</p>
-            <h2 className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-2xl text-text">
+            <h2 className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-xl text-text">
               {progress.discoveredCount} / {progress.totalCount} découvertes
             </h2>
           </div>
-          <span className="text-2xl font-semibold text-accent-cyan">{completionPercent}%</span>
+          <span className="text-xl font-semibold text-accent-cyan">{completionPercent}%</span>
         </div>
-        <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-white/[0.07]">
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.07]">
           <div
             className="h-full rounded-full bg-accent transition-[width] duration-500"
             style={{ width: `${completionPercent}%` }}
           />
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-          <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.025] p-3">
-            <span className="block text-xs text-faint">Déjà tentées</span>
-            <strong className="mt-1 block text-text">{progress.attemptedCount}</strong>
+        <div className="mt-3 grid grid-cols-2 divide-x divide-white/[0.07] text-xs">
+          <div className="pr-3">
+            <span className="block text-faint">Déjà tentées</span>
+            <strong className="mt-0.5 block text-sm text-text">{progress.attemptedCount}</strong>
           </div>
-          <div className="rounded-[12px] border border-white/[0.06] bg-white/[0.025] p-3">
-            <span className="block text-xs text-faint">Prochain objectif</span>
-            <strong className="mt-1 block truncate text-text">
+          <div className="min-w-0 pl-3">
+            <span className="block text-faint">Prochain objectif</span>
+            <strong className="mt-0.5 block truncate text-sm text-text">
               {progress.nextObjective?.frenchName ?? "Atlas complet"}
             </strong>
           </div>
@@ -292,19 +295,38 @@ export function DiscoveryAtlas({
         </AppCard>
       ) : null}
 
-      <section aria-labelledby="atlas-categories-title">
-        <h2 id="atlas-categories-title" className="text-sm font-semibold text-text">
-          Progression par catégorie
-        </h2>
-        <div className="-mx-5 mt-3 flex snap-x gap-2 overflow-x-auto px-5 pb-2">
+      <section aria-labelledby="atlas-collection-title">
+        <div className="mb-2">
+          <p className="premium-kicker">Collection</p>
+          <h2
+            id="atlas-collection-title"
+            className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-xl text-text"
+          >
+            Objets du ciel
+          </h2>
+        </div>
+        <div
+          className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2"
+          aria-label="Filtres de catégorie"
+        >
+          <button
+            type="button"
+            onClick={() => setCategoryLabel(null)}
+            className={`min-h-11 shrink-0 rounded-full border px-4 text-xs font-semibold ${
+              categoryLabel === null
+                ? "border-accent/40 bg-accent/15 text-white"
+                : "border-white/[0.08] bg-surface text-muted"
+            }`}
+            aria-pressed={categoryLabel === null}
+          >
+            Toutes
+          </button>
           {progress.categories.map((category) => (
             <button
               key={category.label}
               type="button"
-              onClick={() =>
-                setCategoryLabel(categoryLabel === category.label ? null : category.label)
-              }
-              className={`min-h-11 shrink-0 snap-start rounded-full border px-4 text-xs font-semibold ${
+              onClick={() => setCategoryLabel(category.label)}
+              className={`min-h-11 shrink-0 rounded-full border px-4 text-xs font-semibold ${
                 categoryLabel === category.label
                   ? "border-accent/40 bg-accent/15 text-white"
                   : "border-white/[0.08] bg-surface text-muted"
@@ -314,37 +336,6 @@ export function DiscoveryAtlas({
               {category.label} · {category.discoveredCount}/{category.totalCount}
             </button>
           ))}
-        </div>
-      </section>
-
-      <section aria-labelledby="atlas-collection-title">
-        <div className="mb-3 flex items-end justify-between gap-3">
-          <div>
-            <p className="premium-kicker">Collection</p>
-            <h2
-              id="atlas-collection-title"
-              className="mt-1 font-[Georgia,'Times_New_Roman',serif] text-xl text-text"
-            >
-              Objets du ciel
-            </h2>
-          </div>
-          <label className="text-xs text-muted">
-            <span className="sr-only">Filtrer par catégorie</span>
-            <select
-              value={categoryLabel ?? "all"}
-              onChange={(event) =>
-                setCategoryLabel(event.target.value === "all" ? null : event.target.value)
-              }
-              className="min-h-11 max-w-36 rounded-full border border-white/[0.1] bg-surface-strong px-3 text-xs text-text outline-none focus:border-accent-cyan"
-            >
-              <option value="all">Toutes catégories</option>
-              {progress.categories.map((category) => (
-                <option key={category.label} value={category.label}>
-                  {category.label}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
         <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-3" aria-label="Filtres de statut">
           {filterOptions.map((option) => (
@@ -364,7 +355,7 @@ export function DiscoveryAtlas({
           ))}
         </div>
         {visibleEntries.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2.5">
             {visibleEntries.map((entry) => (
               <DiscoveryAtlasCard key={entry.id} entry={entry} onSelect={setSelectedEntry} />
             ))}

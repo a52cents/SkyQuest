@@ -14,6 +14,7 @@
  *   une nouvelle analyse afin de ne pas utiliser silencieusement une position périmée ;
  * - l'interface conserve le classement par pertinence et affiche toutes les quêtes générées.
  */
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
@@ -776,7 +777,18 @@ export function Dashboard({
         />
       ) : null}
 
-      <AppHeader eyebrow="SkyQuest" title="Maintenant" />
+      <AppHeader
+        eyebrow="SkyQuest"
+        title="Maintenant"
+        action={
+          <Link
+            href="/atlas"
+            className="inline-flex min-h-11 items-center rounded-brand border border-white/10 bg-white/[0.035] px-3 text-xs font-semibold text-text transition-colors hover:border-white/[0.18] hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/70 sm:px-4 sm:text-sm"
+          >
+            Atlas
+          </Link>
+        }
+      />
 
       <motion.main
         className="dashboard-main"

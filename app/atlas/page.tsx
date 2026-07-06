@@ -30,7 +30,7 @@ export default function AtlasPage() {
   }, []);
 
   return (
-    <PageShell eyebrow="Collection locale" title="Mon atlas du ciel" contentClassName="pb-4">
+    <PageShell eyebrow="Mes découvertes" title="Mon atlas" contentClassName="pb-4">
       {isReady ? (
         <DiscoveryAtlas profile={profile} observations={observations} />
       ) : (

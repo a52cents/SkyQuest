@@ -118,6 +118,25 @@ export default function JournalPage() {
         ) : null}
       </AnimatePresence>
       <div className="grid gap-5">
+        <Link href="/atlas" className="block rounded-[20px]">
+          <AppCard
+            variant="subtle"
+            padding="sm"
+            className="border-accent/20 bg-accent/[0.04] transition-colors hover:border-accent/40"
+          >
+            <div className="flex min-h-11 items-center justify-between gap-4">
+              <div>
+                <p className="font-[Georgia,'Times_New_Roman',serif] text-lg text-text">
+                  Mon atlas
+                </p>
+                <p className="mt-0.5 text-sm leading-5 text-muted">Retrouver mes découvertes</p>
+              </div>
+              <span className="text-xl text-accent" aria-hidden="true">
+                ✦
+              </span>
+            </div>
+          </AppCard>
+        </Link>
         {observations.length > 0 ? (
           <JournalList
             observations={observations}
@@ -132,27 +151,6 @@ export default function JournalPage() {
             message="Marque une quête comme vue ou pas trouvée pour garder une trace locale."
           />
         )}
-        <Link href="/atlas" className="block rounded-[20px]">
-          <AppCard
-            variant="subtle"
-            padding="sm"
-            className="transition-colors hover:border-accent/30"
-          >
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="font-[Georgia,'Times_New_Roman',serif] text-lg text-text">
-                  Mon atlas du ciel
-                </p>
-                <p className="mt-1 text-sm leading-5 text-muted">
-                  Voir les découvertes et les prochaines cibles
-                </p>
-              </div>
-              <span className="text-xl text-accent" aria-hidden="true">
-                ✦
-              </span>
-            </div>
-          </AppCard>
-        </Link>
         <Link href="/glossary" className="block rounded-[20px]">
           <AppCard
             variant="subtle"
