@@ -6,7 +6,7 @@ import {
   parseSkyQuest,
   parseStoredLocation,
 } from "../lib/storage-parsers.ts";
-import { getActiveQuest, getLastLocation } from "../lib/storage.ts";
+import { getActiveQuest, getLastLocation, saveLastLocation } from "../lib/storage.ts";
 
 function quest(overrides = {}) {
   return {
@@ -76,7 +76,16 @@ test("SkyQuest and location parsers accept valid values and reject unsafe coordi
     latitude: 48.86,
     longitude: 2.35,
   });
+  assert.deepEqual(parseStoredLocation({ latitude: 48.86, longitude: 2.35, altitudeMeters: 42 }), {
+    latitude: 48.86,
+    longitude: 2.35,
+    altitudeMeters: 42,
+  });
   assert.equal(parseStoredLocation({ latitude: 91, longitude: 2.35 }), null);
+  assert.equal(
+    parseStoredLocation({ latitude: 48.86, longitude: 2.35, altitudeMeters: Number.NaN }),
+    null,
+  );
 });
 
 test("BestSkyWindow parser validates every nested forecast hour", () => {
@@ -147,6 +156,34 @@ test("storage getters remove corrupted active quests and locations instead of ca
     assert.equal(getLastLocation(), null);
     assert.equal(values.has("skyquest.activeQuest.v0"), false);
     assert.equal(values.has("skyquest.lastLocation.v0"), false);
+  } finally {
+    globalThis.window = originalWindow;
+  }
+});
+
+test("persisted observer location remains rounded, including optional altitude", () => {
+  const originalWindow = globalThis.window;
+  const values = new Map();
+  globalThis.window = {
+    localStorage: {
+      getItem(key) {
+        return values.get(key) ?? null;
+      },
+      setItem(key, value) {
+        values.set(key, value);
+      },
+      removeItem(key) {
+        values.delete(key);
+      },
+    },
+  };
+  try {
+    saveLastLocation({ latitude: 48.8566, longitude: 2.3522, altitudeMeters: 43 });
+    assert.deepEqual(JSON.parse(values.get("skyquest.lastLocation.v0")), {
+      latitude: 48.86,
+      longitude: 2.35,
+      altitudeMeters: 40,
+    });
   } finally {
     globalThis.window = originalWindow;
   }

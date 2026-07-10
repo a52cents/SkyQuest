@@ -3,6 +3,7 @@ import { AppCard } from "@/components/AppCard";
 import { InlineTerm } from "@/components/InlineTerm";
 import type { GuidanceReliability, OrientationConfidence, OrientationStatus } from "./types";
 import type { SkyQuest } from "@/lib/types";
+import type { NorthReference } from "@/lib/orientation";
 
 export type CameraDetailsState = {
   currentAzimuth: number | null;
@@ -17,7 +18,21 @@ export type CameraDetailsState = {
   orientationError: string | null;
   guidanceReliability: GuidanceReliability;
   horizontalCalibration: number;
+  rawAzimuth: number | null;
+  northReference: NorthReference;
+  magneticDeclination: number | null;
 };
+
+function getNorthReferenceLabel(state: CameraDetailsState): string {
+  if (state.northReference === "true") return "Nord géographique";
+  if (state.northReference === "magnetic") {
+    return state.magneticDeclination === null
+      ? "Nord magnétique non corrigé"
+      : "Nord magnétique corrigé vers le nord géographique";
+  }
+  if (state.northReference === "relative") return "Orientation relative";
+  return "Référence nord inconnue";
+}
 
 function DetailsRow({ label, value }: { label: string; value: string }) {
   return (
@@ -67,6 +82,17 @@ export function CameraDetailsPanel({
     ["Zoom reel", state.zoomLabel],
     ["Orientation", state.orientationStatus === "active" ? "Active" : "Inactive"],
     ["Capteur", sensorLabel],
+    ["Nord", getNorthReferenceLabel(state)],
+    [
+      "Correction locale",
+      state.magneticDeclination === null
+        ? "Indisponible"
+        : `${state.magneticDeclination >= 0 ? "+" : ""}${state.magneticDeclination.toFixed(1)}°`,
+    ],
+    [
+      "Lecture brute",
+      state.rawAzimuth === null ? "Indisponible" : `${Math.round(state.rawAzimuth)}°`,
+    ],
     [
       "Fiabilité",
       state.guidanceReliability === "reliable"

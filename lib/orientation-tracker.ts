@@ -3,6 +3,7 @@ import {
   type CameraPointing,
   type DeviceOrientationReading,
 } from "./orientation.ts";
+import type { MagneticDeclinationResult } from "./magnetic-declination.ts";
 
 export type AbsoluteOrientationSensorLike = EventTarget & {
   quaternion: readonly number[] | null;
@@ -21,6 +22,7 @@ export type OrientationTrackerEnvironment = {
   hasDeviceOrientation: boolean;
   getScreenAngle: () => number;
   SensorConstructor?: AbsoluteOrientationSensorConstructor;
+  getMagneticDeclination?: () => MagneticDeclinationResult | null;
 };
 
 type CompassOrientationEvent = Event & {
@@ -28,6 +30,7 @@ type CompassOrientationEvent = Event & {
   beta?: number | null;
   gamma?: number | null;
   webkitCompassHeading?: number;
+  absolute?: boolean;
 };
 
 export function startOrientationTracking(
@@ -40,7 +43,13 @@ export function startOrientationTracking(
 
   const publish = (reading: DeviceOrientationReading) => {
     lastReading = reading;
-    onPointing(getCameraPointing(reading, environment.getScreenAngle()));
+    onPointing(
+      getCameraPointing(
+        reading,
+        environment.getScreenAngle(),
+        environment.getMagneticDeclination?.() ?? null,
+      ),
+    );
   };
   const handleFallback = (event: Event) => {
     const reading = event as CompassOrientationEvent;
@@ -49,6 +58,15 @@ export function startOrientationTracking(
       beta: reading.beta ?? null,
       gamma: reading.gamma ?? null,
       webkitCompassHeading: reading.webkitCompassHeading,
+      northReference:
+        typeof reading.webkitCompassHeading === "number" &&
+        Number.isFinite(reading.webkitCompassHeading)
+          ? "magnetic"
+          : reading.absolute === true || event.type === "deviceorientationabsolute"
+            ? "magnetic"
+            : reading.absolute === false
+              ? "relative"
+              : "unknown",
     });
   };
   const startFallback = () => {
@@ -78,6 +96,7 @@ export function startOrientationTracking(
             quaternion.length >= 4
               ? [quaternion[0], quaternion[1], quaternion[2], quaternion[3]]
               : null,
+          northReference: "magnetic",
         });
       });
       sensor.addEventListener("error", startFallback);

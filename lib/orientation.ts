@@ -9,6 +9,7 @@ import {
   type CameraConfidence,
   type Vector3,
 } from "./sky-projection.ts";
+import type { MagneticDeclinationResult } from "./magnetic-declination.ts";
 
 /** Quaternion [x, y, z, w] rotating device coordinates into the reference frame. */
 export type OrientationQuaternion = [number, number, number, number];
@@ -19,13 +20,24 @@ export type DeviceOrientationReading = {
   gamma: number | null;
   webkitCompassHeading?: number;
   absoluteQuaternion?: OrientationQuaternion | null;
+  northReference?: NorthReference;
 };
 
+export type NorthReference = "true" | "magnetic" | "relative" | "unknown" | "unavailable";
+
 export type CameraPointingSource =
-  "absolute-sensor" | "webkit-compass" | "tilt-only" | "unavailable";
+  | "absolute-sensor"
+  | "device-orientation-absolute"
+  | "webkit-compass"
+  | "tilt-only"
+  | "unavailable";
 
 export type CameraPointing = {
+  /** True-north azimuth used for astronomical comparison, or null when it cannot be established. */
   azimuth: number | null;
+  rawAzimuth: number | null;
+  northReference: NorthReference;
+  magneticDeclination: number | null;
   altitude: number | null;
   roll: number | null;
   quaternion: OrientationQuaternion | null;
@@ -48,6 +60,28 @@ export function normalizeScreenAngle(angle: number): number {
 
 export function angleDifference(current: number, target: number): number {
   return ((normalizeAngle(target) - normalizeAngle(current) + 540) % 360) - 180;
+}
+
+export function convertAzimuthToTrueNorth({
+  azimuth,
+  northReference,
+  magneticDeclinationDegrees,
+}: {
+  azimuth: number | null;
+  northReference: NorthReference;
+  magneticDeclinationDegrees: number | null;
+}): number | null {
+  if (azimuth === null || !Number.isFinite(azimuth)) return null;
+  if (northReference === "true") return normalizeAngle(azimuth);
+  if (
+    northReference === "magnetic" &&
+    magneticDeclinationDegrees !== null &&
+    Number.isFinite(magneticDeclinationDegrees)
+  ) {
+    // WMM declination is positive east: true azimuth = magnetic azimuth + declination.
+    return normalizeAngle(azimuth + magneticDeclinationDegrees);
+  }
+  return null;
 }
 
 export function azimuthToCardinal(azimuth: number): string {
@@ -176,17 +210,27 @@ function pointingFromBasis({
   source,
   screenAngle,
   quaternion,
-  hasAbsoluteNorth,
+  rawAzimuth,
+  northReference,
+  magneticDeclination,
 }: {
   basis: CameraBasis;
   source: CameraPointingSource;
   screenAngle: number;
   quaternion: OrientationQuaternion | null;
-  hasAbsoluteNorth: boolean;
+  rawAzimuth: number | null;
+  northReference: NorthReference;
+  magneticDeclination: number | null;
 }): CameraPointing {
   const horizontal = vectorToHorizontalCoordinates(basis.forward);
   return {
-    azimuth: hasAbsoluteNorth ? (horizontal?.azimuth ?? null) : null,
+    azimuth:
+      northReference === "true" || (northReference === "magnetic" && magneticDeclination !== null)
+        ? (horizontal?.azimuth ?? null)
+        : null,
+    rawAzimuth,
+    northReference,
+    magneticDeclination,
     altitude: horizontal?.altitude ?? null,
     roll: calculateCameraRoll(basis),
     quaternion,
@@ -199,20 +243,39 @@ function pointingFromBasis({
 export function getCameraPointing(
   reading: DeviceOrientationReading,
   rawScreenAngle = 0,
+  declinationResult: MagneticDeclinationResult | null = null,
 ): CameraPointing {
   const screenAngle = normalizeScreenAngle(rawScreenAngle);
+  const magneticDeclination = declinationResult?.available
+    ? declinationResult.declinationDegrees
+    : null;
   const quaternion = reading.absoluteQuaternion
     ? normalizeQuaternion(reading.absoluteQuaternion)
     : null;
   if (quaternion) {
     const deviceBasis = basisFromQuaternion(quaternion, "high");
     if (deviceBasis) {
+      const northReference = reading.northReference ?? "unknown";
+      const rawAzimuth = vectorToHorizontalCoordinates(deviceBasis.forward)?.azimuth ?? null;
+      const trueAzimuth = convertAzimuthToTrueNorth({
+        azimuth: rawAzimuth,
+        northReference,
+        magneticDeclinationDegrees: magneticDeclination,
+      });
+      const appliedDeclination =
+        northReference === "magnetic" && trueAzimuth !== null ? magneticDeclination : null;
+      const correctedBasis =
+        appliedDeclination !== null
+          ? rotateBasisAroundZenith(deviceBasis, -appliedDeclination)
+          : deviceBasis;
       return pointingFromBasis({
-        basis: rotateBasisForScreenOrientation(deviceBasis, screenAngle),
+        basis: rotateBasisForScreenOrientation(correctedBasis, screenAngle),
         source: "absolute-sensor",
         screenAngle,
         quaternion,
-        hasAbsoluteNorth: true,
+        rawAzimuth,
+        northReference,
+        magneticDeclination: appliedDeclination,
       });
     }
   }
@@ -246,13 +309,31 @@ export function getCameraPointing(
           -angleDifference(horizontal.azimuth, compassHeading),
         );
       }
+      const northReference = useCompass ? "magnetic" : (reading.northReference ?? "relative");
+      const rawAzimuth = vectorToHorizontalCoordinates(basis.forward)?.azimuth ?? null;
+      const trueAzimuth = convertAzimuthToTrueNorth({
+        azimuth: rawAzimuth,
+        northReference,
+        magneticDeclinationDegrees: magneticDeclination,
+      });
+      const appliedDeclination =
+        northReference === "magnetic" && trueAzimuth !== null ? magneticDeclination : null;
+      if (appliedDeclination !== null) {
+        basis = rotateBasisAroundZenith(basis, -appliedDeclination);
+      }
       basis = rotateBasisForScreenOrientation(basis, screenAngle);
       return pointingFromBasis({
         basis,
-        source: useCompass ? "webkit-compass" : "tilt-only",
+        source: useCompass
+          ? "webkit-compass"
+          : northReference === "magnetic" || northReference === "true"
+            ? "device-orientation-absolute"
+            : "tilt-only",
         screenAngle,
         quaternion: null,
-        hasAbsoluteNorth: useCompass,
+        rawAzimuth,
+        northReference,
+        magneticDeclination: appliedDeclination,
       });
     }
   }
@@ -260,6 +341,9 @@ export function getCameraPointing(
   if (typeof reading.beta === "number" && Number.isFinite(reading.beta)) {
     return {
       azimuth: null,
+      rawAzimuth: null,
+      northReference: reading.northReference ?? "relative",
+      magneticDeclination: null,
       altitude: betaToCameraAltitude(reading.beta),
       roll: null,
       quaternion: null,
@@ -271,6 +355,9 @@ export function getCameraPointing(
 
   return {
     azimuth: null,
+    rawAzimuth: null,
+    northReference: "unavailable",
+    magneticDeclination: null,
     altitude: null,
     roll: null,
     quaternion: null,
@@ -295,7 +382,9 @@ export function smoothCameraPointing(
       source: next.source,
       screenAngle: next.screenAngle,
       quaternion,
-      hasAbsoluteNorth: next.azimuth !== null,
+      rawAzimuth: next.rawAzimuth,
+      northReference: next.northReference,
+      magneticDeclination: next.magneticDeclination,
     });
   }
   if (next.altitude !== null && previous.altitude !== null) {

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   azimuthToCardinal,
+  convertAzimuthToTrueNorth,
   getCameraPointing,
   normalizeQuaternion,
   smoothCameraPointing,
@@ -15,6 +16,14 @@ import {
 } from "../lib/sky-projection.ts";
 
 const EPSILON = 1e-8;
+const ZERO_DECLINATION = {
+  available: true,
+  declinationDegrees: 0,
+  model: "WMM2025",
+  epoch: 2025,
+  validUntil: "2030-01-01",
+  usedAltitudeFallback: true,
+};
 
 function assertClose(actual, expected, epsilon = EPSILON) {
   assert.ok(Math.abs(actual - expected) <= epsilon, `${actual} != ${expected}`);
@@ -92,10 +101,101 @@ function levelBasis(azimuth, altitude = 0) {
 
 function poseForBasis(basis, screenAngle = 0) {
   return getCameraPointing(
-    { alpha: null, beta: null, gamma: null, absoluteQuaternion: basisToQuaternion(basis) },
+    {
+      alpha: null,
+      beta: null,
+      gamma: null,
+      absoluteQuaternion: basisToQuaternion(basis),
+      northReference: "true",
+    },
     screenAngle,
   );
 }
+
+test("magnetic azimuth converts to true north across zero", () => {
+  assert.equal(
+    convertAzimuthToTrueNorth({
+      azimuth: 350,
+      northReference: "magnetic",
+      magneticDeclinationDegrees: 15,
+    }),
+    5,
+  );
+  assert.equal(
+    convertAzimuthToTrueNorth({
+      azimuth: 5,
+      northReference: "magnetic",
+      magneticDeclinationDegrees: -15,
+    }),
+    350,
+  );
+  assert.equal(
+    convertAzimuthToTrueNorth({
+      azimuth: 42,
+      northReference: "true",
+      magneticDeclinationDegrees: 12,
+    }),
+    42,
+  );
+  for (const northReference of ["relative", "unknown", "unavailable"]) {
+    assert.equal(
+      convertAzimuthToTrueNorth({
+        azimuth: 42,
+        northReference,
+        magneticDeclinationDegrees: 12,
+      }),
+      null,
+    );
+  }
+  assert.equal(
+    convertAzimuthToTrueNorth({
+      azimuth: null,
+      northReference: "magnetic",
+      magneticDeclinationDegrees: 12,
+    }),
+    null,
+  );
+});
+
+test("magnetic pose applies declination once and retains its raw azimuth", () => {
+  const pose = getCameraPointing(
+    {
+      alpha: null,
+      beta: null,
+      gamma: null,
+      absoluteQuaternion: basisToQuaternion(levelBasis(350)),
+      northReference: "magnetic",
+    },
+    0,
+    { ...ZERO_DECLINATION, declinationDegrees: 15 },
+  );
+  assertClose(pose.rawAzimuth, 350);
+  assertClose(pose.azimuth, 5);
+  assert.equal(pose.northReference, "magnetic");
+  assert.equal(pose.magneticDeclination, 15);
+});
+
+test("uncorrected magnetic and relative poses do not invent true azimuth", () => {
+  const quaternion = basisToQuaternion(levelBasis(90));
+  const magnetic = getCameraPointing({
+    alpha: null,
+    beta: null,
+    gamma: null,
+    absoluteQuaternion: quaternion,
+    northReference: "magnetic",
+  });
+  const relative = getCameraPointing({
+    alpha: null,
+    beta: null,
+    gamma: null,
+    absoluteQuaternion: quaternion,
+    northReference: "relative",
+  });
+  assertClose(magnetic.rawAzimuth, 90);
+  assert.equal(magnetic.azimuth, null);
+  assert.equal(relative.azimuth, null);
+  assert.ok(magnetic.basis && relative.basis);
+});
 
 test("portrait rear camera points north at the horizon", () => {
   const pose = poseForBasis(levelBasis(0));
@@ -160,6 +260,7 @@ test("quaternions are normalized and invalid values degrade safely", () => {
     beta: null,
     gamma: null,
     absoluteQuaternion: basisToQuaternion(levelBasis(0)).map((value) => value * 4),
+    northReference: "true",
   });
   assertClose(Math.hypot(...valid.quaternion), 1);
   const invalid = getCameraPointing({
@@ -180,6 +281,7 @@ test("q and -q remain equivalent during smoothing", () => {
     beta: null,
     gamma: null,
     absoluteQuaternion: negated,
+    northReference: "true",
   });
   const smoothed = smoothCameraPointing(first, second);
   assert.deepEqual(smoothed.quaternion, first.quaternion);
@@ -196,7 +298,7 @@ test("beta-only fallback keeps altitude without inventing north", () => {
 
 test("Safari compass heading is not inverted by 180 degrees", () => {
   const reading = (webkitCompassHeading) =>
-    getCameraPointing({ alpha: 0, beta: 90, gamma: 0, webkitCompassHeading });
+    getCameraPointing({ alpha: 0, beta: 90, gamma: 0, webkitCompassHeading }, 0, ZERO_DECLINATION);
   const east = reading(90);
   const southWest = reading(225);
   assertClose(east.azimuth, 90);
@@ -233,6 +335,7 @@ test("tracker recomputes on screen changes and cleans listeners and sensor", () 
       hasDeviceOrientation: true,
       getScreenAngle: () => screenAngle,
       SensorConstructor: FakeSensor,
+      getMagneticDeclination: () => ZERO_DECLINATION,
     },
     (pose) => poses.push(pose),
   );
@@ -248,4 +351,54 @@ test("tracker recomputes on screen changes and cleans listeners and sensor", () 
   screenTarget.dispatchEvent(new Event("change"));
   windowTarget.dispatchEvent(new Event("deviceorientation"));
   assert.equal(poses.length, 2);
+});
+
+test("tracker labels browser north references without promoting relative events", () => {
+  const windowTarget = new EventTarget();
+  const poses = [];
+  const stop = startOrientationTracking(
+    {
+      windowTarget,
+      screenOrientationTarget: null,
+      hasDeviceOrientation: true,
+      getScreenAngle: () => 0,
+      getMagneticDeclination: () => ZERO_DECLINATION,
+    },
+    (pose) => poses.push(pose),
+  );
+  windowTarget.dispatchEvent(
+    Object.assign(new Event("deviceorientationabsolute"), {
+      alpha: 0,
+      beta: 90,
+      gamma: 0,
+      absolute: true,
+    }),
+  );
+  assert.equal(poses.at(-1).northReference, "magnetic");
+  assert.equal(poses.at(-1).source, "device-orientation-absolute");
+  assert.notEqual(poses.at(-1).azimuth, null);
+
+  windowTarget.dispatchEvent(
+    Object.assign(new Event("deviceorientation"), {
+      alpha: 0,
+      beta: 90,
+      gamma: 0,
+      absolute: false,
+    }),
+  );
+  assert.equal(poses.at(-1).northReference, "relative");
+  assert.equal(poses.at(-1).azimuth, null);
+
+  windowTarget.dispatchEvent(
+    Object.assign(new Event("deviceorientation"), {
+      alpha: 0,
+      beta: 90,
+      gamma: 0,
+      webkitCompassHeading: 90,
+    }),
+  );
+  assert.equal(poses.at(-1).northReference, "magnetic");
+  assert.equal(poses.at(-1).source, "webkit-compass");
+  assertClose(poses.at(-1).azimuth, 90);
+  stop();
 });

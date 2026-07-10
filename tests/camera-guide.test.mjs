@@ -7,6 +7,7 @@ import {
   getCameraErrorMessage,
   getDirectionArrow,
   getGuidanceReliability,
+  getOrientationConfidence,
   readCameraZoomRange,
 } from "../components/camera/camera-utils.ts";
 
@@ -67,6 +68,43 @@ test("guidance reliability clearly separates sensors from text fallback", () => 
   assert.equal(getGuidanceReliability("active", "medium", 120), "approximate");
   assert.equal(getGuidanceReliability("active", "low", null), "text_recommended");
   assert.equal(getGuidanceReliability("denied", "high", 120), "text_recommended");
+});
+
+test("north reference controls orientation confidence", () => {
+  assert.equal(
+    getOrientationConfidence({
+      azimuth: 120,
+      source: "absolute-sensor",
+      northReference: "magnetic",
+      magneticDeclination: 2.1,
+    }),
+    "high",
+  );
+  assert.equal(
+    getOrientationConfidence({
+      azimuth: null,
+      source: "absolute-sensor",
+      northReference: "magnetic",
+      magneticDeclination: null,
+    }),
+    "low",
+  );
+  assert.equal(
+    getOrientationConfidence({
+      azimuth: null,
+      source: "tilt-only",
+      northReference: "relative",
+      magneticDeclination: null,
+    }),
+    "low",
+  );
+});
+
+test("manual calibration remains a separate single target offset", () => {
+  const trueSensorAzimuth = 5; // 350° magnetic + 15° WMM declination.
+  const calibratedTarget = applyHorizontalCalibration(20, 10);
+  assert.equal(calibratedTarget, 30);
+  assert.equal(((calibratedTarget - trueSensorAzimuth + 540) % 360) - 180, 25);
 });
 
 test("camera guidance exposes a temporary manual recalibration flow", () => {

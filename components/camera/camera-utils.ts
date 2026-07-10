@@ -1,4 +1,5 @@
 import type { SkyQuest } from "@/lib/types";
+import type { CameraPointing } from "@/lib/orientation";
 import type {
   CameraCapabilities,
   CameraSettings,
@@ -37,6 +38,20 @@ export function getGuidanceReliability(
     return "text_recommended";
   }
   return orientationConfidence === "high" ? "reliable" : "approximate";
+}
+
+export function getOrientationConfidence(
+  pointing: Pick<CameraPointing, "azimuth" | "magneticDeclination" | "northReference" | "source">,
+): OrientationConfidence {
+  if (pointing.azimuth === null) return "low";
+  if (pointing.northReference === "magnetic" && pointing.magneticDeclination === null) {
+    return "low";
+  }
+  return pointing.source === "absolute-sensor"
+    ? "high"
+    : pointing.source === "webkit-compass" || pointing.source === "device-orientation-absolute"
+      ? "medium"
+      : "low";
 }
 
 export function getDirectionArrow(delta: number | null): string {

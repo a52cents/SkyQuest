@@ -5,6 +5,7 @@ export function isSecureBrowserContext(): boolean {
 export type GeoPosition = {
   latitude: number;
   longitude: number;
+  altitudeMeters?: number;
 };
 
 export function getInsecureContextMessage(feature: "position" | "camera" | "orientation"): string {
@@ -30,6 +31,10 @@ export function getCurrentPosition(): Promise<GeoPosition> {
         resolve({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
+          ...(typeof position.coords.altitude === "number" &&
+          Number.isFinite(position.coords.altitude)
+            ? { altitudeMeters: position.coords.altitude }
+            : {}),
         });
       },
       (error) => {

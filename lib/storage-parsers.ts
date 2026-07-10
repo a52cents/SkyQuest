@@ -17,6 +17,7 @@ import type {
 export type StoredLocation = {
   latitude: number;
   longitude: number;
+  altitudeMeters?: number;
 };
 
 export type DashboardAnalysis = {
@@ -112,10 +113,18 @@ function parseSatelliteTrajectoryPoint(value: unknown): SatelliteTrajectoryPoint
 
 export function parseStoredLocation(value: unknown): StoredLocation | null {
   if (!isRecord(value)) return null;
-  if (!isNumberInRange(value.latitude, -90, 90) || !isNumberInRange(value.longitude, -180, 180)) {
+  if (
+    !isNumberInRange(value.latitude, -90, 90) ||
+    !isNumberInRange(value.longitude, -180, 180) ||
+    (value.altitudeMeters !== undefined && !isNumberInRange(value.altitudeMeters, -1_000, 850_000))
+  ) {
     return null;
   }
-  return { latitude: value.latitude, longitude: value.longitude };
+  return {
+    latitude: value.latitude,
+    longitude: value.longitude,
+    ...(typeof value.altitudeMeters === "number" ? { altitudeMeters: value.altitudeMeters } : {}),
+  };
 }
 
 export function parseSkyQuest(value: unknown): SkyQuest | null {

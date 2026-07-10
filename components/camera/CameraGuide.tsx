@@ -29,6 +29,7 @@ import {
   getCameraSettings,
   getDirectionArrow,
   getGuidanceReliability,
+  getOrientationConfidence,
   readCameraCapabilities,
   readCameraZoomRange,
 } from "./camera-utils";
@@ -90,7 +91,8 @@ export function CameraGuide({
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
-  const sensorPointing = useDeviceOrientation(orientationEnabled);
+  const [observerLocation] = useState(() => getLastLocation());
+  const sensorPointing = useDeviceOrientation(orientationEnabled, observerLocation);
 
   useEffect(() => () => streamRef.current?.getTracks().forEach((track) => track.stop()), []);
 
@@ -110,13 +112,7 @@ export function CameraGuide({
 
   useEffect(() => {
     if (sensorPointing.source === "unavailable") return;
-    setOrientationConfidence(
-      sensorPointing.source === "absolute-sensor"
-        ? "high"
-        : sensorPointing.source === "webkit-compass"
-          ? "medium"
-          : "low",
-    );
+    setOrientationConfidence(getOrientationConfidence(sensorPointing));
     if (sensorPointing.azimuth !== null) setCurrentAzimuth(sensorPointing.azimuth);
     if (sensorPointing.altitude !== null) setCurrentAltitude(sensorPointing.altitude);
   }, [sensorPointing]);
@@ -375,6 +371,8 @@ export function CameraGuide({
     setPhotoCaptureStatus("idle");
   }
 
+  // Sensor raw heading -> WMM true north -> 3D smoothing happens in the hook.
+  // This temporary user offset is applied once, only to the final target comparison.
   const calibratedTargetAzimuth = applyHorizontalCalibration(
     liveQuest.azimuth,
     horizontalCalibration,
@@ -448,6 +446,9 @@ export function CameraGuide({
     orientationError,
     guidanceReliability,
     horizontalCalibration,
+    rawAzimuth: sensorPointing.rawAzimuth,
+    northReference: sensorPointing.northReference,
+    magneticDeclination: sensorPointing.magneticDeclination,
   };
 
   return (

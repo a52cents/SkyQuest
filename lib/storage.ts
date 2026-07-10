@@ -702,6 +702,9 @@ export function saveLastLocation(location: StoredLocation): void {
   const roundedLocation = parseStoredLocation({
     latitude: roundCoordinate(location.latitude),
     longitude: roundCoordinate(location.longitude),
+    ...(typeof location.altitudeMeters === "number"
+      ? { altitudeMeters: Math.round(location.altitudeMeters / 10) * 10 }
+      : {}),
   });
   if (!roundedLocation) return;
   memoryLastLocation = roundedLocation;

@@ -51,6 +51,28 @@ Ne pas déplacer ces demandes au montage du composant ou dans un effet automatiq
 
 L'overlay complet n'est activé que si la caméra, l'orientation, la position et un niveau de confiance suffisant sont disponibles.
 
+## Référence nord
+
+Les azimuts astronomiques utilisent toujours le nord géographique. Les sources navigateur sont
+classées avant toute comparaison :
+
+| Source                                    | Référence retenue                                             |
+| ----------------------------------------- | ------------------------------------------------------------- |
+| `AbsoluteOrientationSensor`               | nord magnétique, conformément au repère terrestre W3C         |
+| `deviceorientationabsolute`               | nord magnétique lorsque la lecture est absolue                |
+| `deviceorientation` avec `absolute: true` | nord magnétique                                               |
+| `webkitCompassHeading`                    | nord magnétique                                               |
+| `deviceorientation` relatif               | référence relative, jamais utilisée comme azimut astronomique |
+| inclinaison seule                         | aucune référence nord                                         |
+
+Une lecture magnétique n'est convertie que si WMM2025 peut calculer localement la déclinaison pour
+la position et la date. La convention est `azimut vrai = azimut magnétique + déclinaison`, avec une
+déclinaison positive vers l'est. Sans position ou hors période du modèle, l'altitude et le roulis
+restent utilisables, mais le guidage horizontal repasse au texte.
+
+L'ordre des corrections est : lecture brute, conversion WMM vers le nord vrai, lissage 3D, puis
+calibration manuelle temporaire appliquée une seule fois lors de la comparaison avec la cible.
+
 ## Fallbacks
 
 | Situation                 | Comportement attendu                                          |

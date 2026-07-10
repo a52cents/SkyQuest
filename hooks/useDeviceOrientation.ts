@@ -6,9 +6,19 @@ import {
   startOrientationTracking,
   type AbsoluteOrientationSensorConstructor,
 } from "@/lib/orientation-tracker";
+import { getCachedMagneticDeclination } from "@/lib/magnetic-declination";
+
+type OrientationLocation = {
+  latitude: number;
+  longitude: number;
+  altitudeMeters?: number | null;
+};
 
 const UNAVAILABLE_POINTING: CameraPointing = {
   azimuth: null,
+  rawAzimuth: null,
+  northReference: "unavailable",
+  magneticDeclination: null,
   altitude: null,
   roll: null,
   quaternion: null,
@@ -24,9 +34,15 @@ function readScreenAngle(): number {
   return typeof legacyAngle === "number" && Number.isFinite(legacyAngle) ? legacyAngle : 0;
 }
 
-export function useDeviceOrientation(enabled: boolean): CameraPointing {
+export function useDeviceOrientation(
+  enabled: boolean,
+  observerLocation: OrientationLocation | null = null,
+): CameraPointing {
   const [pointing, setPointing] = useState<CameraPointing>(UNAVAILABLE_POINTING);
   const smoothedPointing = useRef<CameraPointing | null>(null);
+  const observerLatitude = observerLocation?.latitude;
+  const observerLongitude = observerLocation?.longitude;
+  const observerAltitudeMeters = observerLocation?.altitudeMeters;
 
   useEffect(() => {
     if (!enabled) return;
@@ -43,6 +59,16 @@ export function useDeviceOrientation(enabled: boolean): CameraPointing {
         hasDeviceOrientation: "DeviceOrientationEvent" in window,
         getScreenAngle: readScreenAngle,
         SensorConstructor,
+        getMagneticDeclination:
+          observerLatitude !== undefined && observerLongitude !== undefined
+            ? () =>
+                getCachedMagneticDeclination({
+                  latitude: observerLatitude,
+                  longitude: observerLongitude,
+                  altitudeMeters: observerAltitudeMeters,
+                  date: new Date(),
+                })
+            : undefined,
       },
       (rawPointing) => {
         const smoothed = smoothCameraPointing(smoothedPointing.current, rawPointing);
@@ -55,7 +81,7 @@ export function useDeviceOrientation(enabled: boolean): CameraPointing {
       stop();
       smoothedPointing.current = null;
     };
-  }, [enabled]);
+  }, [enabled, observerAltitudeMeters, observerLatitude, observerLongitude]);
 
   return pointing;
 }
