@@ -1,17 +1,49 @@
-/**
- * Orientation du téléphone
- *
- * Normalise les conventions hétérogènes des capteurs navigateur en une direction caméra
- * exploitable par le guidage, puis produit des indications simples de rotation et d'altitude.
- *
- * Points sensibles :
- * - iOS et Android n'exposent pas toujours les mêmes axes ni le même nord de référence ;
- * - les angles doivent rester continus au passage de 359° à 0° ;
- * - une lecture absente ou peu fiable doit réduire la confiance, pas provoquer une erreur ;
- * - ce module ne demande jamais lui-même une permission navigateur.
- */
+import {
+  calculateCameraRoll,
+  normalizeCameraBasis,
+  rotateBasisForScreenOrientation,
+  rotateVectorAroundAxis,
+  smoothCameraBasis,
+  vectorToHorizontalCoordinates,
+  type CameraBasis,
+  type CameraConfidence,
+  type Vector3,
+} from "./sky-projection.ts";
+
+/** Quaternion [x, y, z, w] rotating device coordinates into the reference frame. */
+export type OrientationQuaternion = [number, number, number, number];
+
+export type DeviceOrientationReading = {
+  alpha: number | null;
+  beta: number | null;
+  gamma: number | null;
+  webkitCompassHeading?: number;
+  absoluteQuaternion?: OrientationQuaternion | null;
+};
+
+export type CameraPointingSource =
+  "absolute-sensor" | "webkit-compass" | "tilt-only" | "unavailable";
+
+export type CameraPointing = {
+  azimuth: number | null;
+  altitude: number | null;
+  roll: number | null;
+  quaternion: OrientationQuaternion | null;
+  basis: CameraBasis | null;
+  screenAngle: number;
+  source: CameraPointingSource;
+};
+
+const ZENITH: Vector3 = { x: 0, y: 0, z: 1 };
+const QUATERNION_EPSILON = 1e-8;
+
 export function normalizeAngle(angle: number): number {
   return ((angle % 360) + 360) % 360;
+}
+
+export function normalizeScreenAngle(angle: number): number {
+  if (!Number.isFinite(angle)) return 0;
+  return normalizeAngle(Math.round(angle / 90) * 90);
 }
 
 export function angleDifference(current: number, target: number): number {
@@ -29,70 +61,75 @@ export function azimuthToCardinal(azimuth: number): string {
     "Ouest",
     "Nord-Ouest",
   ];
-  const index = Math.round(normalizeAngle(azimuth) / 45) % directions.length;
-  return directions[index];
+  return directions[Math.round(normalizeAngle(azimuth) / 45) % directions.length];
 }
 
 export function betaToCameraAltitude(beta: number): number {
   return Math.max(-90, Math.min(90, beta - 90));
 }
 
-export type DeviceOrientationReading = {
-  alpha: number | null;
-  beta: number | null;
-  gamma: number | null;
-  webkitCompassHeading?: number;
-  absoluteQuaternion?: [number, number, number, number] | null; // [x, y, z, w]
-};
-
-export type CameraPointing = {
-  azimuth: number | null;
-  altitude: number | null;
-  source: "absolute-sensor" | "webkit-compass" | "tilt-only" | "unavailable";
-};
-
-type Vector3 = [number, number, number];
-
-type FullOrientationReading = {
-  alpha: number;
-  beta: number;
-  gamma: number;
-};
-
-function degreesToRadians(degrees: number): number {
-  return (degrees * Math.PI) / 180;
-}
-
-function radiansToDegrees(radians: number): number {
-  return (radians * 180) / Math.PI;
-}
-
-function vectorToHorizontal(vector: Vector3): { azimuth: number; altitude: number } | null {
-  const [east, north, up] = vector;
-  const length = Math.hypot(east, north, up);
-  if (length === 0) {
-    return null;
-  }
-  return {
-    azimuth: normalizeAngle(radiansToDegrees(Math.atan2(east, north))),
-    altitude: Math.max(-90, Math.min(90, radiansToDegrees(Math.asin(up / length)))),
-  };
-}
-
-// Bug 1 Fixed: Multiplication by rows (device-to-world) instead of columns
-function deviceToEarthVector(rotation: number[], vector: Vector3): Vector3 {
+export function normalizeQuaternion(quaternion: readonly number[]): OrientationQuaternion | null {
+  if (quaternion.length < 4 || !quaternion.slice(0, 4).every(Number.isFinite)) return null;
+  const length = Math.hypot(quaternion[0], quaternion[1], quaternion[2], quaternion[3]);
+  if (length <= QUATERNION_EPSILON) return null;
   return [
-    rotation[0] * vector[0] + rotation[1] * vector[1] + rotation[2] * vector[2],
-    rotation[3] * vector[0] + rotation[4] * vector[1] + rotation[5] * vector[2],
-    rotation[6] * vector[0] + rotation[7] * vector[1] + rotation[8] * vector[2],
+    quaternion[0] / length,
+    quaternion[1] / length,
+    quaternion[2] / length,
+    quaternion[3] / length,
   ];
 }
 
-function getOrientationRotation(alpha: number, beta: number, gamma: number): number[] {
-  const a = degreesToRadians(alpha);
-  const b = degreesToRadians(beta);
-  const g = degreesToRadians(gamma);
+export function alignQuaternionHemisphere(
+  previous: OrientationQuaternion | null,
+  next: OrientationQuaternion,
+): OrientationQuaternion {
+  if (!previous) return next;
+  const dot = previous.reduce((sum, value, index) => sum + value * next[index], 0);
+  return dot < 0 ? (next.map((value) => -value) as OrientationQuaternion) : next;
+}
 
+function rotateVectorByQuaternion(quaternion: OrientationQuaternion, vector: Vector3): Vector3 {
+  const [x, y, z, w] = quaternion;
+  return {
+    x:
+      (1 - 2 * (y * y + z * z)) * vector.x +
+      2 * (x * y - w * z) * vector.y +
+      2 * (x * z + w * y) * vector.z,
+    y:
+      2 * (x * y + w * z) * vector.x +
+      (1 - 2 * (x * x + z * z)) * vector.y +
+      2 * (y * z - w * x) * vector.z,
+    z:
+      2 * (x * z - w * y) * vector.x +
+      2 * (y * z + w * x) * vector.y +
+      (1 - 2 * (x * x + y * y)) * vector.z,
+  };
+}
+
+function basisFromQuaternion(
+  quaternion: OrientationQuaternion,
+  confidence: CameraConfidence,
+): CameraBasis | null {
+  // W3C device axes: +X right, +Y toward the natural top, +Z out of the screen.
+  // The rear camera therefore looks along -Z before the screen rotation is applied.
+  return normalizeCameraBasis({
+    forward: rotateVectorByQuaternion(quaternion, { x: 0, y: 0, z: -1 }),
+    right: rotateVectorByQuaternion(quaternion, { x: 1, y: 0, z: 0 }),
+    up: rotateVectorByQuaternion(quaternion, { x: 0, y: 1, z: 0 }),
+    confidence,
+  });
+}
+
+function deviceOrientationBasis(
+  alpha: number,
+  beta: number,
+  gamma: number,
+  confidence: CameraConfidence,
+): CameraBasis | null {
+  const a = (alpha * Math.PI) / 180;
+  const b = (beta * Math.PI) / 180;
+  const g = (gamma * Math.PI) / 180;
   const cA = Math.cos(a);
   const sA = Math.sin(a);
   const cB = Math.cos(b);
@@ -100,9 +137,8 @@ function getOrientationRotation(alpha: number, beta: number, gamma: number): num
   const cG = Math.cos(g);
   const sG = Math.sin(g);
 
-  // DeviceOrientation defines intrinsic Z-X'-Y'' rotations.
-  // This matrix is device-to-world according to W3C spec.
-  return [
+  // DeviceOrientation uses intrinsic Z-X'-Y'' rotations. Rows map device to local ENU.
+  const rotation = [
     cA * cG - sA * sB * sG,
     -cB * sA,
     cA * sG + cG * sA * sB,
@@ -113,94 +149,122 @@ function getOrientationRotation(alpha: number, beta: number, gamma: number): num
     sB,
     cB * cG,
   ];
+  const transform = (vector: Vector3): Vector3 => ({
+    x: rotation[0] * vector.x + rotation[1] * vector.y + rotation[2] * vector.z,
+    y: rotation[3] * vector.x + rotation[4] * vector.y + rotation[5] * vector.z,
+    z: rotation[6] * vector.x + rotation[7] * vector.y + rotation[8] * vector.z,
+  });
+  return normalizeCameraBasis({
+    forward: transform({ x: 0, y: 0, z: -1 }),
+    right: transform({ x: 1, y: 0, z: 0 }),
+    up: transform({ x: 0, y: 1, z: 0 }),
+    confidence,
+  });
 }
 
-function getBackCameraHorizontal(reading: FullOrientationReading): {
-  camera: { azimuth: number; altitude: number } | null;
-  top: { azimuth: number; altitude: number } | null;
-} {
-  const rotation = getOrientationRotation(reading.alpha, reading.beta, reading.gamma);
+function rotateBasisAroundZenith(basis: CameraBasis, angleDegrees: number): CameraBasis {
   return {
-    camera: vectorToHorizontal(deviceToEarthVector(rotation, [0, 0, -1])),
-    top: vectorToHorizontal(deviceToEarthVector(rotation, [0, 1, 0])),
+    ...basis,
+    forward: rotateVectorAroundAxis(basis.forward, ZENITH, angleDegrees),
+    right: rotateVectorAroundAxis(basis.right, ZENITH, angleDegrees),
+    up: rotateVectorAroundAxis(basis.up, ZENITH, angleDegrees),
   };
 }
 
-// Helper for quaternion rotation: q * v * q_conjugate
-function quaternionToVector(q: [number, number, number, number], v: Vector3): Vector3 {
-  const [x, y, z, w] = q;
-  const [vx, vy, vz] = v;
-
-  return [
-    (1 - 2 * (y * y + z * z)) * vx + 2 * (x * y - w * z) * vy + 2 * (x * z + w * y) * vz,
-    2 * (x * y + w * z) * vx + (1 - 2 * (x * x + z * z)) * vy + 2 * (y * z - w * x) * vz,
-    2 * (x * z - w * y) * vx + 2 * (y * z + w * x) * vy + (1 - 2 * (x * x + y * y)) * vz,
-  ];
+function pointingFromBasis({
+  basis,
+  source,
+  screenAngle,
+  quaternion,
+  hasAbsoluteNorth,
+}: {
+  basis: CameraBasis;
+  source: CameraPointingSource;
+  screenAngle: number;
+  quaternion: OrientationQuaternion | null;
+  hasAbsoluteNorth: boolean;
+}): CameraPointing {
+  const horizontal = vectorToHorizontalCoordinates(basis.forward);
+  return {
+    azimuth: hasAbsoluteNorth ? (horizontal?.azimuth ?? null) : null,
+    altitude: horizontal?.altitude ?? null,
+    roll: calculateCameraRoll(basis),
+    quaternion,
+    basis,
+    screenAngle,
+    source,
+  };
 }
 
-export function getCameraPointing(reading: DeviceOrientationReading): CameraPointing {
-  // PRIORITÉ 1 — AbsoluteOrientationSensor (quaternion absolu)
-  if (reading.absoluteQuaternion) {
-    const q = reading.absoluteQuaternion;
-    // Le vecteur "caméra arrière" dans le repère device est [0, 0, -1]
-    const cameraWorldVector = quaternionToVector(q, [0, 0, -1]);
-    const horizontal = vectorToHorizontal(cameraWorldVector);
-
-    if (horizontal) {
-      return {
-        azimuth: horizontal.azimuth,
-        altitude: horizontal.altitude,
+export function getCameraPointing(
+  reading: DeviceOrientationReading,
+  rawScreenAngle = 0,
+): CameraPointing {
+  const screenAngle = normalizeScreenAngle(rawScreenAngle);
+  const quaternion = reading.absoluteQuaternion
+    ? normalizeQuaternion(reading.absoluteQuaternion)
+    : null;
+  if (quaternion) {
+    const deviceBasis = basisFromQuaternion(quaternion, "high");
+    if (deviceBasis) {
+      return pointingFromBasis({
+        basis: rotateBasisForScreenOrientation(deviceBasis, screenAngle),
         source: "absolute-sensor",
-      };
+        screenAngle,
+        quaternion,
+        hasAbsoluteNorth: true,
+      });
     }
   }
 
-  // FALLBACK — deviceorientation + webkitCompassHeading direct
+  const hasCompleteAngles = [reading.alpha, reading.beta, reading.gamma].every(
+    (value) => typeof value === "number" && Number.isFinite(value),
+  );
   const compassHeading =
-    typeof reading.webkitCompassHeading === "number"
+    typeof reading.webkitCompassHeading === "number" &&
+    Number.isFinite(reading.webkitCompassHeading)
       ? normalizeAngle(reading.webkitCompassHeading)
       : null;
 
-  if (
-    typeof reading.alpha === "number" &&
-    typeof reading.beta === "number" &&
-    typeof reading.gamma === "number"
-  ) {
-    const horizontal = getBackCameraHorizontal({
-      alpha: reading.alpha,
-      beta: reading.beta,
-      gamma: reading.gamma,
-    });
-
-    if (horizontal.camera) {
-      // On utilise la boussole directe uniquement quand le téléphone est quasi-vertical
-      // (beta entre 45° et 135°) pour éviter les sauts angulaires
-      const isQuasiVertical = reading.beta > 45 && reading.beta < 135;
-
-      if (compassHeading !== null && isQuasiVertical) {
-        // Safari fournit déjà le cap réel de l'appareil par rapport au nord magnétique.
-        // Ajouter 180° inverserait entièrement le guidage Est/Ouest.
-        return {
-          azimuth: compassHeading,
-          altitude: horizontal.camera.altitude,
-          source: "webkit-compass",
-        };
+  if (hasCompleteAngles) {
+    const alpha = reading.alpha as number;
+    const beta = reading.beta as number;
+    const gamma = reading.gamma as number;
+    let basis = deviceOrientationBasis(
+      alpha,
+      beta,
+      gamma,
+      compassHeading === null ? "low" : "medium",
+    );
+    if (basis) {
+      const horizontal = vectorToHorizontalCoordinates(basis.forward);
+      const isQuasiVertical = beta > 45 && beta < 135;
+      const useCompass = compassHeading !== null && isQuasiVertical && horizontal !== null;
+      if (useCompass && horizontal) {
+        basis = rotateBasisAroundZenith(
+          basis,
+          -angleDifference(horizontal.azimuth, compassHeading),
+        );
       }
-
-      // Sinon, fallback "tilt-only" (azimuth null pour éviter les sauts)
-      return {
-        azimuth: null,
-        altitude: horizontal.camera.altitude,
-        source: "tilt-only",
-      };
+      basis = rotateBasisForScreenOrientation(basis, screenAngle);
+      return pointingFromBasis({
+        basis,
+        source: useCompass ? "webkit-compass" : "tilt-only",
+        screenAngle,
+        quaternion: null,
+        hasAbsoluteNorth: useCompass,
+      });
     }
   }
 
-  // Fallback ultime si seulement beta est dispo
-  if (typeof reading.beta === "number") {
+  if (typeof reading.beta === "number" && Number.isFinite(reading.beta)) {
     return {
       azimuth: null,
       altitude: betaToCameraAltitude(reading.beta),
+      roll: null,
+      quaternion: null,
+      basis: null,
+      screenAngle,
       source: "tilt-only",
     };
   }
@@ -208,28 +272,48 @@ export function getCameraPointing(reading: DeviceOrientationReading): CameraPoin
   return {
     azimuth: null,
     altitude: null,
+    roll: null,
+    quaternion: null,
+    basis: null,
+    screenAngle,
     source: "unavailable",
   };
 }
 
+export function smoothCameraPointing(
+  previous: CameraPointing | null,
+  next: CameraPointing,
+): CameraPointing {
+  if (!previous || previous.source !== next.source) return next;
+  const quaternion = next.quaternion
+    ? alignQuaternionHemisphere(previous.quaternion, next.quaternion)
+    : null;
+  if (previous.basis && next.basis) {
+    const basis = smoothCameraBasis(previous.basis, next.basis);
+    return pointingFromBasis({
+      basis,
+      source: next.source,
+      screenAngle: next.screenAngle,
+      quaternion,
+      hasAbsoluteNorth: next.azimuth !== null,
+    });
+  }
+  if (next.altitude !== null && previous.altitude !== null) {
+    return { ...next, altitude: previous.altitude + (next.altitude - previous.altitude) * 0.2 };
+  }
+  return { ...next, quaternion };
+}
+
 export function getDirectionHint(currentAzimuth: number, targetAzimuth: number): string {
   const diff = angleDifference(currentAzimuth, targetAzimuth);
-  if (diff > 15) {
-    return "Tourne à droite";
-  }
-  if (diff < -15) {
-    return "Tourne à gauche";
-  }
-  return "Bonne direction";
+  return diff > 15 ? "Tourne à droite" : diff < -15 ? "Tourne à gauche" : "Bonne direction";
 }
 
 export function getAltitudeHint(currentPitch: number, targetAltitude: number): string {
   const diff = targetAltitude - currentPitch;
-  if (diff > 10) {
-    return "Lève un peu le téléphone";
-  }
-  if (diff < -10) {
-    return "Baisse un peu le téléphone";
-  }
-  return "Hauteur proche";
+  return diff > 10
+    ? "Lève un peu le téléphone"
+    : diff < -10
+      ? "Baisse un peu le téléphone"
+      : "Hauteur proche";
 }

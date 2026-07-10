@@ -67,6 +67,20 @@ export function normalizeVector(vector: Vector3): Vector3 | null {
   return length > EPSILON ? scaleVector(vector, 1 / length) : null;
 }
 
+export function normalizeCameraBasis(basis: CameraBasis): CameraBasis | null {
+  const forward = normalizeVector(basis.forward);
+  if (!forward) return null;
+  const rightWithoutForward = addVectors(
+    basis.right,
+    scaleVector(forward, -dotProduct(basis.right, forward)),
+  );
+  const right = normalizeVector(rightWithoutForward);
+  if (!right) return null;
+  const up = normalizeVector(crossProduct(right, forward));
+  if (!up) return null;
+  return { forward, right, up, confidence: basis.confidence };
+}
+
 export function horizontalCoordinatesToVector(azimuth: number, altitude: number): Vector3 {
   const azimuthRadians = (azimuth * Math.PI) / 180;
   const altitudeRadians = (altitude * Math.PI) / 180;
@@ -78,6 +92,25 @@ export function horizontalCoordinatesToVector(azimuth: number, altitude: number)
     y: horizontal * Math.cos(azimuthRadians),
     z: Math.sin(altitudeRadians),
   };
+}
+
+export function resolveCameraBasis({
+  basis,
+  azimuth,
+  altitude,
+  confidence,
+}: {
+  basis: CameraBasis | null;
+  azimuth: number | null;
+  altitude: number | null;
+  confidence: CameraConfidence;
+}): CameraBasis | null {
+  if (basis) return basis;
+  if (azimuth === null || altitude === null) return null;
+  const forward = horizontalCoordinatesToVector(azimuth, altitude);
+  const right = normalizeVector(crossProduct(forward, { x: 0, y: 0, z: 1 }));
+  const up = right ? normalizeVector(crossProduct(right, forward)) : null;
+  return right && up ? { forward, right, up, confidence } : null;
 }
 
 export function vectorToHorizontalCoordinates(
@@ -277,5 +310,5 @@ export function smoothCameraBasis(previous: CameraBasis | null, next: CameraBasi
   const up = normalizeVector(crossProduct(tentativeRight, forward)) ?? next.up;
   const right = normalizeVector(crossProduct(forward, up)) ?? next.right;
 
-  return { forward, right, up, confidence: next.confidence };
+  return normalizeCameraBasis({ forward, right, up, confidence: next.confidence }) ?? next;
 }

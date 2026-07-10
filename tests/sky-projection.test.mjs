@@ -8,6 +8,7 @@ import {
   projectHorizontalTarget,
   rotateBasisForScreenOrientation,
   rotateVectorAroundAxis,
+  resolveCameraBasis,
   smoothCameraBasis,
   vectorToHorizontalCoordinates,
 } from "../lib/sky-projection.ts";
@@ -81,6 +82,37 @@ test("camera roll and portrait/landscape rotation preserve an orthogonal basis",
   const landscape = rotateBasisForScreenOrientation(basis, 90);
   assert.ok(Math.abs(landscape.right.z - 1) < 1e-8);
   assert.ok(Math.abs(landscape.up.x + 1) < 1e-8);
+});
+
+test("overlay basis resolution preserves supplied roll instead of rebuilding level axes", () => {
+  const rolled = {
+    ...basis,
+    right: rotateVectorAroundAxis(basis.right, basis.forward, 30),
+    up: rotateVectorAroundAxis(basis.up, basis.forward, 30),
+  };
+  const resolved = resolveCameraBasis({
+    basis: rolled,
+    azimuth: 0,
+    altitude: 0,
+    confidence: "high",
+  });
+  assert.equal(resolved, rolled);
+  assert.ok(Math.abs(calculateCameraRoll(resolved) - 30) < 1e-8);
+});
+
+test("rolled camera rotates the visual right/up projection while retaining handedness", () => {
+  const target = horizontalCoordinatesToVector(10, 10);
+  const level = projectHorizontalTarget({ target, basis, ...viewport });
+  const rolledBasis = {
+    ...basis,
+    right: rotateVectorAroundAxis(basis.right, basis.forward, 30),
+    up: rotateVectorAroundAxis(basis.up, basis.forward, 30),
+  };
+  const rolled = projectHorizontalTarget({ target, basis: rolledBasis, ...viewport });
+  assert.ok(level && rolled);
+  assert.ok(level.x > 200 && level.y < 400);
+  assert.ok(rolled.x > 200);
+  assert.ok(Math.abs(rolled.x - level.x) > 1 && Math.abs(rolled.y - level.y) > 1);
 });
 
 test("object-fit cover keeps source center at viewport center", () => {

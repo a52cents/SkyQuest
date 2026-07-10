@@ -6,12 +6,9 @@ import { getSkyFigure } from "@/lib/constellation-figures";
 import { meteorShowers } from "@/lib/meteor-showers";
 import type { CameraPointing } from "@/lib/orientation";
 import {
-  crossProduct,
   horizontalCoordinatesToVector,
-  normalizeVector,
   projectHorizontalTarget,
-  smoothCameraBasis,
-  type CameraBasis,
+  resolveCameraBasis,
   type ScreenProjection,
   type Vector3,
 } from "@/lib/sky-projection";
@@ -287,7 +284,6 @@ export function SkyOverlay({
   const sceneRef = useRef<OverlayScene | null>(null);
   const zoomRef = useRef(zoom);
   const enabledRef = useRef(enabled);
-  const smoothedBasisRef = useRef<CameraBasis | null>(null);
 
   useEffect(() => {
     zoomRef.current = zoom;
@@ -345,21 +341,18 @@ export function SkyOverlay({
         pointing.altitude !== null &&
         scene
       ) {
-        const forward = horizontalCoordinatesToVector(pointing.azimuth, pointing.altitude);
-        const right = normalizeVector(crossProduct(forward, { x: 0, y: 0, z: 1 }));
-        const up = right ? normalizeVector(crossProduct(right, forward)) : null;
-        if (!right || !up) {
+        // Full sensor poses retain the real video roll. The level basis is only a safe
+        // compatibility fallback for callers that still provide azimuth/altitude alone.
+        const basis = resolveCameraBasis({
+          basis: pointing.basis,
+          azimuth: pointing.azimuth,
+          altitude: pointing.altitude,
+          confidence: pointing.source === "absolute-sensor" ? "high" : "medium",
+        });
+        if (!basis) {
           rafId = window.requestAnimationFrame(render);
           return;
         }
-        const nextBasis: CameraBasis = {
-          forward,
-          right,
-          up,
-          confidence: pointing.source === "absolute-sensor" ? "high" : "medium",
-        };
-        const basis = smoothCameraBasis(smoothedBasisRef.current, nextBasis);
-        smoothedBasisRef.current = basis;
         const video = videoRef.current;
         const projections = new Map<string, ScreenProjection>();
         for (const point of scene.points) {
@@ -385,7 +378,6 @@ export function SkyOverlay({
     return () => {
       window.cancelAnimationFrame(rafId);
       observer.disconnect();
-      smoothedBasisRef.current = null;
     };
   }, [orientationRef, videoRef]);
 
